@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="app.title">LogSystem - Connexion</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="login-hero">
+
+  <button type="button" class="lang-toggle-btn" id="lang-toggle-btn" aria-label="Changer la langue">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M2 12h20"/>
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+    </svg>
+    <span id="lang-text">FR</span>
+  </button>
+
+  <div id="brand-title">
+    <img class="brand-logo" src="/image/coleps.png" alt="Coleps"
+         style="height:72px;width:auto;object-fit:contain;margin-bottom:10px;
+                filter:drop-shadow(0 2px 8px rgba(0,0,0,0.4));">
+    <h1 data-i18n="app.brand">LogSystem</h1>
+    <p data-i18n="login.platform">Plateforme de gestion des logs</p>
+  </div>
+
+  <button type="button" class="login-toggle-btn" id="login-toggle-btn">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+      <polyline points="10,17 15,12 10,7"/>
+      <line x1="15" y1="12" x2="3" y2="12"/>
+    </svg>
+    <span data-i18n="login.open">Connexion</span>
+  </button>
+
+  <div class="login-overlay" id="login-overlay" role="dialog" aria-modal="true" aria-labelledby="login-dialog-title">
+    <div class="login-page">
+      <div class="login-card">
+        <div class="login-card-header">
+          <div></div>
+          <button type="button" class="close-btn" id="close-login" aria-label="Fermer">×</button>
+        </div>
+        <h1 id="login-dialog-title" data-i18n="login.title">Connexion</h1>
+        <p class="subtitle" data-i18n="login.subtitle">Connectez-vous à votre espace</p>
+
+        <div class="login-error" id="login-error"></div>
+
+        <form id="login-form" autocomplete="on">
+          <div class="form-group">
+            <label for="email" data-i18n="login.email">Adresse email</label>
+            <div class="input-icon-wrapper">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+              <input type="email" id="email" name="email" required autocomplete="email" data-i18n-placeholder="login.email">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="password" data-i18n="login.password">Mot de passe</label>
+            <div class="input-icon-wrapper">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <input type="password" id="password" name="password" required autocomplete="current-password" data-i18n-placeholder="login.password">
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary login-btn" id="login-btn" data-i18n="login.btn">Se connecter</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container"></div>
+
+  <script src="/api.js"></script>
+  <script src="/i18n.js"></script>
+  <script src="/login-page.js"></script>
+</body>
+</html>

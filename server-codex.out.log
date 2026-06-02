@@ -1,0 +1,2862 @@
+[DB] MySQL connection successful
+[DB POOL] Initial stats: {
+  activeConnections: 1,
+  queuedRequests: 0,
+  totalAcquired: 1,
+  totalReleased: 0
+}
+{"level":40,"time":1779807971167,"pid":22156,"hostname":"YANN-pc","msg":"[CACHE] Redis not available — running without cache (degraded mode)"}
+[ALERT] Starting alert engine (event-driven)
+[ALERT] Safety interval set to 60000ms
+[RETENTION] Next run in 654 minutes
+[WATCHER] Loaded 2 persisted offsets from database
+[WATCHER] Watching: ./logs
+{"level":30,"time":1779807971186,"pid":22156,"hostname":"YANN-pc","level":"info","message":"[LOGSYSTEM V4] Running on http://localhost:3001"}
+{"level":30,"time":1779807971186,"pid":22156,"hostname":"YANN-pc","level":"info","message":"[LOGSYSTEM V4] Environment: development"}
+{"level":30,"time":1779807971186,"pid":22156,"hostname":"YANN-pc","level":"info","message":"[LOGSYSTEM V4] Cache: désactivé"}
+[IMPORT] Format détecté: json pour: codex-watchlog-test.json
+[IMPORT] 1 lignes parsées pour job f3d5705b-9a15-4922-8e27-9f428b65ce5e
+[SSE] log_batch broadcasted to 1 clients (user_id: 2)
+[IMPORT] Job f3d5705b-9a15-4922-8e27-9f428b65ce5e terminé: {
+  total: 1,
+  inserted: 1,
+  skipped: 0,
+  missing_user: 1,
+  missing_module: 1,
+  missing_timestamp: 0,
+  errors: 0
+}
+[ALERT] logs.inserted event for user 2 (1 logs), debouncing evaluation...
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 22ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[SSE] Alert 16 broadcasted to 1 clients (user_id: 2)
+[ALERT] Rule 6 (Fatal détecté) triggered: Level FATAL detected 2 times in last 60min
+[ALERT] Evaluated 3 rules for user 2, created 1 alerts in 39ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Alert deduped - rule 6, user 2
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 18ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 30ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Alert deduped - rule 6, user 2
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[SSE] Alert 17 broadcasted to 0 clients (user_id: 1)
+[ALERT] Rule 3 (Fatal détecté) triggered: Level FATAL detected 6 times in last 60min
+[ALERT] Evaluated 3 rules for user 1, created 1 alerts in 16ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Alert deduped - rule 6, user 2
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 37ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 19ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 20ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 1ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 33ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 29ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 27ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 35ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 34ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 17ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 33ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 42ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 29ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 37ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[SSE] Alert 18 broadcasted to 1 clients (user_id: 1)
+[ALERT] Rule 3 (Fatal détecté) triggered: Level FATAL detected 6 times in last 60min
+[ALERT] Evaluated 3 rules for user 1, created 1 alerts in 44ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 29ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 15ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 33ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 30ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 10ms
+{"level":50,"time":1779809341152,"pid":22156,"hostname":"YANN-pc","msg":"[ERROR]"}
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+{"level":50,"time":1779809355554,"pid":22156,"hostname":"YANN-pc","msg":"[ERROR]"}
+{"level":50,"time":1779809381751,"pid":22156,"hostname":"YANN-pc","msg":"[ERROR]"}
+[IMPORT] Format détecté: text pour: mixed_logs.txt
+[IMPORT] 100 lignes parsées pour job 5199792b-8de2-4e6e-9f0c-0f52febc5257
+[SSE] log_batch broadcasted to 0 clients (user_id: 1)
+[IMPORT] Job 5199792b-8de2-4e6e-9f0c-0f52febc5257 terminé: {
+  total: 100,
+  inserted: 100,
+  skipped: 0,
+  missing_user: 100,
+  missing_module: 100,
+  missing_timestamp: 0,
+  errors: 0
+}
+[ALERT] logs.inserted event for user 1 (100 logs), debouncing evaluation...
+[ALERT] Starting evaluation for user 1 - 3 rules
+[SSE] Alert 19 broadcasted to 0 clients (user_id: 1)
+[ALERT] Rule 1 (Erreurs critiques) triggered: Level ERROR detected 19 times in last 60min
+[SSE] Alert 20 broadcasted to 0 clients (user_id: 1)
+[ALERT] Rule 3 (Fatal détecté) triggered: Level FATAL detected 14 times in last 60min
+[ALERT] Evaluated 3 rules for user 1, created 2 alerts in 54ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 28ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 15ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 33ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 20ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 19ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 26ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 52ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 44ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 40ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 23ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 31ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 29ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 36ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 24ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 23ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 29ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 24ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[SSE] Alert 21 broadcasted to 0 clients (user_id: 1)
+[ALERT] Rule 3 (Fatal détecté) triggered: Level FATAL detected 14 times in last 60min
+[ALERT] Evaluated 3 rules for user 1, created 1 alerts in 51ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 29ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 36ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 28ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 33ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 17ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 1ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[SSE] Alert 22 broadcasted to 0 clients (user_id: 1)
+[ALERT] Rule 1 (Erreurs critiques) triggered: Level ERROR detected 18 times in last 60min
+[SSE] Alert 23 broadcasted to 0 clients (user_id: 1)
+[ALERT] Rule 3 (Fatal détecté) triggered: Level FATAL detected 12 times in last 60min
+[ALERT] Evaluated 3 rules for user 1, created 2 alerts in 48ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 1ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[SSE] Alert 24 broadcasted to 0 clients (user_id: 1)
+[ALERT] Rule 1 (Erreurs critiques) triggered: Level ERROR detected 14 times in last 60min
+[SSE] Alert 25 broadcasted to 0 clients (user_id: 1)
+[ALERT] Rule 3 (Fatal détecté) triggered: Level FATAL detected 8 times in last 60min
+[ALERT] Evaluated 3 rules for user 1, created 2 alerts in 28ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 20ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 27ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 18ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 18ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Alert deduped - rule 1, user 1
+[ALERT] Alert deduped - rule 3, user 1
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 21ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 21ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 336ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 258ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 18ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 43ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 15ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 40ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 19ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 50ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 16ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 28ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 19ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 56ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 24ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 22ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 40ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 20ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 29ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 48ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 30ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 26ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 21ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 20ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 1ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 16ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 17ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 1ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 15ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 19ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 15ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 1ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 21ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 19ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 1ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 19ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 17ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 21ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 34ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[RETENTION] Completed: {"DEBUG":{"days":7,"deleted":0},"INFO":{"days":30,"deleted":0},"WARNING":{"days":60,"deleted":0},"ERROR":{"days":90,"deleted":0},"CRITICAL":{"days":180,"deleted":0},"FATAL":{"days":365,"deleted":0},"orphan_error_groups":1,"read_alerts":0}
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 17ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 15ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 63ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 1ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 15ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 1ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 16ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 1ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 20ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 18ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 21ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 16ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 19ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 18ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 19ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 21ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 18ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 21ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 20ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 26ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 17ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 37ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 17ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 17ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 1ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 16ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 15ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 16ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 21ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 15ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 15ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 15ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 1ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 25ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 19ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 18ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 19ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 20ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 24ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 15ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 15ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 24ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 20ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 15ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 17ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 22ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 27ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 50ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 69ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 21ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 1ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 2ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 1ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 24ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 24ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 33ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 9ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 4 - 3 rules
+[ALERT] Evaluated 3 rules for user 4, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 5 - 3 rules
+[ALERT] Evaluated 3 rules for user 5, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 4 - 3 rules
+[ALERT] Evaluated 3 rules for user 4, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 5 - 3 rules
+[ALERT] Evaluated 3 rules for user 5, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 4 - 3 rules
+[ALERT] Evaluated 3 rules for user 4, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 5 - 3 rules
+[ALERT] Evaluated 3 rules for user 5, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 4 - 3 rules
+[ALERT] Evaluated 3 rules for user 4, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 5 - 3 rules
+[ALERT] Evaluated 3 rules for user 5, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 4 - 3 rules
+[ALERT] Evaluated 3 rules for user 4, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 5 - 3 rules
+[ALERT] Evaluated 3 rules for user 5, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 4 - 3 rules
+[ALERT] Evaluated 3 rules for user 4, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 5 - 3 rules
+[ALERT] Evaluated 3 rules for user 5, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 4 - 3 rules
+[ALERT] Evaluated 3 rules for user 4, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 5 - 3 rules
+[ALERT] Evaluated 3 rules for user 5, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 4 - 3 rules
+[ALERT] Evaluated 3 rules for user 4, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 5 - 3 rules
+[ALERT] Evaluated 3 rules for user 5, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 8ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 4 - 3 rules
+[ALERT] Evaluated 3 rules for user 4, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 5 - 3 rules
+[ALERT] Evaluated 3 rules for user 5, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 4 - 3 rules
+[ALERT] Evaluated 3 rules for user 4, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 5 - 3 rules
+[ALERT] Evaluated 3 rules for user 5, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 4 - 3 rules
+[ALERT] Evaluated 3 rules for user 4, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 5 - 3 rules
+[ALERT] Evaluated 3 rules for user 5, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 4 - 3 rules
+[ALERT] Evaluated 3 rules for user 4, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 5 - 3 rules
+[ALERT] Evaluated 3 rules for user 5, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 4 - 3 rules
+[ALERT] Evaluated 3 rules for user 4, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 5 - 3 rules
+[ALERT] Evaluated 3 rules for user 5, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 10ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 4 - 3 rules
+[ALERT] Evaluated 3 rules for user 4, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 5 - 3 rules
+[ALERT] Evaluated 3 rules for user 5, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 4 - 3 rules
+[ALERT] Evaluated 3 rules for user 4, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 5 - 3 rules
+[ALERT] Evaluated 3 rules for user 5, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 4 - 3 rules
+[ALERT] Evaluated 3 rules for user 4, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 5 - 3 rules
+[ALERT] Evaluated 3 rules for user 5, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 14ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 7ms
+[ALERT] Starting evaluation for user 4 - 3 rules
+[ALERT] Evaluated 3 rules for user 4, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 5 - 3 rules
+[ALERT] Evaluated 3 rules for user 5, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 13ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 4 - 3 rules
+[ALERT] Evaluated 3 rules for user 4, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 5 - 3 rules
+[ALERT] Evaluated 3 rules for user 5, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 12ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 4 - 3 rules
+[ALERT] Evaluated 3 rules for user 4, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 5 - 3 rules
+[ALERT] Evaluated 3 rules for user 5, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 4 - 3 rules
+[ALERT] Evaluated 3 rules for user 4, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 5 - 3 rules
+[ALERT] Evaluated 3 rules for user 5, created 0 alerts in 6ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 11ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 4 - 3 rules
+[ALERT] Evaluated 3 rules for user 4, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 5 - 3 rules
+[ALERT] Evaluated 3 rules for user 5, created 0 alerts in 3ms
+[ALERT] Starting evaluation for user 1 - 3 rules
+[ALERT] Evaluated 3 rules for user 1, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 2 - 3 rules
+[ALERT] Evaluated 3 rules for user 2, created 0 alerts in 4ms
+[ALERT] Starting evaluation for user 4 - 3 rules
+[ALERT] Evaluated 3 rules for user 4, created 0 alerts in 5ms
+[ALERT] Starting evaluation for user 5 - 3 rules
+[ALERT] Evaluated 3 rules for user 5, created 0 alerts in 4ms

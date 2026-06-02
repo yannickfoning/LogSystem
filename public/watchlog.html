@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Watch Log - LogSystem</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/watchlog.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="brand">
+      <img src="/image/coleps.png" alt="Coleps"
+           style="height:36px;width:auto;object-fit:contain;border-radius:4px;">
+      <span>LogSystem</span>
+    </div>
+    <ul class="nav-links">
+      <li><a href="/dashboard.html" data-i18n="nav.dashboard">Tableau de bord</a></li>
+      <li><a href="/search.html" data-i18n="nav.search">Recherche</a></li>
+      <li><a href="/import.html" data-i18n="nav.import">Import</a></li>
+      <li><a href="/watchlog.html" class="active" data-i18n="nav.watchlog">Watch Log</a></li>
+      <li><a href="/admin.html" id="admin-link" data-i18n="nav.admin">Administration</a></li>
+    </ul>
+    <div class="nav-right">
+      <a href="#" id="lang-toggle" class="lang-toggle-link">EN</a>
+      <span class="user-info" id="user-info"></span>
+      <a href="#" id="logout-btn" class="btn btn-xs btn-secondary">Déconnexion</a>
+    </div>
+  </nav>
+  <div class="watch-container">
+    <!-- Header -->
+    <div class="watch-header">
+      <div class="header-title">
+        <i class="fas fa-eye"></i>
+        <span data-i18n="watchlog.title">Watch Log — Monitoring Temps Réel</span>
+        <div class="status-indicator"></div>
+      </div>
+      <div class="controls">
+        <button class="btn-small btn-primary" id="btnPause" data-i18n="watchlog.pause">
+          <i class="fas fa-pause"></i> Pause
+        </button>
+        <button class="btn-small btn-secondary" id="btnClear" data-i18n="watchlog.clear">
+          <i class="fas fa-trash"></i> Effacer
+        </button>
+        <button class="btn-small btn-secondary" id="btnExport" data-i18n="watchlog.export">
+          <i class="fas fa-download"></i> Exporter
+        </button>
+        <button class="btn-small btn-danger" id="btnDisconnect" data-i18n="watchlog.disconnect">
+          <i class="fas fa-times"></i> Déconnecter
+        </button>
+      </div>
+    </div>
+
+    <!-- Metrics -->
+    <div class="watch-metrics">
+      <div class="metric-card">
+        <div class="metric-label" data-i18n="watchlog.metric.logs_min">Logs/min</div>
+        <div class="metric-value" id="metricsLogsPerMin">0</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label" data-i18n="watchlog.metric.errors">Erreurs</div>
+        <div class="metric-value" id="metricsErrors">0</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label" data-i18n="watchlog.metric.services">Services</div>
+        <div class="metric-value" id="metricsServices">0</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label" data-i18n="watchlog.metric.error_rate">Taux d'erreur</div>
+        <div class="metric-value" id="metricsErrorRate">0%</div>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="watch-content">
+      <!-- Left: Log Stream -->
+      <div class="log-stream">
+        <div class="stream-header">
+          <div class="stream-title" data-i18n="watchlog.stream.title">
+            <i class="fas fa-stream"></i> Flux en direct
+          </div>
+          <div class="stream-controls">
+            <select class="stream-filter" id="filterLevel">
+              <option value="" data-i18n="watchlog.stream.filter.all">Tous les niveaux</option>
+              <option value="DEBUG">DEBUG</option>
+              <option value="INFO">INFO</option>
+              <option value="WARNING">WARNING</option>
+              <option value="ERROR">ERROR</option>
+              <option value="CRITICAL">CRITICAL</option>
+              <option value="FATAL">FATAL</option>
+            </select>
+            <select class="stream-filter" id="filterService">
+              <option value="" data-i18n="watchlog.stream.filter.services">Tous les services</option>
+            </select>
+          </div>
+        </div>
+        <div class="log-entries" id="logEntries"></div>
+      </div>
+
+      <!-- Right Panel -->
+      <div class="right-panel">
+        <!-- AMÉLIORATION 4: Anomalies Alert Panel -->
+        <div class="panel-card" id="anomalyPanel" style="display: none; border-color: #ef4444;">
+          <div class="panel-header" style="background: rgba(239, 68, 68, 0.2); color: #ef4444;">
+            <i class="fas fa-exclamation-triangle"></i> Anomalies Détectées
+            <span class="badge" style="background: #ef4444; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px;">⚠️</span>
+          </div>
+          <div class="panel-body">
+            <div id="anomalyDetails" style="font-size: 12px; line-height: 1.6;">
+              <p id="anomalyText" style="color: #ef4444; margin: 0;"></p>
+              <p id="anomalyStats" style="color: #9ca3af; margin: 8px 0 0; font-size: 11px;"></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Heatmap -->
+        <div class="panel-card">
+          <div class="panel-header" data-i18n="watchlog.panel.heatmap">
+            <i class="fas fa-fire"></i> Heatmap 24h (erreurs par heure)
+          </div>
+          <div class="panel-body">
+            <div class="heatmap" id="heatmap"></div>
+            <div class="heatmap-legend">
+              <span>0:00</span>
+              <span>6:00</span>
+              <span>12:00</span>
+              <span>18:00</span>
+              <span>23:00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Error Distribution -->
+        <div class="panel-card">
+          <div class="panel-header" data-i18n="watchlog.panel.distribution">
+            <i class="fas fa-chart-bar"></i> Répartition par niveau
+          </div>
+          <div class="panel-body">
+            <div class="level-chart" id="levelChart"></div>
+          </div>
+        </div>
+
+        <!-- Top Services -->
+        <div class="panel-card">
+          <div class="panel-header" data-i18n="watchlog.panel.top_services">
+            <i class="fas fa-cogs"></i> Top Services
+          </div>
+          <div class="panel-body">
+            <ul class="service-list" id="serviceList"></ul>
+          </div>
+        </div>
+
+        <!-- FIX BUG-TRENDS-01: Tableau de tendances temps reel similaire au dashboard -->
+        <div class="panel-card">
+          <div class="panel-header" data-i18n="watchlog.panel.trends">
+            <i class="fas fa-chart-line"></i> Tendances par heure (24h)
+            <span id="trends-update-time" style="font-size:10px;color:var(--text2);margin-left:auto"></span>
+          </div>
+          <div class="panel-body" style="padding:8px 0">
+            <div id="hourly-trends-table" style="font-size:11px">
+              <div style="text-align:center;color:var(--text2);padding:12px">Chargement...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Alertes recentes -->
+        <div class="panel-card">
+          <div class="panel-header" data-i18n="watchlog.panel.alerts">
+            <i class="fas fa-bell"></i> Alertes recentes
+            <span id="alert-badge" style="background:var(--accent-red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:6px;display:none">0</span>
+          </div>
+          <div class="panel-body">
+            <ul class="service-list" id="alertsList" style="max-height:180px;overflow-y:auto"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- FIX BUG-WATCH-04: Modal detail log pour watchlog -->
+  <div class="modal-backdrop" id="wl-modal-detail" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center">
+    <div class="modal-box" style="background:var(--surface1,#1e2433);border-radius:12px;padding:24px;max-width:700px;width:95%;max-height:85vh;overflow-y:auto;position:relative">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div class="modal-title" id="wl-modal-title" style="font-size:15px;font-weight:700;color:var(--text1,#f1f5f9)">Detail du log</div>
+        <button onclick="document.getElementById('wl-modal-detail').style.display='none'" style="background:none;border:none;color:var(--text2,#94a3b8);font-size:20px;cursor:pointer;padding:4px 8px">&times;</button>
+      </div>
+      <div id="wl-modal-body" style="color:var(--text1,#f1f5f9)">Chargement...</div>
+    </div>
+  </div>
+
+  <script src="/api.js"></script>
+  <script src="/i18n.js"></script>
+  <script src="/app-common.js"></script>
+  <script>
+    // FIX BUG-XSS-01: Fonctions d'echappement HTML pour prevenir les injections XSS
+    function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+    function escAttr(s){ return esc(s).replace(/'/g,"&#39;"); }
+    document.getElementById('logout-btn').addEventListener('click', function(e) {
+      e.preventDefault();
+      window.logout();
+    });
+
+    const STATE = {
+      paused: false,
+      sessionStartTime: Date.now(),
+      buffer: [],
+      seenLogIds: new Set(),
+      maxBuffer: 500,
+      metrics: {
+        total: 0,
+        errors: 0,
+        services: new Map(),
+        levelCount: { DEBUG: 0, INFO: 0, WARNING: 0, ERROR: 0, CRITICAL: 0, FATAL: 0 },
+        hourlyErrors: new Array(24).fill(0)
+      },
+      filters: {
+        level: '',
+        service: ''
+      }
+    };
+
+    const LEVEL_SEVERITY = { DEBUG: 1, INFO: 2, WARNING: 3, ERROR: 4, CRITICAL: 5, FATAL: 6 };
+    const LEVEL_COLORS = {
+      DEBUG: '#6366f1', INFO: '#0ea5e9', WARNING: '#f59e0b',
+      ERROR: '#ef4444', CRITICAL: '#7c3aed', FATAL: '#991b1b'
+    };
+
+    let eventSource = null;       // pour les logs en direct → /api/alerts/stream
+    let statsSource = null;       // pour les stats/anomalies → /api/logs/watch/stream
+    let liveRefreshTimer = null;
+    let reconnectAttempts = 0;
+    const MAX_RECONNECT_ATTEMPTS = 5;
+    const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+
+    // ─── Connexion SSE #1 : flux de logs et alertes en direct ──────────────
+    // Les logs arrivent via "log" / "log_batch"; les vraies alertes via "alert".
+    function initSSE() {
+      eventSource = new EventSource('/api/alerts/stream');
+
+      eventSource.addEventListener('connected', function() {
+        document.querySelector('.status-indicator').style.background = '#22c55e';
+        reconnectAttempts = 0;
+      });
+
+      eventSource.addEventListener('alert', function(e) {
+        try {
+          var data = JSON.parse(e.data);
+          if (data.event_type === 'log') {
+            // Compat anciennes sessions avant separation des evenements.
+            addLogEntry(data);
+            scheduleLiveRefresh();
+          } else if (data.message && data.severity) {
+            // Vraie alerte système : l'afficher dans le flux ET dans le panneau alertes
+            addLogEntry({
+              timestamp: data.created_at || new Date().toISOString(),
+              log_level: data.severity === 'critical' ? 'CRITICAL' : data.severity === 'high' ? 'ERROR' : 'WARNING',
+              message: '[Alerte] ' + data.message,
+              service: 'alerts',
+              source: 'system'
+            });
+            prependAlertItem(data); // ajout immédiat dans le panneau alertes
+          }
+        } catch (err) {
+          // Ignore malformed alert event
+        }
+      });
+
+      eventSource.addEventListener('log', function(e) {
+        try {
+          addLogEntry(JSON.parse(e.data));
+          scheduleLiveRefresh();
+        } catch (err) {
+          // Ignore malformed log event
+        }
+      });
+
+      eventSource.addEventListener('log_batch', function(e) {
+        try {
+          var data = JSON.parse(e.data);
+          addLogEntries(data.logs || []);
+          scheduleLiveRefresh();
+        } catch (err) {
+          // Ignore malformed batch event
+        }
+      });
+
+      eventSource.addEventListener('heartbeat', function() { /* keep-alive */ });
+
+      eventSource.onerror = function() {
+        document.querySelector('.status-indicator').style.background = '#ef4444';
+        if (eventSource) eventSource.close();
+        if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+          reconnectAttempts++;
+          setTimeout(initSSE, 2000 * reconnectAttempts);
+        }
+      };
+    }
+
+    // ─── Connexion SSE #2 : stats et détection d'anomalies ─────────────────
+    function initStatsSSE() {
+      statsSource = new EventSource('/api/logs/watch/stream');
+
+      statsSource.addEventListener('connected', function() {
+        // Stats stream connected
+      });
+
+      statsSource.addEventListener('stats_update', function(e) {
+        try {
+          var data = JSON.parse(e.data);
+          if (data.stats) updateMetricsFromStats(data.stats);
+        } catch (err) { console.warn('[WatchLog] Stats parse error:', err); }
+      });
+
+      statsSource.addEventListener('anomaly_detected', function(e) {
+        try {
+          var anomaly = JSON.parse(e.data);
+          if (anomaly.anomaly_detected) showAnomalyAlert(anomaly);
+          else hideAnomalyAlert();
+        } catch (err) { console.warn('[WatchLog] Anomaly parse error:', err); }
+      });
+
+      statsSource.onerror = function() {
+        // Reconnexion silencieuse pour les stats
+        if (statsSource) statsSource.close();
+        setTimeout(initStatsSSE, 10000);
+      };
+    }
+
+    // ─── Ajout immédiat d'une alerte dans le panneau "Alertes récentes" ────
+    function prependAlertItem(a) {
+      var list = document.getElementById('alertsList');
+      if (!list) return;
+      // Retirer le message vide s'il existe
+      var empty = list.querySelector('li[data-empty]');
+      if (empty) empty.remove();
+
+      var sevColor = { low:'#6366f1', medium:'#f59e0b', high:'#ef4444', critical:'#991b1b' }[a.severity] || '#6366f1';
+      var li = document.createElement('li');
+      li.className = 'service-item';
+      li.style.cssText = 'flex-direction:column;align-items:flex-start;gap:2px;animation:slideInLeft 0.3s ease';
+      li.innerHTML =
+        '<span style="font-size:11px;color:' + sevColor + ';font-weight:600">[' + esc((a.severity||'?').toUpperCase()) + ']</span>' +
+        '<span style="font-size:11px;color:var(--text1)">' + esc((a.message||'').slice(0,80)) + '</span>';
+
+      // Insérer au début
+      list.insertBefore(li, list.firstChild);
+
+      // Garder max 10 dans le panneau
+      while (list.children.length > 10) list.removeChild(list.lastChild);
+
+      // Mettre à jour le badge
+      var badge = document.getElementById('alert-badge');
+      if (badge) {
+        var cur = parseInt(badge.textContent) || 0;
+        badge.textContent = cur + 1;
+        badge.style.display = 'inline';
+      }
+    }
+
+    // AMÉLIORATION 4: Update metrics from watch stats
+    function updateMetricsFromStats(stats) {
+      if (!stats) return;
+
+      // Backend compat : watcherService renvoie stats.total_logs / error_count / critical_count / fatal_count / services
+      const total = Number(stats.total_logs || 0);
+      const errors = Number(stats.error_count || 0);
+      const critical = Number(stats.critical_count || 0);
+      const fatal = Number(stats.fatal_count || 0);
+      const services = Number(stats.services || 0);
+
+      document.getElementById('metricsErrors').textContent = errors + critical + fatal;
+      document.getElementById('metricsServices').textContent = services;
+
+      // logs_per_min (fourni par backend) sinon calcul fallback
+      const logsPerMin = stats.logs_per_min != null
+        ? Number(stats.logs_per_min)
+        : (STATE.metrics.total / Math.max((Date.now() - STATE.sessionStartTime) / 60000, 0.0167));
+
+      document.getElementById('metricsLogsPerMin').textContent = Math.round(logsPerMin) || 0;
+
+      const errorRate = total > 0 ? Math.round(((errors + critical + fatal) / total) * 100) : 0;
+      document.getElementById('metricsErrorRate').textContent = errorRate + '%';
+    }
+
+    // AMÉLIORATION 4: Show anomaly alert
+    function showAnomalyAlert(anomaly) {
+      const panel = document.getElementById('anomalyPanel');
+      const text = document.getElementById('anomalyText');
+      const stats = document.getElementById('anomalyStats');
+      
+      panel.style.display = 'block';
+      text.textContent = `⚠️ Anomalie détectée: Taux d'erreur ${anomaly.current_rate?.toFixed(2)}% (normal: ${anomaly.baseline_rate?.toFixed(2)}%)`;
+      stats.innerHTML = `
+        <strong>Augmentation:</strong> ${anomaly.rate_increase_percent}% | 
+        <strong>Erreurs actuelles:</strong> ${anomaly.current_errors} | 
+        <strong>Seuil dépassé:</strong> ${anomaly.threshold_exceeded ? 'OUI' : 'NON'}
+      `;
+    }
+
+    // AMÉLIORATION 4: Hide anomaly alert
+    function hideAnomalyAlert() {
+      const panel = document.getElementById('anomalyPanel');
+      panel.style.display = 'none';
+    }
+
+    function resetMetrics() {
+      STATE.metrics = {
+        total: 0,
+        errors: 0,
+        services: new Map(),
+        levelCount: { DEBUG: 0, INFO: 0, WARNING: 0, ERROR: 0, CRITICAL: 0, FATAL: 0 },
+        hourlyErrors: new Array(24).fill(0)
+      };
+    }
+
+    function normalizeIncomingLog(log) {
+      const level = (log.log_level || log.level || 'INFO').toString().toUpperCase();
+      return {
+        ...log,
+        id: log.id,
+        timestamp: log.timestamp || log.created_at || new Date().toISOString(),
+        log_level: LEVEL_SEVERITY[level] ? level : 'INFO',
+        source: log.source || '',
+        service: log.service || 'unknown',
+        message: log.message || log.raw_log || ''
+      };
+    }
+
+    function pruneBufferTo24Hours() {
+      const cutoff = Date.now() - TWENTY_FOUR_HOURS_MS;
+      const beforeCount = STATE.buffer.length;
+      STATE.buffer = STATE.buffer.filter(function(log) {
+        const ts = new Date(log.timestamp || Date.now()).getTime();
+        return !Number.isNaN(ts) && ts >= cutoff;
+      });
+
+      if (STATE.buffer.length > STATE.maxBuffer) {
+        STATE.buffer = STATE.buffer.slice(0, STATE.maxBuffer);
+      }
+
+      if (beforeCount !== STATE.buffer.length) {
+        STATE.seenLogIds = new Set(STATE.buffer.filter(function(log){ return log.id; }).map(function(log){ return String(log.id); }));
+        resetMetrics();
+        STATE.buffer.forEach(trackLogMetrics);
+      }
+    }
+
+    function trackLogMetrics(log) {
+      STATE.metrics.total++;
+      if (['ERROR', 'CRITICAL', 'FATAL'].includes(log.log_level)) {
+        STATE.metrics.errors++;
+      }
+
+      STATE.metrics.levelCount[log.log_level] = (STATE.metrics.levelCount[log.log_level] || 0) + 1;
+      const hour = new Date(log.timestamp || Date.now()).getHours();
+      if (['ERROR', 'CRITICAL', 'FATAL'].includes(log.log_level)) {
+        STATE.metrics.hourlyErrors[hour]++;
+      }
+
+      const service = log.service || 'unknown';
+      STATE.metrics.services.set(service, (STATE.metrics.services.get(service) || 0) + 1);
+    }
+
+    function addLogEntry(log, deferUpdate) {
+      if (STATE.paused) return;
+      const normalized = normalizeIncomingLog(log);
+      if (normalized.id && STATE.seenLogIds.has(String(normalized.id))) return;
+      if (normalized.id) STATE.seenLogIds.add(String(normalized.id));
+
+      STATE.buffer.unshift(normalized);
+      if (STATE.buffer.length > STATE.maxBuffer) {
+        const removed = STATE.buffer.pop();
+        if (removed && removed.id) STATE.seenLogIds.delete(String(removed.id));
+      }
+
+      trackLogMetrics(normalized);
+      pruneBufferTo24Hours();
+      if (!deferUpdate) updateUI();
+    }
+
+    function addLogEntries(logs) {
+      if (!Array.isArray(logs) || !logs.length || STATE.paused) return;
+      for (let i = 0; i < logs.length; i++) {
+        addLogEntry(logs[i], true);
+      }
+      pruneBufferTo24Hours();
+      updateUI();
+    }
+
+    function replaceBufferWithLogs(logs) {
+      STATE.buffer = (logs || []).slice(0, STATE.maxBuffer).map(normalizeIncomingLog);
+      STATE.seenLogIds = new Set(STATE.buffer.filter(l => l.id).map(l => String(l.id)));
+      pruneBufferTo24Hours();
+      updateUI();
+    }
+
+    function scheduleLiveRefresh() {
+      if (liveRefreshTimer) return;
+      liveRefreshTimer = setTimeout(function() {
+        liveRefreshTimer = null;
+        loadHourlyTrends();
+        loadRecentAlerts();
+      }, 1000);
+    }
+
+    function updateUI() {
+      // Update metrics
+      const elapsedMin = Math.max((Date.now() - STATE.sessionStartTime) / 60000, 0.0167); // min 1s
+      const logsPerMin = Math.round(STATE.metrics.total / elapsedMin) || 0;
+      document.getElementById('metricsLogsPerMin').textContent = logsPerMin;
+      document.getElementById('metricsErrors').textContent = STATE.metrics.errors;
+      document.getElementById('metricsServices').textContent = STATE.metrics.services.size;
+      const errorRate = STATE.metrics.total > 0 ? Math.round((STATE.metrics.errors / STATE.metrics.total) * 100) : 0;
+      document.getElementById('metricsErrorRate').textContent = errorRate + '%';
+
+      // Update stream
+      updateLogStream();
+
+      // Update heatmap
+      updateHeatmap();
+
+      // Update level chart
+      updateLevelChart();
+
+      // Update services
+      updateServiceList();
+    }
+
+    function updateLogStream() {
+      const container = document.getElementById('logEntries');
+      const filtered = STATE.buffer.filter(log => {
+        if (STATE.filters.level && log.log_level !== STATE.filters.level) return false;
+        if (STATE.filters.service && log.service !== STATE.filters.service) return false;
+        return true;
+      });
+
+      // FIX BUG-WATCH-02: Ajouter data-id pour click, afficher service
+      container.innerHTML = filtered.slice(0, 100).map(log => {
+        const time = new Date(log.timestamp || Date.now()).toLocaleTimeString('fr-FR');
+        const svc  = log.service ? `<div class="log-service" style="font-size:10px;color:var(--text2);margin-right:6px">${esc(log.service)}</div>` : '';
+        const idAttr = log.id ? ` data-log-id="${log.id}"` : '';
+        return `
+          <div class="log-entry"${idAttr} style="cursor:${log.id ? 'pointer' : 'default'}">
+            <div class="log-time">${time}</div>
+            <div class="log-level ${escAttr(log.log_level)}">${esc(log.log_level)}</div>
+            ${svc}
+            ${log.event_type ? '<div class="log-meta" style="font-size:10px;color:var(--text2);margin-bottom:4px">Type: '+esc(log.event_type)+'</div>' : ''}
+            ${log.fingerprint ? '<div class="log-meta" style="font-size:10px;color:var(--text2);margin-bottom:4px">Empreinte: '+esc(log.fingerprint.slice(0,16))+'</div>' : ''}
+            <div class="log-message">${esc((log.message || "").slice(0, 200))}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function updateHeatmap() {
+      const heatmap = document.getElementById('heatmap');
+      heatmap.innerHTML = STATE.metrics.hourlyErrors.map((count, hour) => {
+        const intensity = Math.min(count / (Math.max(...STATE.metrics.hourlyErrors) || 1), 1);
+        let activeClass = 'active-0';
+        if (intensity > 0.75) activeClass = 'active-3';
+        else if (intensity > 0.5) activeClass = 'active-2';
+        else if (intensity > 0.25) activeClass = 'active-1';
+        return `<div class="heatmap-cell ${activeClass}" title="${hour}:00 — ${count} errors"></div>`;
+      }).join('');
+    }
+
+    function updateLevelChart() {
+      const chart = document.getElementById('levelChart');
+      const max = Math.max(...Object.values(STATE.metrics.levelCount), 1);
+      chart.innerHTML = Object.entries(STATE.metrics.levelCount).map(([level, count]) => {
+        const height = (count / max) * 100;
+        return `
+          <div style="flex: 1;">
+            <div class="level-bar" style="height: ${height}%; background: ${LEVEL_COLORS[level]};"></div>
+            <div class="level-label">${level} (${count})</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function updateServiceList() {
+      const list = document.getElementById('serviceList');
+      const sorted = Array.from(STATE.metrics.services.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
+      list.innerHTML = sorted.map(([service, count]) => `
+        <li class="service-item">
+          <span class="service-name">${esc(service)}</span>
+          <span class="service-count">${count}</span>
+        </li>
+      `).join('');
+
+      // Update service filter dropdown
+      const filterService = document.getElementById('filterService');
+      const currentValue = filterService.value;
+      filterService.innerHTML = '<option value="">' + (window.i18n ? window.i18n.t('watchlog.stream.filter.services') : 'Tous les services') + '</option>' + sorted.map(([service]) => `
+        <option value="${escAttr(service)}">${esc(service)}</option>
+      `).join('');
+      filterService.value = currentValue;
+    }
+
+    // Event Listeners
+    document.getElementById('btnPause').addEventListener('click', () => {
+      STATE.paused = !STATE.paused;
+      var label = STATE.paused ? (window.i18n ? window.i18n.t('watchlog.resume') : 'Reprendre') : (window.i18n ? window.i18n.t('watchlog.pause') : 'Pause');
+      document.getElementById('btnPause').innerHTML = '<i class="fas ' + (STATE.paused ? 'fa-play' : 'fa-pause') + '"></i> ' + label;
+    });
+
+    document.getElementById('btnClear').addEventListener('click', () => {
+      STATE.buffer = [];
+      STATE.seenLogIds = new Set();
+      resetMetrics();
+      updateUI();
+    });
+
+    document.getElementById('btnDisconnect').addEventListener('click', () => {
+      if (eventSource) eventSource.close();
+      if (statsSource) statsSource.close();
+      window.location.href = '/';
+    });
+
+    document.getElementById('filterLevel').addEventListener('change', (e) => {
+      STATE.filters.level = e.target.value;
+      updateLogStream();
+    });
+
+    document.getElementById('btnExport').addEventListener('click', () => {
+      if (!STATE.buffer.length) { alert(window.i18n ? window.i18n.t('watchlog.export.empty') : 'Aucun log à exporter.'); return; }
+      var header = 'Horodatage,Niveau,Service,Message\n';
+      var rows = STATE.buffer.map(function(l) {
+        var q = function(s){ return '"' + String(s||'').replace(/"/g,'""') + '"'; };
+        return [q(l.timestamp), q(l.log_level), q(l.service||''), q(l.message||'')].join(',');
+      }).join('\n');
+      var blob = new Blob(['\uFEFF' + header + rows], { type: 'text/csv;charset=utf-8' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'watchlog_' + new Date().toISOString().slice(0,19).replace(/[T:]/g,'-') + '.csv';
+      a.click();
+    });
+
+    document.getElementById('filterService').addEventListener('change', (e) => {
+      STATE.filters.service = e.target.value;
+      updateLogStream();
+    });
+    function simulateLogData() {
+      const services = ['api-server', 'database', 'cache', 'worker', 'scheduler'];
+      const levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'];
+      const messages = [
+        'Connection established',
+        'Database query executed',
+        'Cache miss for key',
+        'Background job started',
+        'Error processing request'
+      ];
+
+      setInterval(() => {
+        if (!STATE.paused) {
+          addLogEntry({
+            timestamp: new Date().toISOString(),
+            log_level: levels[Math.floor(Math.random() * levels.length)],
+            service: services[Math.floor(Math.random() * services.length)],
+            message: messages[Math.floor(Math.random() * messages.length)] + ' ' + Math.random().toString(36).slice(2, 7)
+          });
+        }
+      }, 500);
+    }
+
+
+    // Close watchlog modal on backdrop click
+    document.getElementById('wl-modal-detail').addEventListener('click', function(e){ if(e.target===this) this.style.display='none'; });
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape') { var m=document.getElementById('wl-modal-detail'); if(m) m.style.display='none'; } });
+
+    // FIX BUG-WATCH-03: Click sur entree de log pour voir details complets
+    document.getElementById('logEntries').addEventListener('click', function(e) {
+      const entry = e.target.closest('[data-log-id]');
+      if (!entry) return;
+      const logId = entry.getAttribute('data-log-id');
+      if (!logId) return;
+      api.get('/api/logs/' + logId).then(function(log) {
+        const l = log && (log.data || log);
+        if (!l) return;
+        const fmtDT = function(s){ return s ? new Date(s).toLocaleString('fr-FR') : '-'; };
+        let html = '<div style="font-size:12px;line-height:1.9">';
+        [['ID',l.id],['Horodatage',fmtDT(l.timestamp)],['Niveau',l.log_level],
+         ['Source',l.source],['Service',l.service],['Module',l.module],
+         ['Type evenement',l.event_type],['IP client',l.client_ip],
+         ['Utilisateur cible',l.target_user],['Type erreur',l.error_type]
+        ].forEach(function(kv){ if(kv[1]!=null&&kv[1]!=='') html+='<p><strong>'+esc(kv[0])+':</strong> '+esc(String(kv[1]))+'</p>'; });
+        html += '<p><strong>Message:</strong></p><pre style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;white-space:pre-wrap;font-size:11px;max-height:150px;overflow:auto">'+esc(l.message||'')+'</pre>';
+        if (l.stack_trace) html += '<p><strong>Stack trace:</strong></p><pre style="background:rgba(80,0,0,0.3);color:#ff9999;padding:10px;border-radius:6px;white-space:pre-wrap;font-size:10px;max-height:150px;overflow:auto">'+esc(l.stack_trace)+'</pre>';
+        html += '</div>';
+        var modal = document.getElementById('wl-modal-detail');
+        if (modal) {
+          var t=modal.querySelector('#wl-modal-title');
+          var b=modal.querySelector('#wl-modal-body');
+          if(t) t.textContent='Log #'+l.id;
+          if(b) b.innerHTML=html;
+          modal.style.display='flex';
+        }
+      }).catch(function(){});
+    });
+
+    // Initialize
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // FIX BUG-TRENDS-01: Tendances horaires temps reel + alertes recentes
+    // ─────────────────────────────────────────────────────────────────────────
+
+    const LEVEL_SEV = { DEBUG:'#6366f1', INFO:'#0ea5e9', WARNING:'#f59e0b', ERROR:'#ef4444', CRITICAL:'#7c3aed', FATAL:'#991b1b' };
+
+    function loadRecentLogs() {
+      const twentyFourHoursAgo = new Date(Date.now() - TWENTY_FOUR_HOURS_MS).toISOString().slice(0,19);
+      return api.get('/api/logs?limit=100&sort=id&order=desc&date_from=' + encodeURIComponent(twentyFourHoursAgo)).then(function(resp) {
+        const rows = resp && resp.data ? resp.data : (Array.isArray(resp) ? resp : []);
+        replaceBufferWithLogs(rows);
+      }).catch(function(err) {
+          if (window.toast) window.toast.warning('Impossible de charger les logs récents');
+          console.warn('[WatchLog] Failed to load recent logs:', err && (err.error || err.message || err));
+      });
+    }
+
+    function loadHourlyTrends() {
+      api.get('/api/dashboard/hourly').then(function(rows) {
+        const tbl = document.getElementById('hourly-trends-table');
+        if (!tbl) return;
+        if (!rows || !rows.length) { tbl.innerHTML = '<div style="text-align:center;color:var(--text2);padding:12px">Aucune donnee</div>'; return; }
+        const max = Math.max(...rows.map(r => r.cnt), 1);
+        let html = '<table style="width:100%;border-collapse:collapse">';
+        html += '<tr style="color:var(--text2);font-size:10px"><th style="padding:2px 6px;text-align:left">Heure</th><th style="text-align:right;padding:2px 6px">Logs</th><th style="padding:2px 8px;text-align:left;width:60%">Volume</th></tr>';
+        rows.forEach(function(row) {
+          const h = String(row.hour).padStart(2, '0') + ':00';
+          const pct = Math.round((row.cnt / max) * 100);
+          const barColor = row.cnt > max * 0.75 ? '#ef4444' : row.cnt > max * 0.4 ? '#f59e0b' : '#0ea5e9';
+          html += `<tr style="border-top:1px solid rgba(255,255,255,0.04)">
+            <td style="padding:3px 6px;color:var(--text2)">${h}</td>
+            <td style="padding:3px 6px;text-align:right;font-weight:600;color:${barColor}">${row.cnt}</td>
+            <td style="padding:3px 8px"><div style="height:8px;border-radius:4px;background:rgba(255,255,255,0.06);overflow:hidden"><div style="height:100%;width:${pct}%;background:${barColor};border-radius:4px;transition:width 0.3s"></div></div></td>
+          </tr>`;
+        });
+        html += '</table>';
+        tbl.innerHTML = html;
+        const upd = document.getElementById('trends-update-time');
+        if (upd) upd.textContent = 'Mis a jour ' + new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+      }).catch(function() {});
+    }
+
+    function loadRecentAlerts() {
+      api.get('/api/dashboard/alerts?limit=5&status=new').then(function(data) {
+        const list = document.getElementById('alertsList');
+        if (!list) return;
+        const alerts = Array.isArray(data) ? data : (data && data.alerts ? data.alerts : []);
+        const badge = document.getElementById('alert-badge');
+        if (badge) { if (alerts.length > 0) { badge.style.display='inline'; badge.textContent=alerts.length; } else { badge.style.display='none'; } }
+        if (!alerts.length) { list.innerHTML = '<li data-empty style="font-size:12px;color:var(--text2);padding:8px 0">' + (window.i18n ? window.i18n.t('alert.no_alerts') : 'Aucune alerte') + '</li>'; return; }
+        list.innerHTML = alerts.map(function(a) {
+          const sevColor = { low:'#6366f1', medium:'#f59e0b', high:'#ef4444', critical:'#991b1b' }[a.severity] || '#6366f1';
+          return `<li class="service-item" style="flex-direction:column;align-items:flex-start;gap:2px">
+            <span style="font-size:11px;color:${sevColor};font-weight:600">[${esc(a.severity||'?').toUpperCase()}]</span>
+            <span style="font-size:11px;color:var(--text1)">${esc((a.message||'').slice(0,80))}</span>
+          </li>`;
+        }).join('');
+      }).catch(function() {});
+    }
+
+    // Refresh trends every 30s
+    setInterval(loadHourlyTrends, 30000);
+    setInterval(loadRecentAlerts, 15000);
+
+    window.addEventListener('load', () => {
+      initSSE();        // flux de logs en direct via /api/alerts/stream
+      initStatsSSE();   // stats + anomalies via /api/logs/watch/stream
+      loadRecentLogs();
+      loadHourlyTrends();
+      loadRecentAlerts();
+      updateUI();
+    });
+
+    window.addEventListener('beforeunload', () => {
+      if (eventSource) eventSource.close();
+      if (statsSource) statsSource.close();
+    });
+  </script>
+</body>
+</html>

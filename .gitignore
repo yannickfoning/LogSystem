@@ -1,0 +1,43 @@
+# Dépendances
+node_modules/
+npm-debug.log*
+
+# Variables d'environnement — JAMAIS versionner .env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# SEC-02: Exclure les fichiers sensibles
+cookies.txt
+*.cookies
+test-plan.json
+scripts/dev-scripts/
+
+# Logs générés
+logs/*.log
+logs/*.gz
+!logs/.gitkeep
+
+# Uploads temporaires
+uploads/
+tmp/
+
+# Build outputs
+dist/
+build/
+.next/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Tests
+coverage/
+.nyc_output/

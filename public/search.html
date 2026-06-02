@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="app.title">LogSystem - Recherche</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="brand">
+      <img src="/image/coleps.png" alt="Coleps"
+           style="height:36px;width:auto;object-fit:contain;border-radius:4px;">
+      <span>LogSystem</span>
+    </div>
+    <ul class="nav-links">
+      <li><a href="/dashboard.html" data-i18n="nav.dashboard">Tableau de bord</a></li>
+      <li><a href="/search.html" class="active" data-i18n="nav.search">Recherche</a></li>
+      <li><a href="/import.html" data-i18n="nav.import">Import</a></li>
+      <li><a href="/admin.html" id="admin-link" data-i18n="nav.admin">Administration</a></li>
+    </ul>
+    <div class="nav-right">
+      <a href="#" id="lang-toggle" class="lang-toggle-link">EN</a>
+      <span class="user-info" id="user-info"></span>
+      <a href="#" id="logout-btn" class="btn btn-xs btn-secondary" data-i18n="nav.logout">Déconnexion</a>
+    </div>
+  </nav>
+
+  <div class="page-container">
+    <h1 class="page-title" data-i18n="search.title">Recherche de logs</h1>
+
+    <div class="chips">
+      <button class="chip" data-chip="today" data-i18n="search.chip.today">Aujourd'hui</button>
+      <button class="chip" data-chip="last-hour" data-i18n="search.chip.last_hour">Dernière heure</button>
+      <button class="chip" data-chip="24h" data-i18n="search.chip.24h">24 heures</button>
+      <button class="chip" data-chip="7j" data-i18n="search.chip.7j">7 jours</button>
+      <button class="chip" data-chip="errors" data-i18n="search.chip.errors">Erreurs</button>
+      <button class="chip" data-chip="warnings" data-i18n="search.chip.warnings">Warnings</button>
+    </div>
+
+    <div class="filter-bar">
+      <div class="form-group">
+        <input type="text" id="f-search" data-i18n-placeholder="search.placeholder" placeholder="Rechercher...">
+      </div>
+      <div class="form-group">
+        <select id="f-level">
+          <option value="" data-i18n="search.level_all">Tous</option>
+          <option value="DEBUG">DEBUG</option>
+          <option value="INFO">INFO</option>
+          <option value="WARNING">WARNING</option>
+          <option value="ERROR">ERROR</option>
+          <option value="FATAL">FATAL</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <input type="text" id="f-source" data-i18n-placeholder="search.source" placeholder="Source">
+      </div>
+      <div class="form-group">
+        <input type="text" id="f-service" data-i18n-placeholder="search.service" placeholder="Service">
+      </div>
+      <div class="form-group">
+        <input type="datetime-local" id="f-date-from">
+      </div>
+      <div class="form-group">
+        <input type="datetime-local" id="f-date-to">
+      </div>
+      <div>
+        <button class="btn btn-primary" id="search-btn" data-i18n="search.btn">Rechercher</button>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between mb-16">
+      <span class="text-muted" id="results-count"></span>
+      <div class="flex gap-8">
+        <button class="btn btn-sm btn-secondary" id="export-csv" data-i18n="search.export_csv">Export CSV</button>
+        <button class="btn btn-sm btn-secondary" id="export-pdf" data-i18n="search.export_pdf">Export PDF</button>
+      </div>
+    </div>
+    <div class="card card-small mb-16" id="group-counts" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="card-section">
+        <div class="section-title">Types d'événements</div>
+        <div id="event-type-counts" class="chip-list" style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px;color:var(--text1);"></div>
+      </div>
+      <div class="card-section">
+        <div class="section-title">Types d'erreur</div>
+        <div id="error-type-counts" class="chip-list" style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px;color:var(--text1);"></div>
+      </div>
+    </div>
+    <div class="text-hint mb-8">
+      <span id="role-indicator"></span>
+    </div>
+
+    <div class="card">
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th data-i18n="common.timestamp">Timestamp</th>
+              <th data-i18n="common.level">Niveau</th>
+              <th data-i18n="common.source">Source</th>
+              <th data-i18n="common.service">Service</th>
+              <th data-i18n="common.event_type">Type</th>
+              <th>Type d'erreur</th>
+              <th>Empreinte</th>
+              <th data-i18n="common.message">Message</th>
+            </tr>
+          </thead>
+          <tbody id="logs-body"></tbody>
+        </table>
+      </div>
+      <div id="logs-pagination"></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="detail-modal">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <h3 data-i18n="common.message">Message</h3>
+        <button class="modal-close" id="detail-close">&times;</button>
+      </div>
+      <div id="detail-content"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="detail-close-btn" data-i18n="common.close">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container"></div>
+
+  <script src="/api.js"></script>
+  <script src="/i18n.js"></script>
+  <script src="/app-common.js"></script>
+  <script>
+    (function() {
+      if (!window.api) return;
+      var currentPage = 1;
+      var totalPages = 1;
+
+      document.getElementById('logout-btn').addEventListener('click', function(e) {
+        e.preventDefault();
+        window.logout();
+      });
+
+      function buildQuery(params) {
+        var parts = [];
+        for (var k in params) parts.push(encodeURIComponent(k) + '=' + encodeURIComponent(params[k]));
+        return parts.join('&');
+      }
+
+      window.loadPage = function(page) {
+        currentPage = page;
+        doSearch();
+      };
+
+      function doSearch() {
+        var params = getParams();
+        loadGroupCounts(params);
+        api.get('/api/logs?' + buildQuery(params)).then(function(resp) {
+          currentPage = resp.pagination.page || 1;
+          totalPages = resp.pagination.pages || 1;
+          var total = resp.pagination.total != null ? resp.pagination.total : resp.data.length;
+          document.getElementById('results-count').textContent = total + ' résultat(s)';
+          var tb = document.getElementById('logs-body');
+          if (!resp.data.length) {
+            tb.innerHTML = '<tr><td colspan="8" class="no-data" data-i18n="search.no_results">Aucun résultat</td></tr>';
+            document.getElementById('logs-pagination').innerHTML = '';
+            return;
+          }
+          tb.innerHTML = resp.data.map(function(r) {
+            return '<tr data-id="'+r.id+'"><td>'+fmtDT(r.timestamp)+'</td><td>'+badge(r.log_level)+'</td><td>'+esc(r.source)+'</td><td>'+esc(r.service)+'</td><td>'+esc(r.event_type)+'</td><td>'+esc(r.error_type)+'</td><td><code style="font-size:11px;white-space:nowrap;overflow:hidden;display:inline-block;max-width:150px;">'+esc(r.fingerprint)+'</code></td><td class="text-truncate">'+esc(r.message)+'</td></tr>';
+          }).join('');
+          document.getElementById('logs-pagination').innerHTML = paginationHtml(currentPage, totalPages);
+        }).catch(function(err) {
+          window.toast.error(err.error || 'Erreur lors de la recherche');
+        });
+      }
+
+      document.getElementById('search-btn').addEventListener('click', function() { window.chipFilter = null; currentPage = 1; doSearch(); });
+      document.getElementById('f-search').addEventListener('keyup', function(e) { if (e.key === 'Enter') { window.chipFilter = null; currentPage = 1; doSearch(); } });
+
+      function loadGroupCounts(params) {
+        api.get('/api/logs/counts?' + buildQuery(params)).then(function(resp) {
+          var eventTypeEl = document.getElementById('event-type-counts');
+          var errorTypeEl = document.getElementById('error-type-counts');
+          eventTypeEl.innerHTML = (resp.event_types || []).map(function(item) {
+            return '<button class="chip chip-secondary" type="button" data-filter="event_type" data-value="'+escAttr(item.label)+'">'+esc(item.label)+' ('+item.cnt+')</button>';
+          }).join('') || '<span class="text-muted">Aucun type</span>';
+          errorTypeEl.innerHTML = (resp.error_types || []).map(function(item) {
+            return '<button class="chip chip-secondary" type="button" data-filter="error_type" data-value="'+escAttr(item.label)+'">'+esc(item.label)+' ('+item.cnt+')</button>';
+          }).join('') || '<span class="text-muted">Aucune erreur</span>';
+        }).catch(function(err) {
+          if (window.toast) window.toast.warning('Impossible de charger les décomptes');
+        });
+      }
+
+      document.getElementById('group-counts').addEventListener('click', function(e) {
+        var btn = e.target.closest('button[data-filter]');
+        if (!btn) return;
+        var filter = btn.getAttribute('data-filter');
+        var value = btn.getAttribute('data-value');
+        if (!filter || value == null) return;
+        window.chipFilter = { type: filter, value: value };
+        document.getElementById('f-search').value = '';
+        document.getElementById('f-level').value = '';
+        document.getElementById('f-source').value = '';
+        document.getElementById('f-service').value = '';
+        document.getElementById('f-date-from').value = '';
+        document.getElementById('f-date-to').value = '';
+        currentPage = 1;
+        doSearch();
+      });
+
+      function getParams() {
+        var p = { page: currentPage, limit: 50 };
+        var search = document.getElementById('f-search').value.trim();
+        var level = document.getElementById('f-level').value;
+        var source = document.getElementById('f-source').value.trim();
+        var service = document.getElementById('f-service').value.trim();
+        var dateFrom = document.getElementById('f-date-from').value;
+        var dateTo = document.getElementById('f-date-to').value;
+        if (search) p.search = search;
+        if (level) p.log_level = level;
+        if (source) p.source = source;
+        if (service) p.service = service;
+        if (dateFrom) p.date_from = dateFrom.replace('T', ' ');
+        if (dateTo) p.date_to = dateTo.replace('T', ' ');
+        if (window.chipFilter && window.chipFilter.type && window.chipFilter.value) {
+          p[window.chipFilter.type] = window.chipFilter.value;
+        }
+        return p;
+      }
+
+      function applyUrlFilters() {
+        var params = new URLSearchParams(window.location.search);
+        if (params.has('fingerprint')) {
+          window.chipFilter = { type: 'fingerprint', value: params.get('fingerprint') };
+        }
+        if (params.has('event_type')) {
+          window.chipFilter = { type: 'event_type', value: params.get('event_type') };
+        }
+        if (params.has('error_type')) {
+          window.chipFilter = { type: 'error_type', value: params.get('error_type') };
+        }
+        if (params.has('log_level')) {
+          document.getElementById('f-level').value = params.get('log_level');
+        }
+        if (params.has('source')) {
+          document.getElementById('f-source').value = params.get('source');
+        }
+        if (params.has('service')) {
+          document.getElementById('f-service').value = params.get('service');
+        }
+        if (params.has('search')) {
+          document.getElementById('f-search').value = params.get('search');
+        }
+        if (params.has('date_from')) {
+          document.getElementById('f-date-from').value = params.get('date_from');
+        }
+        if (params.has('date_to')) {
+          document.getElementById('f-date-to').value = params.get('date_to');
+        }
+      }
+
+      document.querySelectorAll('.chip').forEach(function(chip) {
+        chip.addEventListener('click', function() {
+          document.querySelectorAll('.chip').forEach(function(c) { c.classList.remove('active'); });
+          chip.classList.add('active');
+          document.getElementById('f-level').value = '';
+          document.getElementById('f-search').value = '';
+          document.getElementById('f-source').value = '';
+          document.getElementById('f-service').value = '';
+          document.getElementById('f-date-from').value = '';
+          document.getElementById('f-date-to').value = '';
+
+          var type = chip.getAttribute('data-chip');
+          if (type === 'today') {
+            var now = new Date();
+            var ds = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+            // FIX SEARCH-03: Ajouter date_to = fin de journee pour borner la recherche
+            document.getElementById('f-date-from').value = ds + 'T00:00';
+            document.getElementById('f-date-to').value   = ds + 'T23:59';
+          } else if (type === 'last-hour') {
+            // FIX BUG-SEARCH-01: Definir date_from ET date_to pour eviter valeur stale
+            var h = new Date(Date.now() - 3600000);
+            var now = new Date();
+            function fmtLocal(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'T'+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+            document.getElementById('f-date-from').value = fmtLocal(h);
+            document.getElementById('f-date-to').value   = fmtLocal(now);
+          } else if (type === '24h') {
+            var h24 = new Date(Date.now() - 86400000);
+            var now24 = new Date();
+            function fmtL(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'T'+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+            document.getElementById('f-date-from').value = fmtL(h24);
+            document.getElementById('f-date-to').value   = fmtL(now24);
+          } else if (type === '7j') {
+            var h7j = new Date(Date.now() - 7*86400000);
+            var now7j = new Date();
+            document.getElementById('f-date-from').value = fmtL(h7j);
+            document.getElementById('f-date-to').value   = fmtL(now7j);
+          } else if (type === 'errors') {
+            document.getElementById('f-level').value = 'ERROR';
+          } else if (type === 'warnings') {
+            document.getElementById('f-level').value = 'WARNING';
+          }
+          window.chipFilter = null;
+          currentPage = 1;
+          doSearch();
+        });
+      });
+
+      document.getElementById('export-csv').addEventListener('click', function() {
+        var params = getParams();
+        delete params.page;
+        delete params.limit;
+        window.open('/api/logs/export/csv?' + buildQuery(params), '_blank');
+      });
+
+      document.getElementById('export-pdf').addEventListener('click', function() {
+        var params = getParams();
+        delete params.page;
+        delete params.limit;
+        window.open('/api/logs/export/pdf?' + buildQuery(params), '_blank');
+      });
+
+      document.getElementById('logs-body').addEventListener('click', function(e) {
+        var tr = e.target.closest('tr[data-id]');
+        if (!tr) return;
+        var id = tr.getAttribute('data-id');
+        api.get('/api/logs/' + id).then(function(log) {
+          var html = '<div style="font-size:13px;line-height:1.8">';
+          html += '<p><strong data-i18n="modal.id">Identifiant:</strong> ' + log.id + '</p>';
+          html += '<p><strong data-i18n="modal.timestamp">Horodatage:</strong> ' + fmtDT(log.timestamp) + '</p>';
+          html += '<p><strong data-i18n="modal.level">Importance:</strong> ' + badge(log.log_level) + '</p>';
+          html += '<p><strong data-i18n="modal.source">Source:</strong> ' + esc(log.source) + '</p>';
+          html += '<p><strong data-i18n="modal.service">Service:</strong> ' + esc(log.service) + '</p>';
+          html += '<p><strong data-i18n="modal.event_type">Type d\'événement:</strong> ' + esc(log.event_type) + '</p>';
+          html += '<p><strong data-i18n="modal.fingerprint">Empreinte:</strong> <code style="font-size:11px">' + esc(log.fingerprint) + '</code></p>';
+          // FIX BUG-MODAL-01: Afficher tous les champs manquants (IP, module, erreur, stack trace)
+          if (log.client_ip)    html += '<p><strong>IP client:</strong> ' + esc(log.client_ip) + '</p>';
+          if (log.module)       html += '<p><strong>Module:</strong> ' + esc(log.module) + '</p>';
+          if (log.error_type)   html += '<p><strong>Type d\'erreur:</strong> <code>' + esc(log.error_type) + '</code></p>';
+          if (log.target_user)  html += '<p><strong>Utilisateur cible:</strong> ' + esc(log.target_user) + '</p>';
+          html += '<p><strong data-i18n="modal.message">Message:</strong></p><pre style="background:var(--surface2);padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-all;font-size:12px;max-height:200px;overflow:auto">' + esc(log.message) + '</pre>';
+          if (log.stack_trace) {
+            html += '<p style="margin-top:8px"><strong>Stack trace:</strong></p><pre style="background:#1a0000;color:#ff6b6b;padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-all;font-size:11px;max-height:200px;overflow:auto">' + esc(log.stack_trace) + '</pre>';
+          }
+          if (log.raw_log) {
+            html += '<p style="margin-top:8px"><strong data-i18n="modal.raw">Log brut:</strong></p><pre style="background:var(--surface2);padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-all;font-size:11px;max-height:150px;overflow:auto">' + esc(log.raw_log) + '</pre>';
+          }
+          if (log.created_at) {
+            html += '<p><strong>Créé à:</strong> ' + fmtDT(log.created_at) + '</p>';
+          }
+          if (log.user_id) {
+            html += '<p><strong>ID utilisateur:</strong> ' + esc(log.user_id) + '</p>';
+          }
+          html += '</div>';
+          document.getElementById('detail-content').innerHTML = html;
+          document.getElementById('detail-modal').classList.add('active');
+        });
+      });
+
+      document.getElementById('detail-close').addEventListener('click', function() {
+        document.getElementById('detail-modal').classList.remove('active');
+      });
+      document.getElementById('detail-close-btn').addEventListener('click', function() {
+        document.getElementById('detail-modal').classList.remove('active');
+      });
+      document.getElementById('detail-modal').addEventListener('click', function(e) {
+        if (e.target === this) this.classList.remove('active');
+      });
+
+      applyUrlFilters();
+      doSearch();
+    })();
+  </script>
+</body>
+</html>

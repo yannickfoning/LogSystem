@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="app.title">LogSystem - Administration</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="brand">
+      <img src="/image/coleps.png" alt="Coleps"
+           style="height:36px;width:auto;object-fit:contain;border-radius:4px;">
+      <span>LogSystem</span>
+    </div>
+    <ul class="nav-links">
+      <li><a href="/dashboard.html" data-i18n="nav.dashboard">Tableau de bord</a></li>
+      <li><a href="/search.html" data-i18n="nav.search">Recherche</a></li>
+      <li><a href="/import.html" data-i18n="nav.import">Import</a></li>
+      <li><a href="/admin.html" class="active" data-i18n="nav.admin">Administration</a></li>
+    </ul>
+    <div class="nav-right">
+      <a href="#" id="lang-toggle" class="lang-toggle-link">EN</a>
+      <span class="user-info" id="user-info"></span>
+      <a href="#" id="logout-btn" class="btn btn-xs btn-secondary" data-i18n="nav.logout">Déconnexion</a>
+    </div>
+  </nav>
+
+  <div class="page-container">
+    <h1 class="page-title" data-i18n="admin.title">Administration</h1>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="users" data-i18n="admin.users">Utilisateurs</button>
+      <button class="tab-btn" data-tab="rules" data-i18n="admin.alert_rules">Règles d'alerte</button>
+      <button class="tab-btn" data-tab="audit" data-i18n="admin.audit">Journal d'audit</button>
+      <button class="tab-btn" data-tab="retention" data-i18n="admin.retention">Rétention</button>
+      <button class="tab-btn" data-tab="system" data-i18n="admin.system">Système</button>
+    </div>
+
+    <!-- ─── USERS TAB ─────────────────────────────────── -->
+    <div class="tab-content active" id="tab-users">
+      <div class="flex justify-between mb-16">
+        <span class="text-muted" id="users-count"></span>
+        <button class="btn btn-primary btn-sm" id="btn-create-user" data-i18n="admin.create_user">Créer un utilisateur</button>
+      </div>
+      <div class="card">
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th data-i18n="common.id">ID</th>
+                <th data-i18n="admin.email">Email</th>
+                <th data-i18n="admin.display_name">Nom affiché</th>
+                <th data-i18n="admin.role">Rôle</th>
+                <th data-i18n="common.status">Statut</th>
+                <th data-i18n="admin.last_login">Dernière connexion</th>
+                <th data-i18n="common.actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="users-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── RULES TAB ──────────────────────────────────── -->
+    <div class="tab-content" id="tab-rules">
+      <div class="flex justify-between mb-16">
+        <span></span>
+        <button class="btn btn-primary btn-sm" id="btn-create-rule" data-i18n="admin.create_rule">Créer une règle</button>
+      </div>
+      <div class="card">
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th data-i18n="admin.rule_name">Nom</th>
+                <th data-i18n="admin.condition_type">Type</th>
+                <th data-i18n="admin.condition_value">Valeur</th>
+                <th data-i18n="admin.severity">Sévérité</th>
+                <th data-i18n="admin.active">Active</th>
+                <th data-i18n="common.actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="rules-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── AUDIT TAB ──────────────────────────────────── -->
+    <div class="tab-content" id="tab-audit">
+      <div class="filter-bar mb-16">
+        <div class="form-group">
+          <select id="audit-action">
+            <option value="" data-i18n="admin.all_actions">Toutes les actions</option>
+            <option value="login">Login</option>
+            <option value="logout">Logout</option>
+            <option value="create_user" data-i18n="admin.create_user">Créer utilisateur</option>
+            <option value="update_user" data-i18n="admin.edit_user">Modifier utilisateur</option>
+            <option value="delete_user" data-i18n="admin.delete_user">Supprimer utilisateur</option>
+            <option value="import_upload" data-i18n="import.upload">Import</option>
+            <option value="purge_logs" data-i18n="admin.purge">Purge</option>
+            <option value="run_retention" data-i18n="admin.run_retention">Rétention</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <input type="date" id="audit-date-from" data-i18n-placeholder="search.date_from" placeholder="Date début">
+        </div>
+        <div>
+          <button class="btn btn-primary btn-sm" id="audit-search-btn" data-i18n="search.btn">Filtrer</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th data-i18n="common.timestamp">Date</th>
+                <th data-i18n="admin.user">Utilisateur</th>
+                <th data-i18n="admin.action">Action</th>
+                <th data-i18n="admin.resource">Ressource</th>
+                <th data-i18n="admin.details">Détails</th>
+                <th data-i18n="admin.ip">IP</th>
+              </tr>
+            </thead>
+            <tbody id="audit-body"></tbody>
+          </table>
+        </div>
+        <div id="audit-pagination"></div>
+      </div>
+    </div>
+
+    <!-- ─── RETENTION TAB ──────────────────────────────── -->
+    <div class="tab-content" id="tab-retention">
+      <div class="grid-2 mb-24">
+        <div class="card">
+          <div class="card-header" data-i18n="admin.stats_by_level">Stats par niveau</div>
+          <div id="retention-stats"></div>
+        </div>
+        <div class="card">
+          <div class="card-header" data-i18n="admin.actions">Actions</div>
+          <div style="margin-top:8px">
+            <button class="btn btn-primary mb-16 w-full" id="btn-run-retention" data-i18n="admin.run_retention">Exécuter la rétention</button>
+            <h4 class="section-subtitle" data-i18n="admin.purge">Purge manuelle</h4>
+            <div class="form-group">
+              <select id="purge-level">
+                <option value="" data-i18n="admin.all_levels">Tous les niveaux</option>
+                <option value="DEBUG">DEBUG</option>
+                <option value="INFO">INFO</option>
+                <option value="WARNING">WARNING</option>
+                <option value="ERROR">ERROR</option>
+                <option value="FATAL">FATAL</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label data-i18n="admin.purge.date">Date antérieure</label>
+              <input type="date" id="purge-date">
+            </div>
+            <button class="btn btn-danger btn-sm" id="btn-purge" data-i18n="admin.purge">Purger</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── SYSTEM TAB ─────────────────────────────────── -->
+    <div class="tab-content" id="tab-system">
+      <div class="kpi-grid" id="system-stats"></div>
+    </div>
+  </div>
+
+  <!-- ─── USER MODAL ───────────────────────────────────── -->
+  <div class="modal-overlay" id="user-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="user-modal-title" data-i18n="admin.create_user">Créer un utilisateur</h3>
+        <button class="modal-close" id="user-modal-close">&times;</button>
+      </div>
+      <form id="user-form">
+        <input type="hidden" id="uf-id">
+        <div class="form-group">
+          <label data-i18n="admin.email">Email</label>
+          <input type="email" id="uf-email" required>
+        </div>
+        <div class="form-group">
+          <label data-i18n="admin.display_name">Nom affiché</label>
+          <input type="text" id="uf-display-name">
+        </div>
+        <div class="form-group">
+          <label data-i18n="admin.password">Mot de passe</label>
+          <input type="password" id="uf-password" placeholder="8 caractères min.">
+        </div>
+        <div class="form-group">
+          <label data-i18n="admin.role">Rôle</label>
+          <select id="uf-role">
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="user-modal-cancel" data-i18n="admin.cancel">Annuler</button>
+          <button type="submit" class="btn btn-primary" data-i18n="admin.save">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ─── RULE MODAL ───────────────────────────────────── -->
+  <div class="modal-overlay" id="rule-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="rule-modal-title" data-i18n="admin.create_rule">Créer une règle</h3>
+        <button class="modal-close" id="rule-modal-close">&times;</button>
+      </div>
+      <form id="rule-form">
+        <input type="hidden" id="rf-id">
+        <div class="form-group">
+          <label data-i18n="admin.rule_name">Nom</label>
+          <input type="text" id="rf-name" required>
+        </div>
+        <div class="form-group">
+          <label data-i18n="admin.rule_desc">Description</label>
+          <textarea id="rf-description"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label data-i18n="admin.condition_type">Type de condition</label>
+            <select id="rf-condition-type">
+              <option value="level">Level</option>
+              <option value="count">Count</option>
+              <option value="fingerprint">Fingerprint</option>
+              <option value="threshold">Threshold</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label data-i18n="admin.condition_value">Valeur</label>
+            <input type="text" id="rf-condition-value" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label data-i18n="admin.threshold">Seuil</label>
+            <input type="number" id="rf-threshold" min="1">
+          </div>
+          <div class="form-group">
+            <label data-i18n="admin.severity">Sévérité</label>
+            <select id="rf-severity">
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="critical">Critical</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label data-i18n="admin.time_window">Fenêtre (min)</label>
+            <input type="number" id="rf-time-window" value="60" min="1">
+          </div>
+          <div class="form-group">
+            <label data-i18n="admin.cooldown">Cooldown (min)</label>
+            <input type="number" id="rf-cooldown" value="30" min="0">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="rf-active" checked> <span data-i18n="admin.active">Active</span>
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="rule-modal-cancel" data-i18n="admin.cancel2">Annuler</button>
+          <button type="submit" class="btn btn-primary" data-i18n="admin.save">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ─── RESET PWD MODAL ─────────────────────────────── -->
+  <div class="modal-overlay" id="pwd-modal">
+    <div class="modal modal-narrow">
+      <div class="modal-header">
+        <h3>Réinitialiser le mot de passe</h3>
+        <button class="modal-close" id="pwd-modal-close">&times;</button>
+      </div>
+      <form id="pwd-form">
+        <input type="hidden" id="pf-id">
+        <div class="form-group">
+          <label data-i18n="admin.password">Nouveau mot de passe</label>
+          <input type="password" id="pf-password" required minlength="8">
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="pwd-modal-cancel" data-i18n="admin.cancel">Annuler</button>
+          <button type="submit" class="btn btn-primary" data-i18n="admin.save">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast-container"></div>
+
+  <script src="/api.js"></script>
+  <script src="/i18n.js"></script>
+  <script src="/app-common.js"></script>
+  <script>
+    (function() {
+      if (!window.api) return;
+      var myUserId = null;
+      var auditPage = 1;
+
+      window.initApp().then(function(u) { myUserId = u.id; });
+
+      document.getElementById('logout-btn').addEventListener('click', function(e) {
+        e.preventDefault();
+        window.logout();
+      });
+
+      // Tabs
+      document.querySelectorAll('.tab-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+          document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
+          btn.classList.add('active');
+          var tab = btn.getAttribute('data-tab');
+          document.getElementById('tab-' + tab).classList.add('active');
+          if (tab === 'audit') loadAudit();
+          if (tab === 'retention') loadRetention();
+          if (tab === 'system') loadSystem();
+        });
+      });
+
+      // ─── Notifications & Sounds (Admin) ───────────
+      var adminUnreadAlerts = 0;
+      var notificationAudio = new Audio('data:audio/wav;base64,UklGRiYAAABXQVZFZm10IBAAAAABAAEAQB8AAAB9AAACABAAZGF0YQIAAAAAAA==');
+      
+      function updateAdminBadge(count) {
+        adminUnreadAlerts = count;
+        var canvas = document.createElement('canvas');
+        canvas.width = 32; canvas.height = 32;
+        var ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#c00';
+        ctx.fillRect(0, 0, 32, 32);
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 20px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(Math.min(count, 9), 16, 24);
+        var link = document.querySelector("link[rel*='icon']") || document.createElement('link');
+        link.rel = 'shortcut icon';
+        link.href = canvas.toDataURL();
+        if (!document.querySelector("link[rel*='icon']")) document.head.appendChild(link);
+        if (count > 0) {
+          document.title = `(${count}) LogSystem Admin`;
+        } else {
+          document.title = 'LogSystem Admin';
+        }
+      }
+      
+      function playAdminSound() {
+        try { notificationAudio.currentTime = 0; notificationAudio.play().catch(function(){}); }
+        catch(e) { /* audio playback blocked */ }
+      }
+      
+      function showAdminNotification(title, options) {
+        if ('Notification' in window && Notification.permission === 'granted') {
+          try {
+            var n = new Notification(title, Object.assign({
+              icon: '/image/logo.png',
+              badge: '/image/logo.png',
+              tag: 'admin-alert-' + Date.now(),
+              requireInteraction: false
+            }, options || {}));
+            n.onclick = function() { window.focus(); this.close(); };
+            setTimeout(() => n.close(), 5000);
+          } catch(e) { /* Notification not available */ }
+        }
+      }
+      
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+      
+      // ─── SSE ALERTS ───────────────────────────────
+      var es = null;
+      var sseRetryDelay = 1000;
+      var sseHeartbeat = Date.now();
+      function connectSSE() {
+        if (es) {
+          try { es.close(); } catch (_) {}
+          es = null;
+        }
+        es = new EventSource('/api/alerts/stream');
+        sseHeartbeat = Date.now();
+        
+        // Zombie detection
+        var zombieCheck = setInterval(() => {
+          if (Date.now() - sseHeartbeat > 120000) {
+            clearInterval(zombieCheck);
+            try { es.close(); } catch (_) {}
+            connectSSE();
+          }
+        }, 30000);
+        
+        es.addEventListener('alert', function(e) {
+          sseHeartbeat = Date.now();
+          var a = JSON.parse(e.data);
+          if (a.event_type === 'log' || a.event_type === 'log_batch') return;
+          playAdminSound();
+          updateAdminBadge(++adminUnreadAlerts);
+          window.toast.warning(a.message);
+          var severity = a.severity || 'medium';
+          showAdminNotification('🚨 Admin Alert: ' + a.message, {
+            body: 'Severity: ' + severity,
+            tag: 'admin-alert-' + a.id
+          });
+          loadSystem();
+        });
+        es.addEventListener('heartbeat', function() {
+          sseHeartbeat = Date.now();
+        });
+        es.onerror = function() {
+          try { es.close(); } catch (_) {}
+          fetch('/api/auth/me', { credentials: 'same-origin' })
+            .then(function(r) {
+              if (r.status === 401) {
+                window.location.href = '/login.html';
+                return;
+              }
+              setTimeout(connectSSE, sseRetryDelay);
+              sseRetryDelay = Math.min(sseRetryDelay * 2, 30000);
+            })
+            .catch(function() {
+              setTimeout(connectSSE, sseRetryDelay);
+              sseRetryDelay = Math.min(sseRetryDelay * 2, 30000);
+            });
+        };
+      }
+      connectSSE();
+
+      setInterval(function() {
+        if (document.hidden) return;
+        loadUsers();
+        loadSystem();
+        if (document.querySelector('.tab-btn.active')) {
+          var tab = document.querySelector('.tab-btn.active').getAttribute('data-tab');
+          if (tab === 'audit') loadAudit();
+          if (tab === 'retention') loadRetention();
+        }
+      }, 60000);
+
+      // ─── USERS ────────────────────────────────────
+      function loadUsers() {
+        api.get('/api/admin/users').then(function(users) {
+          document.getElementById('users-count').textContent = users.length + ' utilisateur(s)';
+          var tb = document.getElementById('users-body');
+          tb.innerHTML = users.map(function(u) {
+            var statusBadge = u.is_active ? '<span class="badge badge-status-resolved">Actif</span>' : '<span class="badge badge-status-open">Inactif</span>';
+            var actions = '';
+            if (u.id !== myUserId) {
+              actions += '<button class="btn btn-xs btn-secondary act-edit-user" data-id="'+u.id+'" data-email="'+esc(u.email)+'" data-name="'+esc(u.display_name)+'" data-role="'+esc(u.role)+'">Edit</button> ';
+              actions += '<button class="btn btn-xs btn-secondary act-reset-pwd" data-id="'+u.id+'">Reset</button> ';
+              actions += u.is_active
+                ? '<button class="btn btn-xs btn-secondary act-toggle-user" data-id="'+u.id+'" data-active="0">Désactiver</button> '
+                : '<button class="btn btn-xs btn-success act-toggle-user" data-id="'+u.id+'" data-active="1">Activer</button> ';
+              actions += '<button class="btn btn-xs btn-danger act-delete-user" data-id="'+u.id+'">Supprimer</button>';
+            } else {
+              actions = '<span style="font-size:12px;color:var(--text2)">(compte courant)</span>';
+            }
+            return '<tr><td>'+u.id+'</td><td>'+esc(u.email)+'</td><td>'+esc(u.display_name)+'</td><td><span class="badge badge-info">'+esc(u.role)+'</span></td><td>'+statusBadge+'</td><td>'+fmtDT(u.last_login)+'</td><td>'+actions+'</td></tr>';
+          }).join('');
+        });
+      }
+
+      document.getElementById('users-body').addEventListener('click', function(e) {
+        var btn = e.target.closest('button');
+        if (!btn) return;
+
+        if (btn.classList.contains('act-edit-user')) {
+          document.getElementById('uf-id').value = btn.dataset.id;
+          document.getElementById('uf-email').value = btn.dataset.email;
+          document.getElementById('uf-display-name').value = btn.dataset.name || '';
+          document.getElementById('uf-role').value = btn.dataset.role;
+          document.getElementById('uf-password').value = '';
+          document.getElementById('uf-password').required = false;
+          document.getElementById('user-modal-title').textContent = 'Modifier l\'utilisateur';
+          document.getElementById('user-modal').classList.add('active');
+        }
+        if (btn.classList.contains('act-reset-pwd')) {
+          document.getElementById('pf-id').value = btn.dataset.id;
+          document.getElementById('pf-password').value = '';
+          document.getElementById('pwd-modal').classList.add('active');
+        }
+        if (btn.classList.contains('act-toggle-user')) {
+          var id = btn.dataset.id;
+          var active = btn.dataset.active === '1';
+          api.put('/api/admin/users/' + id, { is_active: active }).then(function() {
+            window.toast.success(active ? 'Utilisateur activé' : 'Utilisateur désactivé');
+            loadUsers();
+          });
+        }
+        if (btn.classList.contains('act-delete-user')) {
+          if (!confirm('Confirmer la suppression ?')) return;
+          api.del('/api/admin/users/' + btn.dataset.id).then(function() {
+            window.toast.success('Utilisateur supprimé');
+            loadUsers();
+          });
+        }
+      });
+
+      document.getElementById('btn-create-user').addEventListener('click', function() {
+        document.getElementById('user-form').reset();
+        document.getElementById('uf-id').value = '';
+        document.getElementById('uf-password').required = true;
+        document.getElementById('user-modal-title').textContent = 'Créer un utilisateur';
+        document.getElementById('user-modal').classList.add('active');
+      });
+
+      document.getElementById('user-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        var id = document.getElementById('uf-id').value;
+        var data = {
+          email: document.getElementById('uf-email').value,
+          display_name: document.getElementById('uf-display-name').value,
+          role: document.getElementById('uf-role').value
+        };
+        var password = document.getElementById('uf-password').value;
+        if (password) data.password = password;
+
+        var promise = id ? api.put('/api/admin/users/' + id, data) : api.post('/api/admin/users', data);
+        promise.then(function() {
+          window.toast.success(id ? 'Utilisateur modifié' : 'Utilisateur créé');
+          document.getElementById('user-modal').classList.remove('active');
+          loadUsers();
+        }).catch(function(err) { window.toast.error(err.error || 'Erreur'); });
+      });
+
+      document.getElementById('pwd-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        api.post('/api/admin/users/' + document.getElementById('pf-id').value + '/reset-password', {
+          password: document.getElementById('pf-password').value
+        }).then(function() {
+          window.toast.success('Mot de passe réinitialisé');
+          document.getElementById('pwd-modal').classList.remove('active');
+        }).catch(function(err) { window.toast.error(err.error || 'Erreur'); });
+      });
+
+      ['user-modal-close','user-modal-cancel'].forEach(function(id) {
+        document.getElementById(id).addEventListener('click', function() {
+          document.getElementById('user-modal').classList.remove('active');
+        });
+      });
+      ['rule-modal-close','rule-modal-cancel'].forEach(function(id) {
+        document.getElementById(id).addEventListener('click', function() {
+          document.getElementById('rule-modal').classList.remove('active');
+        });
+      });
+      ['pwd-modal-close','pwd-modal-cancel'].forEach(function(id) {
+        document.getElementById(id).addEventListener('click', function() {
+          document.getElementById('pwd-modal').classList.remove('active');
+        });
+      });
+      document.querySelectorAll('.modal-overlay').forEach(function(m) {
+        m.addEventListener('click', function(e) { if (e.target === m) m.classList.remove('active'); });
+      });
+
+      // ─── RULES ────────────────────────────────────
+      function loadRules() {
+        api.get('/api/admin/alert-rules').then(function(rules) {
+          var tb = document.getElementById('rules-body');
+          tb.innerHTML = rules.map(function(r) {
+            var cv = r.condition_value && r.condition_value.length > 30 ? r.condition_value.slice(0,30) + '\u2026' : (r.condition_value || '');
+            var activeBadge = r.is_active ? '<span class="badge badge-status-resolved">Oui</span>' : '<span class="badge badge-status-open">Non</span>';
+            var sevCls = { low: 'badge-info', medium: 'badge-warning', high: 'badge-error', critical: 'badge-fatal' };
+            return '<tr><td>'+esc(r.name)+'</td><td>'+esc(r.condition_type)+'</td><td title="'+esc(r.condition_value)+'" style="font-size:12px">'+esc(cv)+'</td><td><span class="badge '+(sevCls[r.severity]||'badge-info')+'">'+esc(r.severity)+'</span></td><td>'+activeBadge+'</td><td><button class="btn btn-xs btn-secondary act-edit-rule" data-rule="'+encodeURIComponent(JSON.stringify(r))+'">Edit</button> <button class="btn btn-xs btn-danger act-delete-rule" data-id="'+r.id+'">Supprimer</button></td></tr>';
+          }).join('');
+        });
+      }
+
+      document.getElementById('rules-body').addEventListener('click', function(e) {
+        var btn = e.target.closest('button');
+        if (!btn) return;
+        if (btn.classList.contains('act-edit-rule')) {
+          var r = JSON.parse(decodeURIComponent(btn.dataset.rule));
+          document.getElementById('rf-id').value = r.id;
+          document.getElementById('rf-name').value = r.name;
+          document.getElementById('rf-description').value = r.description || '';
+          document.getElementById('rf-condition-type').value = r.condition_type;
+          document.getElementById('rf-condition-value').value = r.condition_value;
+          document.getElementById('rf-threshold').value = r.threshold_value || '';
+          document.getElementById('rf-severity').value = r.severity;
+          document.getElementById('rf-time-window').value = r.time_window_minutes;
+          document.getElementById('rf-cooldown').value = r.cooldown_minutes;
+          document.getElementById('rf-active').checked = !!r.is_active;
+          document.getElementById('rule-modal-title').textContent = 'Modifier la règle';
+          document.getElementById('rule-modal').classList.add('active');
+        }
+        if (btn.classList.contains('act-delete-rule')) {
+          if (!confirm('Confirmer la suppression ?')) return;
+          api.del('/api/admin/alert-rules/' + btn.dataset.id).then(function() {
+            window.toast.success('Règle supprimée');
+            loadRules();
+          });
+        }
+      });
+
+      document.getElementById('btn-create-rule').addEventListener('click', function() {
+        document.getElementById('rule-form').reset();
+        document.getElementById('rf-id').value = '';
+        document.getElementById('rf-active').checked = true;
+        document.getElementById('rule-modal-title').textContent = 'Créer une règle';
+        document.getElementById('rule-modal').classList.add('active');
+      });
+
+      document.getElementById('rule-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        var id = document.getElementById('rf-id').value;
+        var data = {
+          name: document.getElementById('rf-name').value,
+          description: document.getElementById('rf-description').value,
+          condition_type: document.getElementById('rf-condition-type').value,
+          condition_value: document.getElementById('rf-condition-value').value,
+          threshold_value: parseInt(document.getElementById('rf-threshold').value) || null,
+          severity: document.getElementById('rf-severity').value,
+          time_window_minutes: parseInt(document.getElementById('rf-time-window').value) || 60,
+          cooldown_minutes: parseInt(document.getElementById('rf-cooldown').value) || 30,
+          is_active: document.getElementById('rf-active').checked
+        };
+        var promise = id ? api.put('/api/admin/alert-rules/' + id, data) : api.post('/api/admin/alert-rules', data);
+        promise.then(function() {
+          window.toast.success(id ? 'Règle modifiée' : 'Règle créée');
+          document.getElementById('rule-modal').classList.remove('active');
+          loadRules();
+        }).catch(function(err) { window.toast.error(err.error || 'Erreur'); });
+      });
+
+      // ─── AUDIT ────────────────────────────────────
+      function loadAudit() {
+        var params = { page: auditPage, limit: 30 };
+        var action = document.getElementById('audit-action').value;
+        var dateFrom = document.getElementById('audit-date-from').value;
+        if (action) params.action = action;
+        if (dateFrom) params.date_from = dateFrom;
+
+        var qs = Object.keys(params).map(function(k) { return encodeURIComponent(k)+'='+encodeURIComponent(params[k]); }).join('&');
+        api.get('/api/admin/audit?' + qs).then(function(resp) {
+          auditPage = resp.pagination.page;
+          var tb = document.getElementById('audit-body');
+          if (!resp.data.length) {
+            tb.innerHTML = '<tr><td colspan="6" class="no-data">Aucune donnée</td></tr>';
+            document.getElementById('audit-pagination').innerHTML = '';
+            return;
+          }
+          tb.innerHTML = resp.data.map(function(r) {
+            return '<tr><td>'+fmtDT(r.created_at)+'</td><td>'+esc(r.user_email)+'</td><td><span class="badge badge-info">'+esc(r.action)+'</span></td><td>'+esc(r.resource_type)+'</td><td class="text-truncate">'+esc(r.details)+'</td><td>'+esc(r.ip_address)+'</td></tr>';
+          }).join('');
+          document.getElementById('audit-pagination').innerHTML = paginationHtml(auditPage, resp.pagination.pages);
+        });
+      }
+
+      window.loadPage = function(page) {
+        auditPage = page;
+        loadAudit();
+      };
+
+      document.getElementById('audit-search-btn').addEventListener('click', function() { auditPage = 1; loadAudit(); });
+
+      // ─── RETENTION ────────────────────────────────
+      function loadRetention() {
+        api.get('/api/admin/retention/stats').then(function(stats) {
+          var html = '';
+          var levels = ['DEBUG','INFO','WARNING','ERROR','FATAL'];
+          levels.forEach(function(l) {
+            var s = stats.by_level[l] || {};
+            html += '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">';
+            html += '<span>'+badge(l)+' <span style="margin-left:8px;color:var(--text2)">'+s.days+'j</span></span>';
+            html += '<span>'+Number(s.retained||0).toLocaleString()+' / '+Number(s.total||0).toLocaleString()+'</span>';
+            html += '</div>';
+          });
+          document.getElementById('retention-stats').innerHTML = html;
+        });
+      }
+
+      document.getElementById('btn-run-retention').addEventListener('click', function() {
+        var btn = this;
+        btn.disabled = true;
+        btn.textContent = 'Rétention en cours...';
+        api.post('/api/admin/retention/run').then(function(r) {
+          window.toast.success('Rétention terminée');
+          loadRetention();
+        }).catch(function(err) { window.toast.error(err.error || 'Erreur'); })
+        .finally(function() { btn.disabled = false; btn.textContent = 'Exécuter la rétention'; });
+      });
+
+      document.getElementById('btn-purge').addEventListener('click', function() {
+        var level = document.getElementById('purge-level').value;
+        var date = document.getElementById('purge-date').value;
+        if (!level && !date) { window.toast.warning('Spécifiez un critère de purge'); return; }
+        if (!confirm('Confirmer la purge ?')) return;
+        var data = {};
+        if (level) data.log_level = level;
+        if (date) data.date_before = date + ' 23:59:59';
+        api.post('/api/admin/purge', data).then(function(r) {
+          window.toast.success(r.deleted + ' logs supprimés');
+        }).catch(function(err) { window.toast.error(err.error || 'Erreur'); });
+      });
+
+      // ─── SYSTEM ───────────────────────────────────
+      function loadSystem() {
+        api.get('/api/admin/system-stats').then(function(s) {
+          document.getElementById('system-stats').innerHTML =
+            '<div class="kpi-card"><span class="kpi-label">Utilisateurs</span><span class="kpi-value blue">'+s.total_users+'</span></div>' +
+            '<div class="kpi-card"><span class="kpi-label">Taille BDD</span><span class="kpi-value green">'+s.db_size_mb+' Mo</span></div>' +
+            '<div class="kpi-card"><span class="kpi-label">Error Groups (open)</span><span class="kpi-value red">'+s.open_error_groups+'</span></div>' +
+            '<div class="kpi-card"><span class="kpi-label">Alertes non lues</span><span class="kpi-value orange">'+s.new_alerts+'</span></div>' +
+            '<div class="kpi-card"><span class="kpi-label">Total logs</span><span class="kpi-value blue">'+Number(s.total_logs).toLocaleString()+'</span></div>';
+        });
+      }
+
+      // Initial loads
+      loadUsers();
+      loadRules();
+    })();
+  </script>
+</body>
+</html>
