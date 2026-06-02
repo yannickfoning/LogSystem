@@ -250,9 +250,9 @@ async function start() {
   }
 
   const server = app.listen(PORT, () => {
-    logger.info({ level: 'info', message: `[LOGSYSTEM V4] Running on http://localhost:${PORT}` });
-    logger.info({ level: 'info', message: `[LOGSYSTEM V4] Environment: ${process.env.NODE_ENV || 'development'}` });
-    logger.info({ level: 'info', message: `[LOGSYSTEM V4] Cache: ${cacheStarted ? 'Redis actif' : 'désactivé'}` });
+    logger.info({ level: 'info', message: `[LogSystem] Running on http://localhost:${PORT}` });
+    logger.info({ level: 'info', message: `[LogSystem] Environment: ${process.env.NODE_ENV || 'development'}` });
+    logger.info({ level: 'info', message: `[LogSystem] Cache: ${cacheStarted ? 'Redis actif' : 'désactivé'}` });
   });
 
   const shutdown = (signal) => {
