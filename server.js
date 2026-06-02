@@ -34,6 +34,7 @@ import compression from 'compression';
 import fs from 'fs';
 
 import { testConnection } from './config/database.js';
+import { runMigrations } from './lib/database/migrationRunner.js';
 import { requireAuth, requireAuthPage, requireAdminPage } from './middleware/auth.js';
 import { scopeGuard } from './middleware/scopeGuard.js';
 import { csrfMiddleware, csrfValidation } from './middleware/csrf.js';
@@ -202,13 +203,21 @@ app.use((err, req, res, _next) => {
   res.status(500).json({ error: 'Erreur interne du serveur' });
 });
 
-// ── Start ─────────────────────────────────────────────────────────────────────
+// ── Start ───────────────────────────────────────────────────────────────────────────
 async function start() {
   try {
     await testConnection();
   } catch (e) {
     logger.error({ event: 'db_connection_failed', error: e.message }, '[FATAL]');
     process.exit(1);
+  }
+
+  // MIGRATION: Run all pending migrations
+  logger.info({ event: 'starting_migrations' }, '[MIGRATION]');
+  const migrationsSucceeded = await runMigrations();
+  if (!migrationsSucceeded) {
+    logger.warn({ event: 'migrations_had_errors' }, '[MIGRATION]');
+    // Don't exit — continue running, migrations are idempotent
   }
 
   // BUG-03 FIX: Démarrage explicite du service cache Redis
