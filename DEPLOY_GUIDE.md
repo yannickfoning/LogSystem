@@ -1,4 +1,4 @@
-# LogSystem V4 - Guide de Déploiement Render + TiDB
+# LogSystem - Guide de Déploiement Render + TiDB
 
 ## 📋 Table des matières
 1. [Préparation](#préparation)
@@ -38,7 +38,7 @@
 2. **Sign Up** (gratuit)
 3. Créer un **Developer Tier Cluster**
    - Région : Europe (pour latence basse)
-   - Nom : `LogSystem-V4`
+   - Nom : `LogSystem`
 
 ### Étape 2 : Obtenir les credentials
 
