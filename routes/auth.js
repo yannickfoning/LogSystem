@@ -30,6 +30,16 @@ router.post('/login', validateBody(loginSchema), async (req, res) => {
       return res.status(401).json({ error: 'Identifiants invalides' });
     }
 
+    // Premier utilisateur à se connecter → devient admin automatiquement
+    // Cela fonctionne même après une réinitialisation de la plateforme
+    const [allUsers] = await pool.execute('SELECT COUNT(*) as total FROM users WHERE is_active = 1');
+    const isFirstUser = allUsers[0].total === 1;
+    if (isFirstUser && user.role !== 'admin') {
+      await pool.execute('UPDATE users SET role = ? WHERE id = ?', ['admin', user.id]);
+      user.role = 'admin';
+      logger.info({ event: 'first_user_promoted_admin', userId: user.id, email: user.email }, '[AUTH] Premier utilisateur promu admin');
+    }
+
     await pool.execute(
       'UPDATE users SET last_login = NOW() WHERE id = ?',
       [user.id]
