@@ -33,7 +33,7 @@ import rateLimit from 'express-rate-limit';
 import compression from 'compression';
 import fs from 'fs';
 
-import { testConnection } from './config/database.js';
+import { testConnection, buildSslOptions } from './config/database.js';
 import { runMigrations } from './lib/database/migrationRunner.js';
 import { requireAuth, requireAuthPage, requireAdminPage } from './middleware/auth.js';
 import { scopeGuard } from './middleware/scopeGuard.js';
@@ -132,6 +132,7 @@ const sessionStore = new MySQLSessionStore({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
+  ssl: buildSslOptions(),
   clearExpired: true,
   checkExpirationInterval: 900000,
   expiration: 86400000

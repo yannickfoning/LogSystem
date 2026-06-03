@@ -319,11 +319,30 @@ async function processLogFile(filePath, incremental = true) {
 }
 
 export async function startWatcher() {
-  // S-06: Initialize dirOwners asynchronously with validation
-  dirOwners = await parseDirOwners();
+  // FIX #2: Retry with exponential backoff for DB readiness
+  const maxRetries = 3;
+  const delays = [2000, 5000, 10000]; // 2s, 5s, 10s
   
-  // W-02: Load persisted offsets from database
-  await loadPersistedOffsets();
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // S-06: Initialize dirOwners asynchronously with validation
+      dirOwners = await parseDirOwners();
+      
+      // W-02: Load persisted offsets from database
+      await loadPersistedOffsets();
+      
+      // If we get here, DB is ready - break out of retry loop
+      break;
+    } catch (error) {
+      if (attempt === maxRetries) {
+        logger.error({ event: 'watcher_init_failed', attempt, error: error.message }, '[WATCHER]');
+        throw new Error(`Failed to initialize watcher after ${maxRetries} attempts: ${error.message}`);
+      }
+      
+      logger.warn({ event: 'watcher_retry', attempt, delay: delays[attempt - 1], error: error.message }, '[WATCHER]');
+      await new Promise(resolve => setTimeout(resolve, delays[attempt - 1]));
+    }
+  }
   
   const dirs = getDirs();
   if (dirs.length === 0) {
@@ -492,15 +511,45 @@ export async function getWatchStats(userId) {
 
     return {
       stats: {
-        ...(stats[0] || {}),
+        total_logs: stats[0]?.total_logs ?? 0,
+        debug_count: stats[0]?.debug_count ?? 0,
+        info_count: stats[0]?.info_count ?? 0,
+        warning_count: stats[0]?.warning_count ?? 0,
+        error_count: stats[0]?.error_count ?? 0,
+        critical_count: stats[0]?.critical_count ?? 0,
+        fatal_count: stats[0]?.fatal_count ?? 0,
+        sources: stats[0]?.sources ?? 0,
+        services: stats[0]?.services ?? 0,
+        modules: stats[0]?.modules ?? 0,
+        first_log: stats[0]?.first_log ?? null,
+        last_log: stats[0]?.last_log ?? null,
         logs_per_min
       },
       top_errors: topErrors || [],
       throughput: throughput || []
     };
   } catch (error) {
-    logger.error({ event: 'stats_error', error: error.message }, '[WATCHER]');
-    return { error: error.message };
+    logger.error({ event: 'stats_error', userId, error: error.message }, '[WATCHER]');
+    // Always return valid default object for SSE
+    return {
+      stats: {
+        total_logs: 0,
+        debug_count: 0,
+        info_count: 0,
+        warning_count: 0,
+        error_count: 0,
+        critical_count: 0,
+        fatal_count: 0,
+        sources: 0,
+        services: 0,
+        modules: 0,
+        first_log: null,
+        last_log: null,
+        logs_per_min: 0
+      },
+      top_errors: [],
+      throughput: []
+    };
   } finally {
     if (conn) {
       try { conn.release(); } catch (_) {}

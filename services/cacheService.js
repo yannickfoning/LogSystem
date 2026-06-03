@@ -56,7 +56,8 @@ function isReady() {
   return redis !== null && !redisUnavailable && redis.isReady;
 }
 
-const CACHE_TTL = 30;
+const CACHE_TTL_STATS = 300; // 5 minutes for stats
+const CACHE_TTL_COUNTERS = 60; // 1 minute for counters
 
 export async function getCachedDashboard(userId) {
   if (!isReady()) return null;
@@ -74,7 +75,8 @@ export async function setCachedDashboard(userId, data) {
   if (!isReady()) return false;
   try {
     const key = `dashboard:${userId}`;
-    await redis.setEx(key, CACHE_TTL, JSON.stringify(data));
+    // FIX #14: Use explicit TTL (300s for stats)
+    await redis.setEx(key, CACHE_TTL_STATS, JSON.stringify(data));
     return true;
   } catch (e) {
     logger.warn({ event: 'cache_set_error', error: e.message }, '[CACHE]');

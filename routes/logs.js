@@ -5,6 +5,7 @@ import { requireAuth, requireAdmin, userScope } from '../middleware/auth.js';
 import { startWatcher, stopWatcher, getWatcherStatus, detectAnomalies, getWatchStats } from '../services/watcherService.js';
 import { recordAudit } from '../middleware/audit.js';
 import PDFDocument from 'pdfkit';
+import { alertEngineBus } from '../services/alertEngine.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -356,23 +357,33 @@ router.get('/watch/stream', async (req, res) => {
     res.write('event: connected\n');
     res.write(`data: ${JSON.stringify({ connected: true, user_id: user.id })}\n\n`);
 
-    let isConnected = true;
+    let closed = false;
     let statsInterval;
     let anomalyInterval;
+    let heartbeat;
+
+    const cleanup = () => {
+      if (closed) return;
+      closed = true;
+      clearInterval(statsInterval);
+      clearInterval(anomalyInterval);
+      clearInterval(heartbeat);
+      alertEngineBus.off('logs.inserted', alertHandler);
+    };
 
     statsInterval = setInterval(async () => {
-      if (!isConnected) return;
+      if (closed) return;
       try {
         const stats = await getWatchStats(user.id);
         res.write('event: stats_update\n');
         res.write(`data: ${JSON.stringify(stats)}\n\n`);
       } catch (e) {
-        logger.error({ event: 'watch_stream_stats_error', error: e.message }, '[WATCH STREAM]');
+        logger.error({ event: 'watch_stream_stats_error', userId: user.id, error: e.message }, '[WATCH STREAM]');
       }
     }, 10000);
 
     anomalyInterval = setInterval(async () => {
-      if (!isConnected) return;
+      if (closed) return;
       try {
         const anomaly = await detectAnomalies(user.id, 10);
         if (anomaly.anomaly_detected) {
@@ -380,25 +391,29 @@ router.get('/watch/stream', async (req, res) => {
           res.write(`data: ${JSON.stringify(anomaly)}\n\n`);
         }
       } catch (e) {
-        logger.error({ event: 'watch_stream_anomaly_error', error: e.message }, '[WATCH STREAM]');
+        logger.error({ event: 'watch_stream_anomaly_error', userId: user.id, error: e.message }, '[WATCH STREAM]');
       }
     }, 5 * 60 * 1000);
 
-    req.on('close', () => {
-      isConnected = false;
-      clearInterval(statsInterval);
-      clearInterval(anomalyInterval);
-    });
-
-    const heartbeat = setInterval(() => {
-      if (isConnected) {
+    heartbeat = setInterval(() => {
+      if (!closed) {
         res.write(':heartbeat\n\n');
       }
     }, 30000);
 
-    req.on('close', () => {
-      clearInterval(heartbeat);
-    });
+    // FIX #1: Listen to alertEngineBus events and filter by user_id
+    const alertHandler = (event) => {
+      if (closed) return;
+      // Filter events: only send if event.userId matches current user or user is admin
+      if (event.userId !== user.id && user.role !== 'admin') return;
+      
+      res.write('event: alert_triggered\n');
+      res.write(`data: ${JSON.stringify(event)}\n\n`);
+    };
+    alertEngineBus.on('logs.inserted', alertHandler);
+
+    req.on('close', cleanup);
+    req.on('error', cleanup);
   } catch (error) {
     logger.error({ event: 'watch_stream_error', error: error.message }, '[WATCH STREAM]');
     if (!res.headersSent) {

@@ -33,8 +33,8 @@
       <div class="drop-zone" id="drop-zone">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         <p data-i18n="import.drop">Glissez un fichier ici ou cliquez pour sélectionner</p>
-        <p class="text-hint" data-i18n="import.formats">Formats acceptés : .log, .txt, .json, .jsonl, .csv, .xml, .zip, .gz (max 50 Mo)</p>
-        <input type="file" class="file-input" id="file-input" accept=".log,.txt,.json,.jsonl,.csv,.xml,.zip,.gz,.gzip,.tar,.tgz">
+        <p class="text-hint" data-i18n="import.formats">Formats acceptés : .log, .txt, .json, .jsonl, .csv, .xml, .zip, .gz, .rar (max 50 Mo)</p>
+        <input type="file" class="file-input" id="file-input" accept=".log,.txt,.json,.jsonl,.csv,.xml,.zip,.gz,.gzip,.tar,.tgz,.rar">
       </div>
 
       <div class="form-row mt-16">
@@ -45,6 +45,17 @@
         <div class="form-group">
           <label data-i18n="import.service">Service (optionnel)</label>
           <input type="text" id="import-service" data-i18n-placeholder="import.service.placeholder" placeholder="ex: api-gateway">
+        </div>
+      </div>
+
+      <div class="form-row mt-16">
+        <div class="form-group">
+          <label>Format des dates dans le fichier</label>
+          <select id="date-locale" name="locale">
+            <option value="fr" selected>Français (JJ/MM/AAAA)</option>
+            <option value="us">Américain (MM/JJ/AAAA)</option>
+            <option value="iso">ISO 8601 (AAAA-MM-JJ)</option>
+          </select>
         </div>
       </div>
 
@@ -122,7 +133,7 @@
 
       function selectFile(file) {
         var ext = file.name.split('.').pop().toLowerCase();
-        if (!['log','txt','json','jsonl','csv','xml','zip','gz','gzip','tar','tgz'].includes(ext)) {
+        if (!['log','txt','json','jsonl','csv','xml','zip','gz','gzip','tar','tgz','rar'].includes(ext)) {
           window.toast.error(window.i18n ? window.i18n.t('import.unsupported') : 'Format non supporté');
           return;
         }
@@ -140,8 +151,10 @@
         formData.append('file', selectedFile);
         var source = document.getElementById('import-source').value;
         var service = document.getElementById('import-service').value;
+        var locale = document.getElementById('date-locale').value; // FIX 4b
         if (source) formData.append('source', source);
         if (service) formData.append('service', service);
+        formData.append('locale', locale); // FIX 4b
 
         try {
           var result = await api.upload('/api/import/upload', formData);
@@ -173,6 +186,32 @@
               document.getElementById('progress-text').textContent = 'Import terminé !';
               document.getElementById('progress-fill').style.width = '100%';
               document.getElementById('progress-pct').textContent = '100%';
+              
+              // FIX 4a: Display quality summary
+              if (job.import_summary) {
+                var s = job.import_summary;
+                var total = job.total_lines || 0;
+                var inserted = job.processed_lines || 0;
+                var skipped = job.skipped_lines || 0;
+                var missingUser = s.missing_user || 0;
+                var missingTs = s.missing_timestamp || 0;
+                var inferred = s.timestamp_inferred_count || 0;
+                
+                var pctUser = total > 0 ? Math.round((1 - missingUser / total) * 100) : 0;
+                var pctTs = total > 0 ? Math.round((1 - missingTs / total) * 100) : 0;
+                
+                var summaryHtml = '<div class="card mt-16" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px">';
+                summaryHtml += '<h4 style="margin:0 0 12px;font-size:14px;color:#1e293b">📊 Qualité d\'extraction</h4>';
+                summaryHtml += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">';
+                summaryHtml += '<div style="text-align:center"><div style="font-size:22px;font-weight:700;color:#2563eb">' + inserted + '</div><div style="font-size:11px;color:#64748b">logs importés</div></div>';
+                summaryHtml += '<div style="text-align:center"><div style="font-size:22px;font-weight:700;color:' + (pctTs >= 90 ? '#16a34a' : pctTs >= 60 ? '#d97706' : '#dc2626') + '">' + pctTs + '%</div><div style="font-size:11px;color:#64748b">dates originales<br>' + (missingTs > 0 ? '(' + missingTs + ' inférées)' : '✓ toutes extraites') + '</div></div>';
+                summaryHtml += '<div style="text-align:center"><div style="font-size:22px;font-weight:700;color:' + (pctUser >= 70 ? '#16a34a' : pctUser >= 40 ? '#d97706' : '#94a3b8') + '">' + pctUser + '%</div><div style="font-size:11px;color:#64748b">avec utilisateur<br>' + (missingUser > 0 ? '(' + missingUser + ' non trouvés)' : '✓ tous identifiés') + '</div></div>';
+                summaryHtml += '</div>';
+                if (skipped > 0) summaryHtml += '<p style="font-size:12px;color:#dc2626;margin:8px 0 0">⚠ ' + skipped + ' lignes ignorées (vides ou invalides)</p>';
+                summaryHtml += '</div>';
+                document.getElementById('progress-section').insertAdjacentHTML('afterend', summaryHtml);
+              }
+              
               window.toast.success('Import terminé avec succès');
               uploadBtn.disabled = false;
               uploadBtn.textContent = 'Importer';

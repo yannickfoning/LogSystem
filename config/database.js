@@ -2,12 +2,29 @@ import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 import logger from './logger.js';
 
 // Ensure .env is loaded
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '../.env') });
+
+export function buildSslOptions() {
+  if (String(process.env.DB_SSL || '').toLowerCase() !== 'true') return undefined;
+
+  const ssl = {
+    rejectUnauthorized: String(process.env.DB_SSL_REJECT_UNAUTHORIZED || 'true').toLowerCase() !== 'false'
+  };
+
+  if (process.env.DB_SSL_CA_PATH) {
+    ssl.ca = fs.readFileSync(process.env.DB_SSL_CA_PATH, 'utf8');
+  } else if (process.env.DB_SSL_CA) {
+    ssl.ca = process.env.DB_SSL_CA.replace(/\\n/g, '\n');
+  }
+
+  return ssl;
+}
 
 // AMÉLIORATION Transverse: Optimized connection pool for 10k+ logs/sec
 // Increased connectionLimit and tuned parameters for high throughput
@@ -25,7 +42,8 @@ const pool = mysql.createPool({
   namedPlaceholders: true,
   maxPreparedStatements: 100,
   enableKeepAlive: true,
-  keepAliveInitialDelay: 0
+  keepAliveInitialDelay: 0,
+  ssl: buildSslOptions()
 });
 
 // PERF-05: Connection pool monitoring with stats

@@ -186,6 +186,11 @@ describe('Archive Detection', () => {
     expect(type).toBe('targz');
   });
 
+  it('should detect RAR by extension', () => {
+    const type = detectArchiveType('logs.rar');
+    expect(type).toBe('rar');
+  });
+
   it('should detect ZIP by magic bytes', () => {
     const magic = Buffer.from([0x50, 0x4B, 0x03, 0x04]);
     const type = detectArchiveType('unknown', magic);
@@ -196,6 +201,16 @@ describe('Archive Detection', () => {
     const magic = Buffer.from([0x1F, 0x8B]);
     const type = detectArchiveType('unknown', magic);
     expect(type).toBe('gzip');
+  });
+
+  it('should detect RAR by magic bytes', () => {
+    const magic = Buffer.from([0x52, 0x61, 0x72, 0x21]);
+    const type = detectArchiveType('unknown', magic);
+    expect(type).toBe('rar');
+  });
+
+  it('should classify RAR files as archives', () => {
+    expect(isArchive('logs.rar')).toBe(true);
   });
 });
 

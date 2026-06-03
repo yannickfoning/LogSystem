@@ -59,6 +59,9 @@
         <input type="text" id="f-service" data-i18n-placeholder="search.service" placeholder="Service">
       </div>
       <div class="form-group">
+        <input type="text" id="f-target-user" placeholder="Utilisateur" autocomplete="off">
+      </div>
+      <div class="form-group">
         <input type="datetime-local" id="f-date-from">
       </div>
       <div class="form-group">
@@ -95,13 +98,12 @@
         <table>
           <thead>
             <tr>
-              <th data-i18n="common.timestamp">Timestamp</th>
+              <th data-i18n="common.timestamp">Horodatage</th>
               <th data-i18n="common.level">Niveau</th>
               <th data-i18n="common.source">Source</th>
               <th data-i18n="common.service">Service</th>
+              <th>Utilisateur</th>
               <th data-i18n="common.event_type">Type</th>
-              <th>Type d'erreur</th>
-              <th>Empreinte</th>
               <th data-i18n="common.message">Message</th>
             </tr>
           </thead>
@@ -167,7 +169,28 @@
             return;
           }
           tb.innerHTML = resp.data.map(function(r) {
-            return '<tr data-id="'+r.id+'"><td>'+fmtDT(r.timestamp)+'</td><td>'+badge(r.log_level)+'</td><td>'+esc(r.source)+'</td><td>'+esc(r.service)+'</td><td>'+esc(r.event_type)+'</td><td>'+esc(r.error_type)+'</td><td><code style="font-size:11px;white-space:nowrap;overflow:hidden;display:inline-block;max-width:150px;">'+esc(r.fingerprint)+'</code></td><td class="text-truncate">'+esc(r.message)+'</td></tr>';
+            // FIX 3a: Timestamp with inferred indicator
+            var tsCell = r.timestamp_inferred
+              ? '<td><span title="Date inférée (non présente dans le log original)" style="color:#f59e0b">'
+                + fmtDT(r.timestamp)
+                + ' <small>~</small></span></td>'
+              : '<td>' + fmtDT(r.timestamp) + '</td>';
+            
+            // FIX 3a: User column with badge
+            var userCell = r.target_user
+              ? '<td><span style="background:#eff6ff;color:#2563eb;padding:1px 6px;border-radius:4px;font-size:11px">'
+                + esc(r.target_user) + '</span></td>'
+              : '<td><span style="color:#9ca3af;font-size:11px">—</span></td>';
+            
+            return '<tr data-id="'+r.id+'">'
+              + tsCell
+              + '<td>'+badge(r.log_level)+'</td>'
+              + '<td>'+esc(r.source)+'</td>'
+              + '<td>'+esc(r.service)+'</td>'
+              + userCell
+              + '<td>'+esc(r.event_type)+'</td>'
+              + '<td class="text-truncate">'+esc(r.message)+'</td>'
+              + '</tr>';
           }).join('');
           document.getElementById('logs-pagination').innerHTML = paginationHtml(currentPage, totalPages);
         }).catch(function(err) {
@@ -204,6 +227,7 @@
         document.getElementById('f-level').value = '';
         document.getElementById('f-source').value = '';
         document.getElementById('f-service').value = '';
+        document.getElementById('f-target-user').value = ''; // FIX 3b
         document.getElementById('f-date-from').value = '';
         document.getElementById('f-date-to').value = '';
         currentPage = 1;
@@ -216,12 +240,14 @@
         var level = document.getElementById('f-level').value;
         var source = document.getElementById('f-source').value.trim();
         var service = document.getElementById('f-service').value.trim();
+        var targetUser = document.getElementById('f-target-user').value.trim();
         var dateFrom = document.getElementById('f-date-from').value;
         var dateTo = document.getElementById('f-date-to').value;
         if (search) p.search = search;
         if (level) p.log_level = level;
         if (source) p.source = source;
         if (service) p.service = service;
+        if (targetUser) p.target_user = targetUser; // FIX 3b
         if (dateFrom) p.date_from = dateFrom.replace('T', ' ');
         if (dateTo) p.date_to = dateTo.replace('T', ' ');
         if (window.chipFilter && window.chipFilter.type && window.chipFilter.value) {
@@ -250,6 +276,9 @@
         if (params.has('service')) {
           document.getElementById('f-service').value = params.get('service');
         }
+        if (params.has('target_user')) {
+          document.getElementById('f-target-user').value = params.get('target_user'); // FIX 3b
+        }
         if (params.has('search')) {
           document.getElementById('f-search').value = params.get('search');
         }
@@ -269,6 +298,7 @@
           document.getElementById('f-search').value = '';
           document.getElementById('f-source').value = '';
           document.getElementById('f-service').value = '';
+          document.getElementById('f-target-user').value = ''; // FIX 3b
           document.getElementById('f-date-from').value = '';
           document.getElementById('f-date-to').value = '';
 
@@ -329,7 +359,14 @@
         api.get('/api/logs/' + id).then(function(log) {
           var html = '<div style="font-size:13px;line-height:1.8">';
           html += '<p><strong data-i18n="modal.id">Identifiant:</strong> ' + log.id + '</p>';
-          html += '<p><strong data-i18n="modal.timestamp">Horodatage:</strong> ' + fmtDT(log.timestamp) + '</p>';
+          // FIX 3c: Add date inferee badge
+          html += '<p><strong data-i18n="modal.timestamp">Horodatage :</strong> ' + fmtDT(log.timestamp);
+          if (log.timestamp_inferred) {
+            html += ' <span title="La date originale du log n\'a pas pu être extraite. Cette date correspond au moment de l\'import." '
+                  + 'style="background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:4px;font-size:11px;margin-left:6px">'
+                  + '⚠ date inférée</span>';
+          }
+          html += '</p>';
           html += '<p><strong data-i18n="modal.level">Importance:</strong> ' + badge(log.log_level) + '</p>';
           html += '<p><strong data-i18n="modal.source">Source:</strong> ' + esc(log.source) + '</p>';
           html += '<p><strong data-i18n="modal.service">Service:</strong> ' + esc(log.service) + '</p>';

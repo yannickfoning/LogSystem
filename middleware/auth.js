@@ -84,5 +84,8 @@ export function userScope(req) {
   if (!user) {
     return { sql: ' AND 1=0', params: [] }; // S-01: fail-closed when no user
   }
+  if (user.role === 'admin') {
+    return { sql: '', params: [] }; // Admin global - no user filter
+  }
   return { sql: ' AND user_id = ?', params: [user.id] };
 }

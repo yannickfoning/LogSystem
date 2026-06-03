@@ -50,15 +50,24 @@ router.get('/', async (req, res) => {
     let params = [];
 
     // AMÉLIORATION 1: User scope (S-03 & S-07 multi-tenant)
+    // FIX #9: Normalized scope handling - userScope now returns '' for admin, ' AND user_id = ?' for users
     if (scope.sql) {
-      whereConditions.push(scope.sql.replace(/AND\s*/, ''));
+      whereConditions.push(scope.sql.trim());
       params.push(...scope.params);
     }
 
     // Filtres texte avec FULLTEXT (P-03)
+    // FIX #6: Fallback automatique sur LIKE pour les termes courts (< 4 caractères)
     if (query && query.trim().length > 0) {
-      whereConditions.push('MATCH(message, normalized_message) AGAINST(? IN BOOLEAN MODE)');
-      params.push(query.trim());
+      const trimmedQuery = query.trim();
+      if (trimmedQuery.length < 4) {
+        whereConditions.push('(message LIKE ? OR normalized_message LIKE ?)');
+        const like = '%' + trimmedQuery + '%';
+        params.push(like, like);
+      } else {
+        whereConditions.push('MATCH(message, normalized_message) AGAINST(? IN BOOLEAN MODE)');
+        params.push(trimmedQuery);
+      }
     }
 
     // Filtres métadonnées
@@ -407,6 +416,13 @@ function normalizeTimestamp(ts) {
   // UNIX timestamp (10-13 digits)
   if (/^\d{10,13}$/.test(str)) {
     return new Date(parseInt(str) * (str.length === 10 ? 1000 : 1)).toISOString().slice(0, 19).replace('T', ' ');
+  }
+  
+  // FIX #7: Format DD/MM/YYYY HH:mm:ss ou DD/MM/YYYY (format français)
+  const frMatch = str.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}:\d{2}(?::\d{2})?))?/);
+  if (frMatch) {
+    const time = frMatch[4] || '00:00:00';
+    return `${frMatch[3]}-${frMatch[2]}-${frMatch[1]} ${time}`;
   }
   
   // ISO 8601 already valid
