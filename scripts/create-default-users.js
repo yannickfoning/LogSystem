@@ -4,60 +4,63 @@ dotenv.config();
 import bcrypt from 'bcrypt';
 import pool from '../config/database.js';
 
-const adminEmail = process.env.DEFAULT_ADMIN_EMAIL || 'admin@logsystem.local';
-const adminPassword = process.env.DEFAULT_ADMIN_PASSWORD || 'Admin@1234';
-const adminName = process.env.DEFAULT_ADMIN_NAME || 'Administrateur';
 const rounds = parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
 
-async function ensureDefaultAdmin() {
-  let adminId;
-  let action;
+const USERS = [
+  {
+    email:        process.env.DEFAULT_ADMIN_EMAIL    || 'admin@logsystem.local',
+    password:     process.env.DEFAULT_ADMIN_PASSWORD || 'Admin@1234',
+    display_name: process.env.DEFAULT_ADMIN_NAME     || 'Administrateur',
+    role:         'admin',
+  },
+  {
+    email:        process.env.DEFAULT_USER_EMAIL    || 'user@logsystem.local',
+    password:     process.env.DEFAULT_USER_PASSWORD || 'User@1234',
+    display_name: process.env.DEFAULT_USER_NAME     || 'Utilisateur Standard',
+    role:         'user',
+  },
+];
 
+async function ensureUsers() {
   try {
-    const passwordHash = await bcrypt.hash(adminPassword, rounds);
+    for (const u of USERS) {
+      const passwordHash = await bcrypt.hash(u.password, rounds);
 
-    const [existing] = await pool.execute(
-      'SELECT id FROM users WHERE email = ?',
-      [adminEmail]
-    );
-
-    if (existing.length > 0) {
-      const user = existing[0];
-      await pool.execute(
-        `UPDATE users
-         SET password_hash = ?,
-             display_name = ?,
-             role = 'admin',
-             is_active = 1,
-             session_version = session_version + 1
-         WHERE id = ?`,
-        [passwordHash, adminName, user.id]
+      const [existing] = await pool.execute(
+        'SELECT id FROM users WHERE email = ?',
+        [u.email]
       );
 
-      action = 'Administrateur existant mis a jour';
-      adminId = user.id;
-    } else {
-      const [result] = await pool.execute(
-        `INSERT INTO users (email, password_hash, display_name, role, is_active, created_at)
-         VALUES (?, ?, ?, 'admin', 1, NOW())`,
-        [adminEmail, passwordHash, adminName]
-      );
-
-      action = 'Administrateur cree';
-      adminId = result.insertId;
+      if (existing.length > 0) {
+        const { id } = existing[0];
+        await pool.execute(
+          `UPDATE users
+           SET password_hash    = ?,
+               display_name     = ?,
+               role             = ?,
+               is_active        = 1,
+               session_version  = session_version + 1
+           WHERE id = ?`,
+          [passwordHash, u.display_name, u.role, id]
+        );
+        console.log(`[${u.role.toUpperCase()}] Mis à jour  — ID: ${id} | Email: ${u.email} | Mot de passe: ${u.password}`);
+      } else {
+        const [result] = await pool.execute(
+          `INSERT INTO users (email, password_hash, display_name, role, is_active, created_at)
+           VALUES (?, ?, ?, ?, 1, NOW())`,
+          [u.email, passwordHash, u.display_name, u.role]
+        );
+        console.log(`[${u.role.toUpperCase()}] Créé       — ID: ${result.insertId} | Email: ${u.email} | Mot de passe: ${u.password}`);
+      }
     }
+
+    console.log('\n⚠️  Changez ces mots de passe après la première connexion.');
   } finally {
     await pool.end();
   }
-
-  console.log(`[ADMIN] ${action}`);
-  console.log(`[ADMIN] Email: ${adminEmail}`);
-  console.log(`[ADMIN] ID: ${adminId}`);
-  console.log(`[ADMIN] Mot de passe: ${adminPassword}`);
-  console.log('[ADMIN] Changez ce mot de passe apres la premiere connexion.');
 }
 
-ensureDefaultAdmin().catch(error => {
-  console.error('[ADMIN] Erreur:', error.message);
+ensureUsers().catch(err => {
+  console.error('[ERREUR]', err.message);
   process.exit(1);
 });
