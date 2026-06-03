@@ -1167,6 +1167,42 @@ table .text-truncate {
   }
 }
 
+/* ─── LOGIN RESPONSIVE MOBILE ─────────────────── */
+@media (max-width: 768px) {
+  body.login-hero #brand-title {
+    width: 85%;
+    padding: 24px 20px;
+    top: 45%;
+  }
+
+  body.login-hero #brand-title h1 {
+    font-size: 36px;
+    letter-spacing: 4px;
+  }
+
+  body.login-hero #brand-title p {
+    font-size: 14px;
+    letter-spacing: 1px;
+    margin-top: 10px;
+  }
+
+  body.login-hero .brand-logo {
+    height: 48px !important;
+  }
+
+  body.login-hero .lang-toggle-btn,
+  body.login-hero .login-toggle-btn {
+    padding: 8px 14px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 380px) {
+  body.login-hero #brand-title h1 {
+    font-size: 28px;
+  }
+}
+
 /* ─── UTILITAIRES UI (CSP-safe, sans style inline) ─────────────────────────── */
 .text-muted { font-size: 13px; color: var(--text2); }
 .font-semibold { font-weight: 600; }
