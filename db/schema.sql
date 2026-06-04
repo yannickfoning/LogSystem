@@ -166,4 +166,47 @@ CREATE TABLE `watch_offsets` (
   INDEX `idx_watch_offsets_updated` (`updated_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
+DROP TABLE IF EXISTS `sessions`;
+CREATE TABLE `sessions` (
+  `session_id` VARCHAR(128) NOT NULL PRIMARY KEY,
+  `expires` INT(11) UNSIGNED NOT NULL,
+  `data` MEDIUMTEXT,
+  INDEX `sessions_expires_idx` (`expires`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP TABLE IF EXISTS `watch_log_metrics`;
+CREATE TABLE `watch_log_metrics` (
+  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+  `path` VARCHAR(1024),
+  `lines_parsed` INT DEFAULT 0,
+  `errors` INT DEFAULT 0,
+  `last_run` DATETIME,
+  `user_id` INT,
+  INDEX `idx_wlm_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP TABLE IF EXISTS `anomalies`;
+CREATE TABLE `anomalies` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `type` VARCHAR(100),
+  `severity` VARCHAR(20),
+  `message` TEXT,
+  `detected_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `user_id` INT,
+  `metadata` JSON,
+  INDEX `idx_anomalies_user` (`user_id`),
+  INDEX `idx_anomalies_detected` (`detected_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP TABLE IF EXISTS `parser_metrics`;
+CREATE TABLE `parser_metrics` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `format` VARCHAR(50),
+  `lines_parsed` INT DEFAULT 0,
+  `errors` INT DEFAULT 0,
+  `duration_ms` INT DEFAULT 0,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;
