@@ -1,9 +1,6 @@
-SET NAMES utf8mb4;
+﻿SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
--- ----------------------------
--- Table structure for users
--- ----------------------------
 DROP TABLE IF EXISTS `users`;
 CREATE TABLE `users` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
@@ -17,9 +14,6 @@ CREATE TABLE `users` (
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ----------------------------
--- Table structure for logs
--- ----------------------------
 DROP TABLE IF EXISTS `logs`;
 CREATE TABLE `logs` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -55,22 +49,15 @@ CREATE TABLE `logs` (
   INDEX `idx_event_type` (`event_type`),
   INDEX `idx_error_type` (`error_type`),
   INDEX `idx_user_id` (`user_id`),
-  -- P-02: Unique index for deduplication
   UNIQUE KEY `idx_fingerprint_ts_user` (`fingerprint`, `timestamp`, `user_id`),
-  -- P-03: FULLTEXT index for search
   FULLTEXT INDEX `ft_message` (`message`, `normalized_message`),
-  -- P-05: Composite index for dashboard queries
   INDEX `idx_user_ts` (`user_id`, `timestamp` DESC),
   INDEX `idx_user_level_ts` (`user_id`, `log_level`, `timestamp` DESC),
   INDEX `idx_user_error_type_ts` (`user_id`, `error_type`, `timestamp` DESC),
   INDEX `idx_user_fingerprint_ts` (`user_id`, `fingerprint`, `timestamp` DESC),
-  -- S-06: Foreign key constraint
   CONSTRAINT `fk_logs_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ----------------------------
--- Table structure for error_groups
--- ----------------------------
 DROP TABLE IF EXISTS `error_groups`;
 CREATE TABLE `error_groups` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
@@ -98,9 +85,6 @@ CREATE TABLE `error_groups` (
   INDEX `idx_error_groups_error_type` (`error_type`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ----------------------------
--- Table structure for alert_rules
--- ----------------------------
 DROP TABLE IF EXISTS `alert_rules`;
 CREATE TABLE `alert_rules` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
@@ -118,9 +102,6 @@ CREATE TABLE `alert_rules` (
   CONSTRAINT `fk_alert_rules_user` FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ----------------------------
--- Table structure for alerts
--- ----------------------------
 DROP TABLE IF EXISTS `alerts`;
 CREATE TABLE `alerts` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
@@ -136,12 +117,11 @@ CREATE TABLE `alerts` (
   `user_id` INT,
   INDEX `idx_alerts_user_id` (`user_id`),
   INDEX `idx_alerts_resolved` (`resolved_at`),
+  INDEX `idx_alerts_status` (`status`),
+  INDEX `idx_alerts_user_status` (`user_id`, `status`),
   CONSTRAINT `fk_alerts_rule` FOREIGN KEY (`rule_id`) REFERENCES `alert_rules`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ----------------------------
--- Table structure for import_jobs
--- ----------------------------
 DROP TABLE IF EXISTS `import_jobs`;
 CREATE TABLE `import_jobs` (
   `id` VARCHAR(36) PRIMARY KEY,
@@ -161,9 +141,6 @@ CREATE TABLE `import_jobs` (
   CONSTRAINT `fk_import_jobs_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ----------------------------
--- Table structure for audit_log
--- ----------------------------
 DROP TABLE IF EXISTS `audit_log`;
 CREATE TABLE `audit_log` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
@@ -181,23 +158,12 @@ CREATE TABLE `audit_log` (
   INDEX `idx_audit_created` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ----------------------------
--- Table structure for watch_offsets (W-02)
--- ----------------------------
 DROP TABLE IF EXISTS `watch_offsets`;
 CREATE TABLE `watch_offsets` (
   `path` VARCHAR(1024) PRIMARY KEY,
-  `offset` BIGINT DEFAULT 0,
+  `file_offset` BIGINT DEFAULT 0,
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX `idx_watch_offsets_updated` (`updated_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;
-
--- DB-01 FIX: Use CREATE INDEX IF NOT EXISTS for idempotent migrations
--- PERF-03 FIX: Index manquant sur alerts.status (fréquemment filtré)
-CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(`status`);
-CREATE INDEX IF NOT EXISTS idx_alerts_user_status ON alerts(`user_id`, `status`);
-
--- Index sur error_groups.status (résolution)
-CREATE INDEX IF NOT EXISTS idx_error_groups_status ON error_groups(`status`);
