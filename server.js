@@ -134,6 +134,7 @@ const sessionStore = new MySQLSessionStore({
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   ssl: buildSslOptions(),
+  createDatabaseTable: true,
   clearExpired: true,
   checkExpirationInterval: 900000,
   expiration: 86400000
@@ -141,7 +142,7 @@ const sessionStore = new MySQLSessionStore({
 
 app.use(session({
   secret: sessionSecret,
-  resave: false,
+  resave: true,
   saveUninitialized: false,
   store: sessionStore,
   cookie: {
