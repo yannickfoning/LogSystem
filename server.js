@@ -33,7 +33,7 @@ import rateLimit from 'express-rate-limit';
 import compression from 'compression';
 import fs from 'fs';
 
-import { testConnection, buildSslOptions } from './config/database.js';
+import pool, { testConnection, buildSslOptions } from './config/database.js';
 import { runMigrations } from './lib/database/migrationRunner.js';
 import { requireAuth, requireAuthPage, requireAdminPage } from './middleware/auth.js';
 import { scopeGuard } from './middleware/scopeGuard.js';
@@ -51,7 +51,7 @@ import { startWatcher, stopWatcher } from './services/watcherService.js';
 import { startCacheService } from './services/cacheService.js';
 import { createHtmlCspMiddleware } from './middleware/htmlCsp.js';
 
-const app = express();`napp.set('trust proxy', 1);
+const app = express();
 app.set('trust proxy', 1);
 const PORT = parseInt(process.env.PORT || '3001', 10); // FIX: fallback cohérent avec .env
 
@@ -134,7 +134,6 @@ const sessionStore = new MySQLSessionStore({
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   ssl: buildSslOptions(),
-  createDatabaseTable: true,
   clearExpired: true,
   checkExpirationInterval: 900000,
   expiration: 86400000
@@ -142,7 +141,7 @@ const sessionStore = new MySQLSessionStore({
 
 app.use(session({
   secret: sessionSecret,
-  resave: true,
+  resave: false,
   saveUninitialized: false,
   store: sessionStore,
   cookie: {
@@ -246,6 +245,25 @@ async function start() {
     logger.error({ event: 'watcherStartFailed', message: e.message });
   }
 
+  // Créer un admin par défaut si aucun utilisateur n'existe
+  try {
+    const [existingUsers] = await pool.execute('SELECT COUNT(*) as total FROM users');
+    if (existingUsers[0].total === 0) {
+      const bcrypt = await import('bcrypt');
+      const rounds = parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
+      const defaultEmail = process.env.DEFAULT_ADMIN_EMAIL || 'admin@logsystem.com';
+      const defaultPassword = process.env.DEFAULT_ADMIN_PASSWORD || 'Admin@1234';
+      const hash = await bcrypt.default.hash(defaultPassword, rounds);
+      await pool.execute(
+        'INSERT INTO users (email, password_hash, display_name, role, is_active) VALUES (?, ?, ?, ?, ?)',
+        [defaultEmail, hash, 'Administrateur', 'admin', 1]
+      );
+      logger.info({ event: 'default_admin_created', email: defaultEmail }, '[INIT] Utilisateur admin par défaut créé');
+    }
+  } catch (e) {
+    logger.error({ event: 'default_admin_creation_failed', error: e.message }, '[INIT]');
+  }
+
   const logsDir = (process.env.WATCH_DIRS || './logs').split(',')[0].trim();
   if (!fs.existsSync(logsDir)) {
     fs.mkdirSync(logsDir, { recursive: true });
@@ -281,4 +299,3 @@ start().catch((err) => {
   logger.fatal({ event: 'startupFailed', message: err.message, stack: err.stack });
   process.exit(1);
 });
-
