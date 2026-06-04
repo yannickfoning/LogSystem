@@ -51,7 +51,7 @@ import { startWatcher, stopWatcher } from './services/watcherService.js';
 import { startCacheService } from './services/cacheService.js';
 import { createHtmlCspMiddleware } from './middleware/htmlCsp.js';
 
-const app = express();
+const app = express();`napp.set('trust proxy', 1);
 const PORT = parseInt(process.env.PORT || '3001', 10); // FIX: fallback cohérent avec .env
 
 // Forcer HTTPS en production
