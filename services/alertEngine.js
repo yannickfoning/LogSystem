@@ -3,6 +3,8 @@ import pool from '../config/database.js';
 import { levelSeverity } from '../config/database.js';
 import { normalizeLevel } from '../config/database.js';
 import EventEmitter from 'events';
+import { detectVolumeAnomalies } from './anomaliesService.js';
+
 
 const ALERT_EVAL_INTERVAL = parseInt(process.env.ALERT_EVAL_INTERVAL || '60000', 10);
 const SAFETY_INTERVAL = parseInt(process.env.SAFETY_INTERVAL || ALERT_EVAL_INTERVAL.toString(), 10); // Fix #3: Use ALERT_EVAL_INTERVAL (60s) instead of 10s to prevent DB saturation
@@ -408,6 +410,12 @@ export async function startAlertEngine() {
   alertEngineBus.on('logs.inserted', ({ userId, count }) => {
     logger.info({ event: 'logs_inserted', userId, count }, '[ALERT]');
     debounceEvalUser(userId);
+    // Phase 8: Z-Score anomaly detection (traffic spike)
+    if (userId) {
+      detectVolumeAnomalies(userId).catch(e =>
+        logger.error({ event: 'volume_anomaly_service_failed', userId, error: e.message }, '[ALERT]')
+      );
+    }
   });
 
   // FIX BUG-ALERT-01: SAFETY_INTERVAL = ALERT_EVAL_INTERVAL (60s par defaut) - filet de securite periodique

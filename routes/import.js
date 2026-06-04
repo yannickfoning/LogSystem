@@ -38,15 +38,14 @@ const upload = multer({
       'text/plain', 'text/log', 'application/json', 'application/jsonl',
       'text/x-log', 'application/octet-stream', 'application/zip',
       'application/gzip', 'application/x-gzip', 'application/x-tar',
-      'application/x-brotli', 'application/zstd', 'application/vnd.rar',
-      'application/x-rar-compressed'
+      'application/x-brotli', 'application/zstd'
     ];
     if (file.mimetype && !allowedMimeTypes.includes(file.mimetype)) {
       return cb(new Error(`Type MIME non supporté: ${file.mimetype}`));
     }
 
     const ext = filename.split('.').pop().toLowerCase();
-    const allowedExtensions = ['log', 'txt', 'json', 'jsonl', 'csv', 'xml', 'zip', 'gz', 'gzip', 'tar', 'tgz', 'br', 'brotli', 'zst', 'zstandard', 'rar'];
+    const allowedExtensions = ['log', 'txt', 'json', 'jsonl', 'csv', 'xml', 'zip', 'gz', 'gzip', 'tar', 'tgz', 'br', 'brotli', 'zst', 'zstandard'];
     if (!allowedExtensions.includes(ext)) {
       return cb(new Error(`Extension non supportée. Utilisez: ${allowedExtensions.join(', ')}`));
     }
@@ -58,11 +57,10 @@ const upload = multer({
 // Ordre de sévérité pour error_groups
 const SEV_ORDER = { DEBUG: 0, INFO: 1, WARNING: 2, ERROR: 3, CRITICAL: 4, FATAL: 5 };
 
-async function processImport(jobId, buffer, filename, userId, source, service, locale) {
+async function processImport(jobId, buffer, filename, userId, source, service) {
   // normalize variable scopes to avoid temporal dead zone
   const importSource = source ?? null;
   const importService = service ?? null;
-  const dateLocale = locale || process.env.LOG_DATE_LOCALE || 'fr'; // FIX 2a
   const batchSize = Math.min(parseInt(process.env.IMPORT_BATCH_SIZE || '2000', 10), 5000);
 
   let filesToProcess = [];
@@ -75,7 +73,7 @@ async function processImport(jobId, buffer, filename, userId, source, service, l
       logger.info({ event: 'archive_extracted', count: filesToProcess.length }, '[IMPORT]');
     } catch (e) {
       logger.error({ event: 'archive_extraction_error', error: e.message }, '[IMPORT]');
-      throw e;
+      filesToProcess = [];
     }
   } else {
     filesToProcess = [{ filename, content: buffer }];
@@ -89,7 +87,7 @@ async function processImport(jobId, buffer, filename, userId, source, service, l
 
     let parsedLogs;
     try {
-        parsedLogs = await parseLogContent(file.content, detectedFormat, { source: importSource, service: importService, locale: dateLocale });
+        parsedLogs = await parseLogContent(file.content, detectedFormat, { source: importSource, service: importService });
     } catch (e) {
       logger.error({ event: 'parsing_error', format: detectedFormat, error: e.message }, '[IMPORT]');
       parsedLogs = [];
@@ -109,7 +107,6 @@ async function processImport(jobId, buffer, filename, userId, source, service, l
     missing_user: 0,
     missing_module: 0,
     missing_timestamp: 0,
-    timestamp_inferred_count: 0,
     errors: 0
   };
 
@@ -153,10 +150,6 @@ async function processImport(jobId, buffer, filename, userId, source, service, l
           // Don't skip — allow null target_user
         }
         
-        if (logEntry.timestamp_inferred) {
-          importSummary.timestamp_inferred_count++;
-        }
-        
         if (!logEntry.module) {
           importSummary.missing_module++;
           logger.warn({ event: 'missing_module', logIndex: i, jobId }, '[IMPORT]');
@@ -192,6 +185,8 @@ async function processImport(jobId, buffer, filename, userId, source, service, l
           parser_format:      logEntry.log_format || null,
           timestamp_inferred: logEntry.timestamp_inferred ? 1 : 0,
           classification_confidence: logEntry.classification_confidence || null,
+          file_created_at:    logEntry.file_created_at || null,
+          file_modified_at:   logEntry.file_modified_at || null,
           // FIX: host, log_format, status_code, duration_ms supprimés (colonnes inexistantes)
         };
 
@@ -228,10 +223,10 @@ async function processImport(jobId, buffer, filename, userId, source, service, l
       alertWorker.broadcastLogBatch(insertedBatch, { userId, jobId });
     }
 
-    // FIX 2c: Store import_summary for later retrieval
+    // AMÉLIORATION 1: Store import_summary for later retrieval
     await conn.execute(
-      'UPDATE import_jobs SET status = ?, processed_lines = ?, error_count = ?, skipped_lines = ?, import_summary = ?, completed_at = NOW() WHERE id = ?',
-      ['completed', processed, errors, (importSummary.skipped || 0), JSON.stringify(importSummary), jobId]
+      'UPDATE import_jobs SET status = ?, processed_lines = ?, error_count = ?, skipped_lines = ?, completed_at = NOW() WHERE id = ?',
+      ['completed', processed, errors, (importSummary.skipped || 0), jobId]
     );
 
     logger.info({ event: 'import_completed', jobId, summary: importSummary }, '[IMPORT]');
@@ -279,16 +274,18 @@ async function insertBatch(conn, batch, userId) {
       entry.target_user,
       entry.parser_format,
       entry.timestamp_inferred,
-      entry.classification_confidence
+      entry.classification_confidence,
+      entry.file_created_at,
+      entry.file_modified_at
       // FIX: supprimé host, log_format, status_code, duration_ms (n'existent pas dans logs)
     ]);
 
     await conn.query(
-      `INSERT IGNORE INTO logs (
+        `INSERT IGNORE INTO logs (
         raw_log, timestamp, created_time, timezone, log_level, source, source_server, service, message, normalized_message,
         event_type, fingerprint, user_id, client_ip, module, error_type,
-        stack_trace, target_user, parser_format, timestamp_inferred, classification_confidence
-      ) VALUES ?`,
+        stack_trace, target_user, parser_format, timestamp_inferred, classification_confidence, file_created_at, file_modified_at
+      ) VALUES ?`
       [logValues]
     );
 
@@ -376,14 +373,13 @@ router.post('/upload', upload.single('file'), validateBody(importUploadSchema), 
     const userId = req.session.user.id;
     const source = req.body.source || null;
     const service = req.body.service || null;
-    const locale = req.body.locale || null; // FIX 2a
 
     await pool.execute(
       'INSERT INTO import_jobs (id, filename, user_id, import_source, import_service) VALUES (?, ?, ?, ?, ?)',
       [jobId, req.file.originalname, userId, source, service]
     );
 
-    processImport(jobId, req.file.buffer, req.file.originalname, userId, source, service, locale)
+    processImport(jobId, req.file.buffer, req.file.originalname, userId, source, service)
       .catch(e => logger.error({ event: 'import_fatal', jobId, error: e.message }, '[IMPORT]'));
 
     await recordAudit({

@@ -449,3 +449,87 @@
     /* ── Activity indicator ──────────────────────────────────────────────── */
     #refresh-indicator { opacity: 0; transition: opacity 0.3s; font-size: 11px; color: var(--text2); }
     #refresh-indicator.show { opacity: 1; }
+
+    /* ========================================================================== */
+    /* PHASE 2 : RESPONSIVE DESIGN COMPLET - BREAKPOINTS COUVRANTS            */
+    /* ========================================================================== */
+
+    /* --- Règle Transverse : Tableaux Scrollables Horizontalement --- */
+    .table-responsive, .table-container, table {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      display: block;
+    }
+
+    /* --- Graphiques Adaptatifs --- */
+    canvas {
+      max-width: 100% !important;
+      height: auto !important;
+    }
+
+    /* --- Breakpoint: Écrans Mobiles Fins (320px à 480px) --- */
+    @media screen and (max-width: 480px) {
+      .navbar {
+        flex-direction: column;
+        padding: 10px;
+        gap: 12px;
+      }
+      .nav-links {
+        flex-direction: column;
+        width: 100%;
+        text-align: center;
+        gap: 8px;
+      }
+      .nav-links li a {
+        display: block;
+        padding: 8px;
+      }
+      .dash-layout, .kpi-grid, .grid-2, .grid-3 {
+        grid-template-columns: 1fr !important;
+        padding: 8px;
+        gap: 12px;
+      }
+      .kpi-card {
+        padding: 12px;
+      }
+      .kpi-value {
+        font-size: 1.8rem !important;
+      }
+    }
+
+    /* --- Breakpoint: Tablettes & Smartphones Larges (481px à 768px) --- */
+    @media screen and (min-width: 481px) and (max-width: 768px) {
+      .navbar {
+        flex-wrap: wrap;
+      }
+      .dash-layout, .kpi-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 16px;
+      }
+      .grid-2, .grid-3 {
+        grid-template-columns: 1fr !important;
+      }
+    }
+
+    /* --- Breakpoint: Laptops standard (769px à 1024px) --- */
+    @media screen and (min-width: 769px) and (max-width: 1024px) {
+      .dash-layout {
+        grid-template-columns: 1fr;
+      }
+      .kpi-grid {
+        grid-template-columns: repeat(3, 1fr) !important;
+      }
+    }
+
+    /* --- Breakpoint: Desktops & Ultrawide (1025px à 1440px et au-delà) --- */
+    @media screen and (min-width: 1441px) {
+      .dash-layout {
+        grid-template-columns: repeat(4, 1fr);
+        max-width: 1800px;
+      }
+      .kpi-grid {
+        grid-template-columns: repeat(5, 1fr) !important;
+      }
+    }
+
