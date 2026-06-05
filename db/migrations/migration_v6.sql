@@ -1,14 +1,12 @@
--- LogSystem V6 (Aiven MySQL compatible — no DELIMITER, no IF NOT EXISTS on indexes)
+-- LogSystem V6 (Aiven MySQL 100% compatible)
 
-ALTER TABLE `logs`
-  ADD COLUMN IF NOT EXISTS `created_at_log` DATETIME NULL,
-  ADD COLUMN IF NOT EXISTS `created_time_log` TIME NULL,
-  ADD COLUMN IF NOT EXISTS `imported_time` TIME NULL,
-  ADD COLUMN IF NOT EXISTS `file_created_at` DATETIME NULL,
-  ADD COLUMN IF NOT EXISTS `file_modified_at` DATETIME NULL;
+ALTER TABLE `logs` ADD COLUMN `created_at_log` DATETIME NULL;
+ALTER TABLE `logs` ADD COLUMN `created_time_log` TIME NULL;
+ALTER TABLE `logs` ADD COLUMN `imported_time` TIME NULL;
+ALTER TABLE `logs` ADD COLUMN `file_created_at` DATETIME NULL;
+ALTER TABLE `logs` ADD COLUMN `file_modified_at` DATETIME NULL;
 
-ALTER TABLE `import_jobs`
-  ADD COLUMN IF NOT EXISTS `import_summary` JSON NULL AFTER `skipped_lines`;
+ALTER TABLE `import_jobs` ADD COLUMN `import_summary` JSON NULL;
 
 ALTER TABLE `logs` ADD INDEX `idx_audit_severity` (`log_level`);
 ALTER TABLE `logs` ADD INDEX `idx_audit_timestamp` (`timestamp`);
