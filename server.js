@@ -33,7 +33,7 @@ import rateLimit from 'express-rate-limit';
 import compression from 'compression';
 import fs from 'fs';
 
-import pool, { testConnection, buildSslOptions } from './config/database.js';
+import { testConnection, buildSslOptions } from './config/database.js';
 import { runMigrations } from './lib/database/migrationRunner.js';
 import { requireAuth, requireAuthPage, requireAdminPage } from './middleware/auth.js';
 import { scopeGuard } from './middleware/scopeGuard.js';
@@ -43,6 +43,7 @@ import logsRoutes from './routes/logs.js';
 import importRoutes from './routes/import.js';
 import dashboardRoutes from './routes/dashboard.js';
 import adminRoutes from './routes/admin.js';
+import searchApiRoutes from './routes/api/search.js';
 import { alertWorker } from './workers/alertWorker.js';
 import { startAlertEngine, setAlertWorker, stopAlertEngine } from './services/alertEngine.js';
 import { startRetentionScheduler } from './services/retentionService.js';
@@ -184,6 +185,7 @@ app.use('/api/logs', requireAuth, scopeGuard, logsRoutes);
 app.use('/api/import', requireAuth, scopeGuard, importRoutes);
 app.use('/api/dashboard', requireAuth, scopeGuard, dashboardRoutes);
 app.use('/api/admin', requireAuth, scopeGuard, adminRoutes);
+app.use('/api/search', requireAuth, scopeGuard, searchApiRoutes);
 
 // SSE Alert Stream
 app.get('/api/alerts/stream', requireAuth, (req, res) => {
@@ -245,25 +247,6 @@ async function start() {
     logger.error({ event: 'watcherStartFailed', message: e.message });
   }
 
-  // Créer un admin par défaut si aucun utilisateur n'existe
-  try {
-    const [existingUsers] = await pool.execute('SELECT COUNT(*) as total FROM users');
-    if (existingUsers[0].total === 0) {
-      const bcrypt = await import('bcrypt');
-      const rounds = parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
-      const defaultEmail = process.env.DEFAULT_ADMIN_EMAIL || 'admin@logsystem.com';
-      const defaultPassword = process.env.DEFAULT_ADMIN_PASSWORD || 'Admin@1234';
-      const hash = await bcrypt.default.hash(defaultPassword, rounds);
-      await pool.execute(
-        'INSERT INTO users (email, password_hash, display_name, role, is_active) VALUES (?, ?, ?, ?, ?)',
-        [defaultEmail, hash, 'Administrateur', 'admin', 1]
-      );
-      logger.info({ event: 'default_admin_created', email: defaultEmail }, '[INIT] Utilisateur admin par défaut créé');
-    }
-  } catch (e) {
-    logger.error({ event: 'default_admin_creation_failed', error: e.message }, '[INIT]');
-  }
-
   const logsDir = (process.env.WATCH_DIRS || './logs').split(',')[0].trim();
   if (!fs.existsSync(logsDir)) {
     fs.mkdirSync(logsDir, { recursive: true });
@@ -299,3 +282,4 @@ start().catch((err) => {
   logger.fatal({ event: 'startupFailed', message: err.message, stack: err.stack });
   process.exit(1);
 });
+

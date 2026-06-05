@@ -3,8 +3,6 @@ import pool from '../config/database.js';
 import { levelSeverity } from '../config/database.js';
 import { normalizeLevel } from '../config/database.js';
 import EventEmitter from 'events';
-import { detectVolumeAnomalies } from './anomaliesService.js';
-
 
 const ALERT_EVAL_INTERVAL = parseInt(process.env.ALERT_EVAL_INTERVAL || '60000', 10);
 const SAFETY_INTERVAL = parseInt(process.env.SAFETY_INTERVAL || ALERT_EVAL_INTERVAL.toString(), 10); // Fix #3: Use ALERT_EVAL_INTERVAL (60s) instead of 10s to prevent DB saturation
@@ -51,25 +49,31 @@ async function ensureDefaultAlertRules() {
   // FIX BUG-ALERT-03: Seed rules per-admin only (never NULL created_by)
   const [adminUsers] = await pool.execute("SELECT id FROM users WHERE role = 'admin' AND is_active = 1 LIMIT 5");
   if (!adminUsers.length) { logger.info({ event: 'no_admin_users_seeding_skipped' }, '[ALERT]'); return; }
-  const rules = [
-    ['Erreurs critiques', 'Détecte les erreurs FATAL et ERROR fréquentes', 'level', 'ERROR', 10, 60, 'high', 30],
-    ['Volume anormal', 'Alerte sur un volume de logs inhabituel', 'count', 'all', 5000, 60, 'medium', 60],
-    ['Fatal détecté', 'Alerte immédiate sur les logs FATAL', 'level', 'FATAL', 1, 60, 'critical', 15]
+  // Comprehensive default alert rules (all 12 requirements)
+  const allRules = [
+    // 5. Alertes critiques — ERROR: 10 erreurs / 5 minutes
+    ['Erreurs fréquentes (ERROR)', 'Détecte 10+ erreurs ERROR sur 5 minutes', 'level', 'ERROR', 10, 5, 'high', 10],
+    // 5. FATAL: 1 occurrence
+    ['FATAL détecté', 'Alerte immédiate sur toute occurrence FATAL', 'level', 'FATAL', 1, 60, 'critical', 5],
+    // 5. CRITICAL: 1 occurrence
+    ['CRITICAL détecté', 'Alerte immédiate sur toute occurrence CRITICAL', 'level', 'CRITICAL', 1, 60, 'critical', 10],
+    // 5. SECURITY: 3 occurrences
+    ['Événements sécurité', 'Détecte 3+ événements de sécurité', 'level', 'SECURITY', 3, 30, 'critical', 15],
+    // 5. AUTH failures: 5 in window
+    ['Échecs authentification', 'Détecte 5+ échecs de connexion sur 10 minutes', 'count', 'auth_fail', 5, 10, 'high', 15],
+    // 5. DISK: 80% (monitored via log patterns)
+    ['Disque critique (80%)', 'Alerte si logs signalent utilisation disque > 80%', 'fingerprint', 'disk_space_critical', 1, 60, 'critical', 30],
+    // Volume anormal
+    ['Volume anormal', 'Alerte sur un volume de logs inhabituel (5000/h)', 'count', 'all', 5000, 60, 'medium', 60],
+    // Silence ingestion
+    ['Silence ingestion', 'Aucune activité détectée depuis 30 minutes', 'silence', 'all', 0, 30, 'medium', 60],
+    // ERROR trend (broader window)
+    ['Erreurs critiques (1h)', 'Plus de 50 erreurs ERROR/CRITICAL sur 1 heure', 'level', 'ERROR', 50, 60, 'high', 30],
+    // WARNING surge
+    ['Pic de WARNINGs', 'Détecte 100+ warnings sur 15 minutes', 'level', 'WARNING', 100, 15, 'medium', 20],
   ];
 
-  for (const [name, description, conditionType, conditionValue, thresholdValue, timeWindow, severity, cooldown] of rules) {
-    await pool.execute(
-      `INSERT INTO alert_rules (name, description, condition_type, condition_value, threshold_value, time_window_minutes, severity, cooldown_minutes, is_active, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
-      [name, description, conditionType, conditionValue, thresholdValue, timeWindow, severity, cooldown, adminUsers[0].id]
-    );
-  }
-
-  const extraRules = [
-    ['Erreur critique detectee', 'Alerte immediate sur les logs CRITICAL', 'level', 'CRITICAL', 1, 60, 'critical', 15],
-    ['Silence ingestion', 'Alerte si aucune activite recente n est detectee', 'silence', 'all', 0, 30, 'medium', 60]
-  ];
-  for (const [name, description, conditionType, conditionValue, thresholdValue, timeWindow, severity, cooldown] of extraRules) {
+  for (const [name, description, conditionType, conditionValue, thresholdValue, timeWindow, severity, cooldown] of allRules) {
     await pool.execute(
       `INSERT INTO alert_rules (name, description, condition_type, condition_value, threshold_value, time_window_minutes, severity, cooldown_minutes, is_active, created_by)
        SELECT ?, ?, ?, ?, ?, ?, ?, ?, 1, ?
@@ -410,12 +414,6 @@ export async function startAlertEngine() {
   alertEngineBus.on('logs.inserted', ({ userId, count }) => {
     logger.info({ event: 'logs_inserted', userId, count }, '[ALERT]');
     debounceEvalUser(userId);
-    // Phase 8: Z-Score anomaly detection (traffic spike)
-    if (userId) {
-      detectVolumeAnomalies(userId).catch(e =>
-        logger.error({ event: 'volume_anomaly_service_failed', userId, error: e.message }, '[ALERT]')
-      );
-    }
   });
 
   // FIX BUG-ALERT-01: SAFETY_INTERVAL = ALERT_EVAL_INTERVAL (60s par defaut) - filet de securite periodique

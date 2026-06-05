@@ -97,6 +97,11 @@ router.get('/summary', async (req, res) => {
       scope.params
     );
 
+    const levels_breakdown = {};
+    for (const row of levelRows) {
+      levels_breakdown[String(row.log_level || '').toUpperCase()] = row.cnt;
+    }
+
     const data = {
       total_logs: total[0].cnt,
       today_logs: today[0].cnt,
@@ -104,7 +109,8 @@ router.get('/summary', async (req, res) => {
       unread_alerts: unreadAlerts[0].cnt,
       fatal_count: fatalCount[0].cnt,
       critical_count: criticalCount[0].cnt,
-      source_count: sourceCount[0].cnt
+      source_count: sourceCount[0].cnt,
+      levels_breakdown  // Point 6: INFO, WARNING, ERROR, CRITICAL, DEBUG counts
     };
     for (const row of levelRows) {
       const key = 'level_' + String(row.log_level || '').toLowerCase();

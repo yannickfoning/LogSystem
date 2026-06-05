@@ -434,10 +434,46 @@ export async function detectAnomalies(userId, windowMinutes = 10) {
       ? ((currentErrorRate / baselineErrorRate) * 100 - 100)
       : currentErrorRate > 0 ? 100 : 0;
 
-    const isAnomaly = currentErrorRate > baselineErrorRate * 1.5 || currentErrorRate > 30;
+    // Z-score anomaly detection (point 8)
+    // Compute rolling 1h windows to get stddev for z-score
+    const [hourlyBuckets] = await conn.query(
+      `SELECT FLOOR(TIMESTAMPDIFF(MINUTE, DATE_SUB(NOW(), INTERVAL 24 HOUR), timestamp) / 60) as bucket,
+              COUNT(CASE WHEN log_level IN ('ERROR','CRITICAL','FATAL') THEN 1 END) as errors
+         FROM logs
+        WHERE user_id = ? AND timestamp >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+        GROUP BY bucket ORDER BY bucket`,
+      [userId]
+    );
+
+    let zScore = 0;
+    let movingAvgAnomaly = false;
+    if (hourlyBuckets.length >= 3) {
+      const vals = hourlyBuckets.map(r => parseFloat(r.errors) || 0);
+      const mean = vals.reduce((s, v) => s + v, 0) / vals.length;
+      const variance = vals.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / vals.length;
+      const std = Math.sqrt(variance);
+      const latest = vals[vals.length - 1] || 0;
+      zScore = std > 0 ? (latest - mean) / std : 0;
+      // Moving average of last 3 windows
+      const last3 = vals.slice(-3);
+      const movAvg = last3.reduce((s, v) => s + v, 0) / last3.length;
+      movingAvgAnomaly = movAvg > mean * 1.8;
+    }
+
+    const isAnomaly = currentErrorRate > baselineErrorRate * 1.5
+      || currentErrorRate > 30
+      || Math.abs(zScore) > 2.5
+      || movingAvgAnomaly;
+
+    const anomalyType = [];
+    if (currentErrorRate > 30) anomalyType.push('high_error_rate');
+    if (currentErrorRate > baselineErrorRate * 1.5) anomalyType.push('error_spike');
+    if (Math.abs(zScore) > 2.5) anomalyType.push('zscore_outlier');
+    if (movingAvgAnomaly) anomalyType.push('moving_avg_spike');
 
     return {
       anomaly_detected: isAnomaly,
+      anomaly_types: anomalyType,
       window_minutes: windowMinutes,
       current_count: current.count,
       baseline_count: baseline.count,
@@ -446,7 +482,9 @@ export async function detectAnomalies(userId, windowMinutes = 10) {
       current_rate: parseFloat(currentErrorRate.toFixed(2)),
       baseline_rate: parseFloat(baselineErrorRate.toFixed(2)),
       threshold_exceeded: currentErrorRate > 30,
-      rate_increase_percent: parseFloat(rateIncrease.toFixed(1))
+      rate_increase_percent: parseFloat(rateIncrease.toFixed(1)),
+      z_score: parseFloat(zScore.toFixed(2)),
+      moving_avg_anomaly: movingAvgAnomaly
     };
   } catch (error) {
     logger.error({ event: 'anomaly_detection_error', error: error.message }, '[WATCHER]');

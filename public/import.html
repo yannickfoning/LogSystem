@@ -13,7 +13,8 @@
            style="height:36px;width:auto;object-fit:contain;border-radius:4px;">
       <span>LogSystem</span>
     </div>
-    <ul class="nav-links">
+    <button class="hamburger" id="hamburger-btn" aria-label="Menu" aria-expanded="false"><span></span><span></span><span></span></button>
+    <ul class="nav-links" id="nav-links">
       <li><a href="/dashboard.html" data-i18n="nav.dashboard">Tableau de bord</a></li>
       <li><a href="/search.html" data-i18n="nav.search">Recherche</a></li>
       <li><a href="/import.html" class="active" data-i18n="nav.import">Import</a></li>
@@ -33,8 +34,8 @@
       <div class="drop-zone" id="drop-zone">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         <p data-i18n="import.drop">Glissez un fichier ici ou cliquez pour sélectionner</p>
-        <p class="text-hint" data-i18n="import.formats">Formats acceptés : .log, .txt, .json, .jsonl, .csv, .xml, .zip, .gz, .rar (max 50 Mo)</p>
-        <input type="file" class="file-input" id="file-input" accept=".log,.txt,.json,.jsonl,.csv,.xml,.zip,.gz,.gzip,.tar,.tgz,.rar">
+        <p class="text-hint" data-i18n="import.formats">Formats supportés : .log, .txt, .json, .jsonl, .csv, .xml, .zip, .gz, .tar, .rar, <strong>.7z</strong> (max 50 Mo)</p>
+        <input type="file" class="file-input" id="file-input" accept=".log,.txt,.json,.jsonl,.csv,.xml,.zip,.gz,.gzip,.tar,.tgz,.rar,.7z">
       </div>
 
       <div class="form-row mt-16">
@@ -252,6 +253,31 @@
 
       loadJobs();
     })();
+  </script>
+
+  <script>
+  (function(){
+    var btn = document.getElementById('hamburger-btn');
+    var nav = document.getElementById('nav-links');
+    if (!btn || !nav) return;
+    btn.addEventListener('click', function(){
+      var open = nav.classList.toggle('open');
+      btn.classList.toggle('open', open);
+      btn.setAttribute('aria-expanded', open);
+    });
+    document.addEventListener('click', function(e){
+      if (!btn.contains(e.target) && !nav.contains(e.target)) {
+        nav.classList.remove('open');
+        btn.classList.remove('open');
+      }
+    });
+    nav.querySelectorAll('a').forEach(function(a){
+      a.addEventListener('click', function(){
+        nav.classList.remove('open');
+        btn.classList.remove('open');
+      });
+    });
+  })();
   </script>
 </body>
 </html>

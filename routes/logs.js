@@ -10,8 +10,8 @@ import { alertEngineBus } from '../services/alertEngine.js';
 const router = Router();
 router.use(requireAuth);
 
-const MAX_LIMIT = 500;
-const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 100; // Point 10: Never show more than 100 logs per page
+const DEFAULT_LIMIT = 100; // Point 10: 100 logs/page
 const LOG_COLUMNS = 'id, timestamp, created_time, imported_at, log_level, source, source_server, service, message, normalized_message, event_type, error_type, fingerprint, user_id, target_user, module, parser_format, timestamp_inferred, created_at';
 
 // ── Helper : filtres SQL partagés ─────────────────────────────────────────────
@@ -76,6 +76,11 @@ router.get('/export/csv', async (req, res) => {
       r.id, String(r.timestamp ?? '').slice(0, 10), String(r.timestamp ?? '').slice(11, 19),
       r.log_level ?? '', r.source ?? '', r.service ?? '', r.event_type ?? '', r.message ?? ''
     ].map(escape).join(',')).join('\n');
+    // Audit trail for export (point 11)
+    const user = req.session?.user;
+    if (user) {
+      recordAudit({ userId: user.id, userEmail: user.email, action: 'export', resourceType: 'logs', details: { format: 'csv', filters: req.query }, ipAddress: req.ip }).catch(()=>{});
+    }
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="logs_export_${new Date().toISOString().slice(0,10)}.csv"`);
     res.send('\uFEFF' + header + '\n' + body);

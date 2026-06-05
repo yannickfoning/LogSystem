@@ -71,7 +71,8 @@
            style="height:36px;width:auto;object-fit:contain;border-radius:4px;">
       <span>LogSystem</span>
     </div>
-    <ul class="nav-links">
+    <button class="hamburger" id="hamburger-btn" aria-label="Menu" aria-expanded="false"><span></span><span></span><span></span></button>
+    <ul class="nav-links" id="nav-links">
       <li><a href="/dashboard.html" class="active" data-i18n="nav.dashboard">Tableau de bord</a></li>
       <li><a href="/search.html" data-i18n="nav.search">Recherche</a></li>
       <li><a href="/import.html" data-i18n="nav.import">Import</a></li>
@@ -137,6 +138,40 @@
         <div class="kpi-label-v2">Sources actives</div>
         <div class="kpi-value-v2" id="kpi-sources">—</div>
         <div class="kpi-trend" data-i18n="dashboard.kpi.distinct_sources">Distinct sources</div>
+      </div>
+    </div>
+
+    <!-- KPI row 2 : INFO / WARNING / ERROR / CRITICAL breakdown (point 6) -->
+    <div class="kpi-row" style="margin-top:10px;">
+      <div class="kpi-card-v2" style="border-top:3px solid #6b7280;">
+        <div class="kpi-icon">🔵</div>
+        <div class="kpi-label-v2">DEBUG</div>
+        <div class="kpi-value-v2" id="kpi-debug">—</div>
+        <div class="kpi-trend" id="kpi-debug-pct" style="font-size:11px;color:var(--text2);">— %</div>
+      </div>
+      <div class="kpi-card-v2" style="border-top:3px solid #4f8ef7;">
+        <div class="kpi-icon">ℹ️</div>
+        <div class="kpi-label-v2">INFO</div>
+        <div class="kpi-value-v2" id="kpi-info">—</div>
+        <div class="kpi-trend" id="kpi-info-pct" style="font-size:11px;color:var(--text2);">— %</div>
+      </div>
+      <div class="kpi-card-v2" style="border-top:3px solid #f59e0b;">
+        <div class="kpi-icon">⚠️</div>
+        <div class="kpi-label-v2">WARNING</div>
+        <div class="kpi-value-v2" id="kpi-warning">—</div>
+        <div class="kpi-trend" id="kpi-warning-pct" style="font-size:11px;color:var(--text2);">— %</div>
+      </div>
+      <div class="kpi-card-v2" style="border-top:3px solid #ef4444;">
+        <div class="kpi-icon">❌</div>
+        <div class="kpi-label-v2">ERROR</div>
+        <div class="kpi-value-v2" id="kpi-error">—</div>
+        <div class="kpi-trend" id="kpi-error-pct" style="font-size:11px;color:var(--text2);">— %</div>
+      </div>
+      <div class="kpi-card-v2" style="border-top:3px solid #8b5cf6;">
+        <div class="kpi-icon">🔴</div>
+        <div class="kpi-label-v2">CRITICAL</div>
+        <div class="kpi-value-v2" id="kpi-critical">—</div>
+        <div class="kpi-trend" id="kpi-critical-pct" style="font-size:11px;color:var(--text2);">— %</div>
       </div>
     </div>
 
@@ -221,9 +256,23 @@
             <button class="btn btn-xs btn-secondary" id="mark-all-read" data-i18n="dashboard.mark_all_read">Tout lire</button>
           </div>
           <div class="scroll-y" style="max-height:280px;">
-            <div style="padding:12px 14px;" id="alerts-list">
-              <div class="skeleton" style="height:56px;margin-bottom:8px;border-radius:8px;"></div>
-              <div class="skeleton" style="height:56px;margin-bottom:8px;border-radius:8px;width:85%;"></div>
+            <div id="alerts-list">
+              <table class="alert-widget-table">
+                <thead>
+                  <tr>
+                    <th class="col-type">Type</th>
+                    <th class="col-sev">Gravité</th>
+                    <th class="col-occ">Occur.</th>
+                    <th class="col-date">Date</th>
+                    <th class="col-time">Heure</th>
+                    <th class="col-dir">Répertoire</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="alerts-tbody">
+                  <tr><td colspan="7" style="padding:16px;text-align:center;color:var(--text2);">Chargement…</td></tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -574,6 +623,16 @@
         document.getElementById('kpi-alerts-trend').textContent = t('dashboard.kpi.alerts_pending');
         document.getElementById('kpi-fatal-trend').textContent = t('dashboard.kpi.critical_levels');
 
+        // Severity breakdown KPI row 2 (point 6)
+        var levels = d.levels_breakdown || {};
+        var total = d.total_logs || 1;
+        ['debug','info','warning','error','critical'].forEach(function(lvl){
+          var count = levels[lvl.toUpperCase()] || levels[lvl] || 0;
+          animateValue('kpi-'+lvl, count);
+          var pctEl = document.getElementById('kpi-'+lvl+'-pct');
+          if (pctEl) pctEl.textContent = total > 0 ? (((count/total)*100).toFixed(1) + ' %') : '0 %';
+        });
+
         var dbEl=document.getElementById('status-db'); if(dbEl) dbEl.textContent='✅ ' + t('dashboard.status.connected');
         var wEl=document.getElementById('status-watcher'); if(wEl) wEl.textContent='✅ ' + t('dashboard.status.active');
       });
@@ -630,20 +689,67 @@
 
     // ── Alertes ──
     function loadAlerts() {
-      return api.get('/api/dashboard/alerts?limit=10&status=new').then(function(d){
+      return api.get('/api/dashboard/alerts?limit=15&status=new').then(function(d){
         var alerts = d && d.alerts ? d.alerts : (Array.isArray(d)?d:[]);
-        var list = document.getElementById('alerts-list');
-        if (!alerts.length) { list.innerHTML='<p style="color:var(--text2);font-size:13px;text-align:center;padding:12px 0;">' + t('dashboard.no_alerts') + '</p>'; return; }
-        list.innerHTML = alerts.map(function(a){
+        var tbody = document.getElementById('alerts-tbody');
+        if (!alerts.length) {
+          tbody.innerHTML = '<tr><td colspan="7" style="padding:20px;text-align:center;color:var(--text2);font-size:13px;">' + t('dashboard.no_alerts') + '</td></tr>';
+          return;
+        }
+        tbody.innerHTML = alerts.map(function(a){
+          var dt = a.created_at ? new Date(a.created_at) : null;
+          var dateStr = dt ? dt.toLocaleDateString('fr-FR') : '—';
+          var timeStr = dt ? dt.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}) : '—';
+          var meta = a.metadata ? (typeof a.metadata === 'string' ? JSON.parse(a.metadata||'{}') : a.metadata) : {};
+          var dir = meta.directory || meta.source || a.alert_type || '—';
+          var occ = meta.count || meta.occurrence_count || 1;
+          var type = (a.alert_type || a.rule_name || 'Alerte').substring(0,18);
+          var sevClass = 'badge-'+(a.severity||'medium');
           var isNew = a.status === 'new';
-          return '<div class="alert-item-v2 '+(isNew?'new ':'')+'severity-'+esc(a.severity||'medium')+'" data-alert-id="'+a.id+'">'
-            + '<div class="alert-msg">'+esc(a.message||'')+'</div>'
-            + '<div class="alert-meta">'
-            + '<span class="sev-badge '+esc(a.severity||'medium')+'">'+esc(a.severity||'medium')+'</span>'
-            + '<span>'+timeAgo(a.created_at)+'</span>'
-            + '</div></div>';
+          return '<tr class="'+(isNew?'alert-new':'')+'" data-alert-id="'+esc(String(a.id))+'" style="cursor:pointer;" onclick="markAlertRead('+a.id+')">'
+            + '<td class="col-type" title="'+esc(type)+'">'+esc(type.length>16?type.substring(0,16)+'…':type)+'</td>'
+            + '<td class="col-sev"><span class="'+sevClass+'">'+esc(a.severity||'medium')+'</span></td>'
+            + '<td class="col-occ" style="text-align:center;">'+occ+'</td>'
+            + '<td class="col-date">'+dateStr+'</td>'
+            + '<td class="col-time">'+timeStr+'</td>'
+            + '<td class="col-dir" title="'+esc(dir)+'">'+esc(dir.length>20?dir.substring(0,20)+'…':dir)+'</td>'
+            + '<td style="text-align:right;"><button class="btn btn-xs" onclick="event.stopPropagation();markAlertRead('+a.id+')" title="Marquer lu" style="padding:2px 6px;font-size:10px;">✓</button></td>'
+            + '</tr>';
         }).join('');
+        // Click to open modal with full alert info
+        tbody.querySelectorAll('tr[data-alert-id]').forEach(function(row){
+          row.addEventListener('click', function(){
+            var id = row.getAttribute('data-alert-id');
+            var alert = alerts.find(function(a){ return String(a.id)===id; });
+            if (alert) showAlertDetail(alert);
+          });
+        });
       });
+    }
+
+    function showAlertDetail(a) {
+      var meta = a.metadata ? (typeof a.metadata === 'string' ? JSON.parse(a.metadata||'{}') : a.metadata) : {};
+      var dt = a.created_at ? new Date(a.created_at) : null;
+      var html = '<dl style="display:grid;grid-template-columns:120px 1fr;gap:6px 12px;font-size:12.5px;">'
+        + '<dt style="color:var(--text2)">Type</dt><dd>'+(a.alert_type||'—')+'</dd>'
+        + '<dt style="color:var(--text2)">Gravité</dt><dd><span class="badge-'+(a.severity||'medium')+'">'+(a.severity||'medium')+'</span></dd>'
+        + '<dt style="color:var(--text2)">Statut</dt><dd>'+(a.status||'—')+'</dd>'
+        + '<dt style="color:var(--text2)">Date</dt><dd>'+(dt?dt.toLocaleString('fr-FR'):'—')+'</dd>'
+        + '<dt style="color:var(--text2)">Message</dt><dd>'+(a.message||'—')+'</dd>'
+        + (meta.directory?'<dt style="color:var(--text2)">Répertoire</dt><dd>'+esc(meta.directory)+'</dd>':'')
+        + (meta.count?'<dt style="color:var(--text2)">Occurrences</dt><dd>'+meta.count+'</dd>':'')
+        + '</dl>';
+      var modal = document.getElementById('modal-alert-detail');
+      if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modal-alert-detail';
+        modal.className = 'modal-backdrop';
+        modal.innerHTML = '<div class="modal-box"><div class="modal-head"><span class="modal-title">🔔 Détail alerte</span><button class="modal-close" onclick="this.closest('.modal-backdrop').classList.remove('show')">&times;</button></div><div class="modal-body" id="modal-alert-body"></div></div>';
+        document.body.appendChild(modal);
+        modal.addEventListener('click', function(e){ if(e.target===modal) modal.classList.remove('show'); });
+      }
+      document.getElementById('modal-alert-body').innerHTML = html;
+      modal.classList.add('show');
     }
 
     function markAlertRead(id){
@@ -833,6 +939,25 @@ function showLogDetail(logId){
       });
       es.addEventListener('heartbeat', function(){ heartbeat = Date.now(); });
       es.onerror = function(){ if(sseStatusEl) sseStatusEl.textContent='🔴 Déconnecté'; es.close(); setTimeout(connectSSE, 5000); };
+      es.addEventListener('log', function(e){
+        try {
+          var data = JSON.parse(e.data);
+          // Refresh dashboard stats silently on new log
+          if (data && data.log_level) {
+            clearTimeout(window._sseRefreshTimer);
+            window._sseRefreshTimer = setTimeout(function(){ if(typeof loadDashboard === 'function') loadDashboard(); }, 3000);
+          }
+        } catch(err){}
+      });
+      es.addEventListener('alert', function(e){
+        try {
+          var data = JSON.parse(e.data);
+          if (data && data.message) {
+            showToast('⚠️ Alerte: ' + data.message, 'warning');
+            if(typeof loadAlerts === 'function') loadAlerts();
+          }
+        } catch(err){}
+      });
       setInterval(function(){ if(Date.now()-heartbeat>120000){ es.close(); setTimeout(connectSSE, 1000);} }, 30000);
     }
 
@@ -853,6 +978,34 @@ function showLogDetail(logId){
     // ── Init ──
     refreshAll();
     connectSSE();
+
+    // ── Mobile hamburger menu ──
+    (function(){
+      var btn = document.getElementById('hamburger-btn');
+      var nav = document.getElementById('nav-links');
+      if (!btn || !nav) return;
+      btn.addEventListener('click', function(){
+        var open = nav.classList.toggle('open');
+        btn.classList.toggle('open', open);
+        btn.setAttribute('aria-expanded', open);
+      });
+      // Close on outside click
+      document.addEventListener('click', function(e){
+        if (!btn.contains(e.target) && !nav.contains(e.target)) {
+          nav.classList.remove('open');
+          btn.classList.remove('open');
+          btn.setAttribute('aria-expanded', 'false');
+        }
+      });
+      // Close on nav link click
+      nav.querySelectorAll('a').forEach(function(a){
+        a.addEventListener('click', function(){
+          nav.classList.remove('open');
+          btn.classList.remove('open');
+          btn.setAttribute('aria-expanded', 'false');
+        });
+      });
+    })();
     startAutoRefresh();
 
   })();

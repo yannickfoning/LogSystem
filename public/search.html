@@ -13,7 +13,8 @@
            style="height:36px;width:auto;object-fit:contain;border-radius:4px;">
       <span>LogSystem</span>
     </div>
-    <ul class="nav-links">
+    <button class="hamburger" id="hamburger-btn" aria-label="Menu" aria-expanded="false"><span></span><span></span><span></span></button>
+    <ul class="nav-links" id="nav-links">
       <li><a href="/dashboard.html" data-i18n="nav.dashboard">Tableau de bord</a></li>
       <li><a href="/search.html" class="active" data-i18n="nav.search">Recherche</a></li>
       <li><a href="/import.html" data-i18n="nav.import">Import</a></li>
@@ -38,37 +39,66 @@
       <button class="chip" data-chip="warnings" data-i18n="search.chip.warnings">Warnings</button>
     </div>
 
-    <div class="filter-bar">
-      <div class="form-group">
-        <input type="text" id="f-search" data-i18n-placeholder="search.placeholder" placeholder="Rechercher...">
+    <!-- Recherche avancée (point 7) — Filtres: Date, Heure, Niveau, Application, Répertoire, Source, Mot-clé -->
+    <div class="card" style="padding:14px;margin-bottom:16px;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:10px;">
+        <!-- Mot-clé -->
+        <div class="form-group">
+          <label style="font-size:11px;color:var(--text2);margin-bottom:4px;display:block;">🔍 Mot-clé</label>
+          <input type="text" id="f-search" placeholder="Rechercher..." autocomplete="off" style="width:100%;">
+        </div>
+        <!-- Niveau -->
+        <div class="form-group">
+          <label style="font-size:11px;color:var(--text2);margin-bottom:4px;display:block;">📊 Niveau</label>
+          <select id="f-level" style="width:100%;">
+            <option value="">Tous les niveaux</option>
+            <option value="DEBUG">DEBUG</option>
+            <option value="INFO">INFO</option>
+            <option value="WARNING">WARNING</option>
+            <option value="ERROR">ERROR</option>
+            <option value="CRITICAL">CRITICAL</option>
+            <option value="FATAL">FATAL</option>
+          </select>
+        </div>
+        <!-- Source -->
+        <div class="form-group">
+          <label style="font-size:11px;color:var(--text2);margin-bottom:4px;display:block;">📂 Source</label>
+          <input type="text" id="f-source" placeholder="Source / serveur" style="width:100%;">
+        </div>
+        <!-- Application / Service -->
+        <div class="form-group">
+          <label style="font-size:11px;color:var(--text2);margin-bottom:4px;display:block;">📱 Application</label>
+          <input type="text" id="f-service" placeholder="Service / application" style="width:100%;">
+        </div>
+        <!-- Répertoire (source_server) -->
+        <div class="form-group">
+          <label style="font-size:11px;color:var(--text2);margin-bottom:4px;display:block;">📁 Répertoire</label>
+          <input type="text" id="f-directory" placeholder="Répertoire / serveur" style="width:100%;">
+        </div>
+        <!-- Utilisateur -->
+        <div class="form-group">
+          <label style="font-size:11px;color:var(--text2);margin-bottom:4px;display:block;">👤 Utilisateur</label>
+          <input type="text" id="f-target-user" placeholder="Utilisateur cible" autocomplete="off" style="width:100%;">
+        </div>
+        <!-- Date de -->
+        <div class="form-group">
+          <label style="font-size:11px;color:var(--text2);margin-bottom:4px;display:block;">📅 Date / Heure de</label>
+          <input type="datetime-local" id="f-date-from" style="width:100%;">
+        </div>
+        <!-- Date à -->
+        <div class="form-group">
+          <label style="font-size:11px;color:var(--text2);margin-bottom:4px;display:block;">📅 Date / Heure à</label>
+          <input type="datetime-local" id="f-date-to" style="width:100%;">
+        </div>
       </div>
-      <div class="form-group">
-        <select id="f-level">
-          <option value="" data-i18n="search.level_all">Tous</option>
-          <option value="DEBUG">DEBUG</option>
-          <option value="INFO">INFO</option>
-          <option value="WARNING">WARNING</option>
-          <option value="ERROR">ERROR</option>
-          <option value="FATAL">FATAL</option>
-        </select>
+      <!-- Exemple de recherche combinée -->
+      <div style="font-size:11px;color:var(--text2);margin-bottom:10px;">
+        💡 Recherche combinée ex: <code style="background:var(--surface2);padding:2px 5px;border-radius:4px;">ERROR + nginx + 03/06/2026</code>
       </div>
-      <div class="form-group">
-        <input type="text" id="f-source" data-i18n-placeholder="search.source" placeholder="Source">
-      </div>
-      <div class="form-group">
-        <input type="text" id="f-service" data-i18n-placeholder="search.service" placeholder="Service">
-      </div>
-      <div class="form-group">
-        <input type="text" id="f-target-user" placeholder="Utilisateur" autocomplete="off">
-      </div>
-      <div class="form-group">
-        <input type="datetime-local" id="f-date-from">
-      </div>
-      <div class="form-group">
-        <input type="datetime-local" id="f-date-to">
-      </div>
-      <div>
-        <button class="btn btn-primary" id="search-btn" data-i18n="search.btn">Rechercher</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <button class="btn btn-primary" id="search-btn">🔍 Rechercher</button>
+        <button class="btn btn-secondary" id="reset-btn" style="font-size:12px;">✕ Réinitialiser</button>
+        <span id="search-combo-hint" style="font-size:11px;color:var(--text2);margin-left:8px;"></span>
       </div>
     </div>
 
@@ -235,7 +265,7 @@
       });
 
       function getParams() {
-        var p = { page: currentPage, limit: 50 };
+        var p = { page: currentPage, limit: 100 }; // Point 10: 100/page
         var search = document.getElementById('f-search').value.trim();
         var level = document.getElementById('f-level').value;
         var source = document.getElementById('f-source').value.trim();
@@ -248,6 +278,7 @@
         if (source) p.source = source;
         if (service) p.service = service;
         if (targetUser) p.target_user = targetUser; // FIX 3b
+        var directory = document.getElementById('f-directory'); if (directory && directory.value.trim()) p.source_server = directory.value.trim();
         if (dateFrom) p.date_from = dateFrom.replace('T', ' ');
         if (dateTo) p.date_to = dateTo.replace('T', ' ');
         if (window.chipFilter && window.chipFilter.type && window.chipFilter.value) {
@@ -409,6 +440,31 @@
       applyUrlFilters();
       doSearch();
     })();
+  </script>
+
+  <script>
+  (function(){
+    var btn = document.getElementById('hamburger-btn');
+    var nav = document.getElementById('nav-links');
+    if (!btn || !nav) return;
+    btn.addEventListener('click', function(){
+      var open = nav.classList.toggle('open');
+      btn.classList.toggle('open', open);
+      btn.setAttribute('aria-expanded', open);
+    });
+    document.addEventListener('click', function(e){
+      if (!btn.contains(e.target) && !nav.contains(e.target)) {
+        nav.classList.remove('open');
+        btn.classList.remove('open');
+      }
+    });
+    nav.querySelectorAll('a').forEach(function(a){
+      a.addEventListener('click', function(){
+        nav.classList.remove('open');
+        btn.classList.remove('open');
+      });
+    });
+  })();
   </script>
 </body>
 </html>

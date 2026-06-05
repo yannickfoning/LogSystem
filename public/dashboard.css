@@ -450,86 +450,75 @@
     #refresh-indicator { opacity: 0; transition: opacity 0.3s; font-size: 11px; color: var(--text2); }
     #refresh-indicator.show { opacity: 1; }
 
-    /* ========================================================================== */
-    /* PHASE 2 : RESPONSIVE DESIGN COMPLET - BREAKPOINTS COUVRANTS            */
-    /* ========================================================================== */
+/* ═══════════════════════════════════════════════════════════════════════
+   DASHBOARD RESPONSIVE — Améliorations points 1 & 6
+   ═══════════════════════════════════════════════════════════════════════ */
 
-    /* --- Règle Transverse : Tableaux Scrollables Horizontalement --- */
-    .table-responsive, .table-container, table {
-      width: 100%;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      display: block;
-    }
+/* Stats grid: 5 cards in a row on desktop */
+.dash-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
 
-    /* --- Graphiques Adaptatifs --- */
-    canvas {
-      max-width: 100% !important;
-      height: auto !important;
-    }
+/* Alert widget enhanced (point 6) */
+.alert-widget-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.alert-widget-table th {
+  text-align: left;
+  padding: 6px 8px;
+  color: var(--text2);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.alert-widget-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  color: var(--text);
+  vertical-align: middle;
+}
+.alert-widget-table tr:hover td { background: rgba(255,255,255,0.03); }
 
-    /* --- Breakpoint: Écrans Mobiles Fins (320px à 480px) --- */
-    @media screen and (max-width: 480px) {
-      .navbar {
-        flex-direction: column;
-        padding: 10px;
-        gap: 12px;
-      }
-      .nav-links {
-        flex-direction: column;
-        width: 100%;
-        text-align: center;
-        gap: 8px;
-      }
-      .nav-links li a {
-        display: block;
-        padding: 8px;
-      }
-      .dash-layout, .kpi-grid, .grid-2, .grid-3 {
-        grid-template-columns: 1fr !important;
-        padding: 8px;
-        gap: 12px;
-      }
-      .kpi-card {
-        padding: 12px;
-      }
-      .kpi-value {
-        font-size: 1.8rem !important;
-      }
-    }
+/* Severity badges */
+.badge-critical { color: #ff4757; font-weight: 700; }
+.badge-high     { color: var(--danger); font-weight: 600; }
+.badge-medium   { color: var(--warning); }
+.badge-low      { color: var(--primary); }
 
-    /* --- Breakpoint: Tablettes & Smartphones Larges (481px à 768px) --- */
-    @media screen and (min-width: 481px) and (max-width: 768px) {
-      .navbar {
-        flex-wrap: wrap;
-      }
-      .dash-layout, .kpi-grid {
-        grid-template-columns: repeat(2, 1fr) !important;
-        gap: 16px;
-      }
-      .grid-2, .grid-3 {
-        grid-template-columns: 1fr !important;
-      }
-    }
+/* ─── Responsive breakpoints ────────────────────────────────────────── */
+@media (max-width: 1200px) {
+  .dash-kpi-grid { grid-template-columns: repeat(3, 1fr); }
+}
 
-    /* --- Breakpoint: Laptops standard (769px à 1024px) --- */
-    @media screen and (min-width: 769px) and (max-width: 1024px) {
-      .dash-layout {
-        grid-template-columns: 1fr;
-      }
-      .kpi-grid {
-        grid-template-columns: repeat(3, 1fr) !important;
-      }
-    }
+@media (max-width: 1024px) {
+  .main-grid { grid-template-columns: 1fr !important; }
+  .dash-kpi-grid { grid-template-columns: repeat(3, 1fr); }
+  .alert-widget-table .col-dir,
+  .alert-widget-table .col-occ { display: none; }
+}
 
-    /* --- Breakpoint: Desktops & Ultrawide (1025px à 1440px et au-delà) --- */
-    @media screen and (min-width: 1441px) {
-      .dash-layout {
-        grid-template-columns: repeat(4, 1fr);
-        max-width: 1800px;
-      }
-      .kpi-grid {
-        grid-template-columns: repeat(5, 1fr) !important;
-      }
-    }
+@media (max-width: 768px) {
+  .dash-kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .dash-actions { flex-direction: column; gap: 6px; align-items: flex-start; }
+  .alert-widget-table .col-date,
+  .alert-widget-table .col-time { display: none; }
+  .alert-widget-table { font-size: 11px; }
+}
 
+@media (max-width: 480px) {
+  .dash-kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .dash-header { flex-direction: column; gap: 8px; }
+  .dash-title { font-size: 18px; }
+  .alert-widget-table .col-type { display: none; }
+}
+
+@media (max-width: 320px) {
+  .dash-kpi-grid { grid-template-columns: 1fr; }
+}
