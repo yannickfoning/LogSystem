@@ -1,3 +1,5 @@
+-- migration_log_intelligence.sql (fixed for Aiven MySQL - no IF NOT EXISTS on indexes)
+
 ALTER TABLE logs
   ADD COLUMN IF NOT EXISTS created_time TIME NULL AFTER timestamp,
   ADD COLUMN IF NOT EXISTS imported_at DATETIME DEFAULT CURRENT_TIMESTAMP AFTER created_time,
@@ -11,11 +13,29 @@ UPDATE logs SET imported_at = COALESCE(imported_at, created_at, NOW());
 UPDATE logs SET source_server = COALESCE(source_server, source);
 UPDATE logs SET created_time = COALESCE(created_time, TIME(timestamp));
 
-CREATE INDEX IF NOT EXISTS idx_logs_source_server ON logs(source_server);
-CREATE INDEX IF NOT EXISTS idx_logs_error_type ON logs(error_type);
-CREATE INDEX IF NOT EXISTS idx_logs_user_error_type_ts ON logs(user_id, error_type, timestamp DESC);
-CREATE INDEX IF NOT EXISTS idx_logs_user_fingerprint_ts ON logs(user_id, fingerprint, timestamp DESC);
-CREATE INDEX IF NOT EXISTS idx_logs_imported_at ON logs(imported_at);
+DROP PROCEDURE IF EXISTS add_indexes_log_intel;
+DELIMITER //
+CREATE PROCEDURE add_indexes_log_intel()
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='logs' AND INDEX_NAME='idx_logs_source_server') THEN
+    ALTER TABLE `logs` ADD INDEX `idx_logs_source_server` (`source_server`);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='logs' AND INDEX_NAME='idx_logs_error_type') THEN
+    ALTER TABLE `logs` ADD INDEX `idx_logs_error_type` (`error_type`);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='logs' AND INDEX_NAME='idx_logs_user_error_type_ts') THEN
+    ALTER TABLE `logs` ADD INDEX `idx_logs_user_error_type_ts` (`user_id`, `error_type`, `timestamp`);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='logs' AND INDEX_NAME='idx_logs_user_fingerprint_ts') THEN
+    ALTER TABLE `logs` ADD INDEX `idx_logs_user_fingerprint_ts` (`user_id`, `fingerprint`, `timestamp`);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='logs' AND INDEX_NAME='idx_logs_imported_at') THEN
+    ALTER TABLE `logs` ADD INDEX `idx_logs_imported_at` (`imported_at`);
+  END IF;
+END //
+DELIMITER ;
+CALL add_indexes_log_intel();
+DROP PROCEDURE IF EXISTS add_indexes_log_intel;
 
 ALTER TABLE error_groups
   ADD COLUMN IF NOT EXISTS previous_seen DATETIME NULL AFTER last_seen,
@@ -30,5 +50,17 @@ ALTER TABLE error_groups
 ALTER TABLE error_groups
   MODIFY COLUMN status ENUM('open','resolved','returned') DEFAULT 'open';
 
-CREATE INDEX IF NOT EXISTS idx_error_groups_status_last ON error_groups(status, last_seen DESC);
-CREATE INDEX IF NOT EXISTS idx_error_groups_error_type ON error_groups(error_type);
+DROP PROCEDURE IF EXISTS add_indexes_error_groups;
+DELIMITER //
+CREATE PROCEDURE add_indexes_error_groups()
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='error_groups' AND INDEX_NAME='idx_error_groups_status_last') THEN
+    ALTER TABLE `error_groups` ADD INDEX `idx_error_groups_status_last` (`status`, `last_seen`);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='error_groups' AND INDEX_NAME='idx_error_groups_error_type') THEN
+    ALTER TABLE `error_groups` ADD INDEX `idx_error_groups_error_type` (`error_type`);
+  END IF;
+END //
+DELIMITER ;
+CALL add_indexes_error_groups();
+DROP PROCEDURE IF EXISTS add_indexes_error_groups;
