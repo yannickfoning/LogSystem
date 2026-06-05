@@ -40,7 +40,15 @@ function getDirs() {
 }
 
 async function parseDirOwners() {
-  const mapping = process.env.WATCH_DIR_USER_MAP || './logs:1';
+  // Use first admin user if no explicit mapping configured
+  let defaultUserId = 1;
+  try {
+    const [adminRows] = await pool.execute(
+      "SELECT id FROM users WHERE role='admin' AND is_active=1 ORDER BY id ASC LIMIT 1"
+    );
+    if (adminRows.length > 0) defaultUserId = adminRows[0].id;
+  } catch(_) {}
+  const mapping = process.env.WATCH_DIR_USER_MAP || `./logs:${defaultUserId}`;
   const owners = {};
   const userIds = new Set();
   
@@ -68,7 +76,8 @@ async function parseDirOwners() {
     const validIds = new Set(users.map(u => u.id));
     for (const userId of userIds) {
       if (!validIds.has(userId)) {
-        throw new Error(`User ID ${userId} in WATCH_DIR_USER_MAP does not exist in database`);
+        logger.warn({ event: 'watcher_user_not_found', userId }, '[WATCHER] User not found — watcher disabled until user exists');
+        return;
       }
     }
   }
