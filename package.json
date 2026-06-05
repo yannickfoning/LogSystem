@@ -16,7 +16,9 @@
     "test": "vitest"
   },
   "dependencies": {
+    "7zip-min": "^1.4.3",
     "bcrypt": "^5.1.1",
+    "bcryptjs": "^3.0.3",
     "chokidar": "^3.6.0",
     "compression": "^1.7.4",
     "cookie-parser": "^1.4.6",
@@ -29,16 +31,16 @@
     "helmet": "^7.1.0",
     "iconv-lite": "^0.6.3",
     "multer": "^1.4.5-lts.1",
-    "mysql2": "^3.22.4",
+    "mysql": "^2.18.1",
+    "mysql2": "^2.3.3",
+    "node-unrar-js": "^2.0.1",
     "pdfkit": "^0.15.0",
     "pino": "^10.3.1",
     "redis": "^4.7.0",
     "tar": "^7.5.15",
     "unzipper": "^0.10.14",
     "uuid": "^10.0.0",
-    "zod": "^3.23.8",
-    "7zip-min": "^1.4.3",
-    "node-unrar-js": "^2.0.1"
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "pino-pretty": "^13.1.3",
