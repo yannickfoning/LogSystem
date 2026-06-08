@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Hôte : 127.0.0.1
--- Généré le : mer. 03 juin 2026 à 17:15
+-- Généré le : mar. 09 juin 2026 à 00:35
 -- Version du serveur : 10.4.32-MariaDB
 -- Version de PHP : 8.0.30
 
@@ -62,6 +62,17 @@ CREATE TABLE `alert_rules` (
   `created_by` int(11) DEFAULT NULL,
   `created_at` datetime DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Déchargement des données de la table `alert_rules`
+--
+
+INSERT INTO `alert_rules` (`id`, `name`, `description`, `condition_type`, `condition_value`, `threshold_value`, `time_window_minutes`, `severity`, `cooldown_minutes`, `is_active`, `created_by`, `created_at`) VALUES
+(101, 'ERROR_LIMIT', '10 erreurs / 5 minutes', 'threshold', 'ERROR', 10, 5, 'high', 10, 1, 9, '2026-06-08 23:09:49'),
+(102, 'FATAL_TRIGGER', '1 occurrence FATAL', 'threshold', 'FATAL', 1, 1, 'critical', 5, 1, 9, '2026-06-08 23:09:49'),
+(103, 'SECURITY_BREACH', '3 events securite', 'threshold', 'SECURITY', 3, 15, 'critical', 10, 1, 9, '2026-06-08 23:09:49'),
+(104, 'AUTH_BRUTEFORCE', '5 echecs auth', 'threshold', 'AUTH', 5, 10, 'high', 15, 1, 9, '2026-06-08 23:09:49'),
+(105, 'DISK_THRESHOLD', 'Disque > 80%', 'threshold', 'DISK', 80, 5, 'medium', 60, 1, 9, '2026-06-08 23:09:49');
 
 -- --------------------------------------------------------
 
@@ -151,7 +162,12 @@ CREATE TABLE `import_jobs` (
   `user_id` int(11) DEFAULT NULL,
   `started_at` datetime DEFAULT NULL,
   `completed_at` datetime DEFAULT NULL,
-  `created_at` datetime DEFAULT current_timestamp()
+  `created_at` datetime DEFAULT current_timestamp(),
+  `file_size` bigint(20) DEFAULT NULL,
+  `file_hash` varchar(64) DEFAULT NULL,
+  `source_directory` varchar(1024) DEFAULT NULL,
+  `import_ip_address` varchar(45) DEFAULT NULL,
+  `import_summary` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`import_summary`))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -190,7 +206,11 @@ CREATE TABLE `logs` (
   `duration_ms` int(11) DEFAULT NULL COMMENT 'Operation duration in milliseconds',
   `status_code` int(11) DEFAULT NULL COMMENT 'HTTP or operation status code',
   `timestamp_inferred` tinyint(1) DEFAULT 0 COMMENT 'AMÉLIORATION 1: Flag if timestamp was inferred from import time',
-  `classification_confidence` decimal(4,3) DEFAULT 0.500
+  `classification_confidence` decimal(4,3) DEFAULT 0.500,
+  `created_time_log` time DEFAULT NULL,
+  `imported_time` time DEFAULT NULL,
+  `file_created_at` datetime DEFAULT NULL,
+  `file_modified_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -233,12 +253,20 @@ CREATE TABLE `users` (
   `email` varchar(255) NOT NULL,
   `password_hash` varchar(255) NOT NULL,
   `display_name` varchar(100) DEFAULT NULL,
-  `role` enum('user','admin') DEFAULT 'user',
+  `role` enum('user','analyst','admin') DEFAULT 'user',
   `is_active` tinyint(1) DEFAULT 1,
   `last_login` datetime DEFAULT NULL,
   `session_version` int(11) DEFAULT 0,
   `created_at` datetime DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Déchargement des données de la table `users`
+--
+
+INSERT INTO `users` (`id`, `email`, `password_hash`, `display_name`, `role`, `is_active`, `last_login`, `session_version`, `created_at`) VALUES
+(9, 'admin@logsystem.local', '$2b$12$odqFAIyGXmuZaA9Op9YjxeMxL2pkl4xRemSPZ6e/eJc8c5EKAET8W', 'Administrateur', 'admin', 1, NULL, 0, '2026-06-08 23:05:31'),
+(10, 'analyste@logsystem.local', '$2b$12$O5NpeCZo3II2g35hoHV0FeCkinKB7y4LtfXKIkIllvMJ2/UqlgEDG', 'Analyste', 'analyst', 1, NULL, 0, '2026-06-08 23:05:31');
 
 -- --------------------------------------------------------
 
@@ -317,7 +345,8 @@ ALTER TABLE `audit_log`
   ADD KEY `idx_audit_user` (`user_id`),
   ADD KEY `idx_audit_action` (`action`),
   ADD KEY `idx_audit_resource` (`resource_type`),
-  ADD KEY `idx_audit_created` (`created_at`);
+  ADD KEY `idx_audit_created` (`created_at`),
+  ADD KEY `idx_audit_timestamp2` (`created_at`);
 
 --
 -- Index pour la table `error_groups`
@@ -379,7 +408,15 @@ ALTER TABLE `logs`
   ADD KEY `idx_logs_error_type` (`error_type`),
   ADD KEY `idx_logs_user_error_type_ts` (`user_id`,`error_type`,`timestamp`),
   ADD KEY `idx_logs_user_fingerprint_ts` (`user_id`,`fingerprint`,`timestamp`),
-  ADD KEY `idx_logs_imported_at` (`imported_at`);
+  ADD KEY `idx_logs_imported_at` (`imported_at`),
+  ADD KEY `idx_imported_at` (`imported_at`),
+  ADD KEY `idx_audit_severity` (`log_level`),
+  ADD KEY `idx_audit_timestamp` (`timestamp`),
+  ADD KEY `idx_audit_source` (`source`),
+  ADD KEY `idx_audit_user_id` (`user_id`),
+  ADD KEY `idx_logs_combined_search` (`user_id`,`log_level`,`source`,`timestamp`),
+  ADD KEY `idx_file_created` (`file_created_at`),
+  ADD KEY `idx_logs_file_modified_at` (`file_modified_at`);
 ALTER TABLE `logs` ADD FULLTEXT KEY `ft_message` (`message`,`normalized_message`);
 
 --
@@ -430,7 +467,7 @@ ALTER TABLE `alerts`
 -- AUTO_INCREMENT pour la table `alert_rules`
 --
 ALTER TABLE `alert_rules`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=106;
 
 --
 -- AUTO_INCREMENT pour la table `anomalies`
@@ -466,7 +503,7 @@ ALTER TABLE `parser_metrics`
 -- AUTO_INCREMENT pour la table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT pour la table `watch_log_metrics`
