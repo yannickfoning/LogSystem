@@ -15,25 +15,49 @@ export interface AuthUser {
 
 interface AuthState {
   user: AuthUser | null;
-  isLoading: boolean;
-  isInitialized: boolean;
+  // Aliases utilisés dans page.tsx
+  loading: boolean;
+  initialized: boolean;
+  // Méthodes
+  isAdmin: () => boolean;
+  initialize: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
-  isLoading: false,
-  isInitialized: false,
+  loading: false,
+  initialized: false,
+
+  isAdmin: () => {
+    const { user } = get();
+    return user?.role === 'admin';
+  },
+
+  initialize: async () => {
+    set({ loading: true });
+    try {
+      const res = await fetch('/api/auth/me', { credentials: 'include' });
+      if (res.ok) {
+        const user = await res.json();
+        set({ user, loading: false, initialized: true });
+      } else {
+        set({ user: null, loading: false, initialized: true });
+      }
+    } catch {
+      set({ user: null, loading: false, initialized: true });
+    }
+  },
 
   login: async (email: string, password: string) => {
-    set({ isLoading: true });
+    set({ loading: true });
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include', // Cookie HTTPOnly géré par le navigateur
+        credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
       if (!res.ok) {
@@ -41,9 +65,9 @@ export const useAuthStore = create<AuthState>((set) => ({
         throw new Error(data.error || 'Identifiants invalides');
       }
       const user = await res.json();
-      set({ user, isLoading: false });
+      set({ user, loading: false });
     } catch (e) {
-      set({ isLoading: false });
+      set({ loading: false });
       throw e;
     }
   },
@@ -52,21 +76,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
     } catch {}
-    set({ user: null, isInitialized: true });
+    set({ user: null, initialized: true });
   },
 
   checkAuth: async () => {
-    set({ isLoading: true });
-    try {
-      const res = await fetch('/api/auth/me', { credentials: 'include' });
-      if (res.ok) {
-        const user = await res.json();
-        set({ user, isLoading: false, isInitialized: true });
-      } else {
-        set({ user: null, isLoading: false, isInitialized: true });
-      }
-    } catch {
-      set({ user: null, isLoading: false, isInitialized: true });
-    }
+    return get().initialize();
   },
 }));

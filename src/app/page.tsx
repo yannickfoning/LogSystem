@@ -477,15 +477,15 @@ function DashboardView() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Taille DB</span>
-                  <span className="font-medium">{system.system.dbSize}</span>
+                  <span className="font-medium">{system?.system?.dbSize}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Dernier import</span>
-                  <span className="font-medium">{system.system.lastImport ? formatDate(system.system.lastImport) : 'Aucun'}</span>
+                  <span className="font-medium">{system?.system?.lastImport ? formatDate(system.system.lastImport) : 'Aucun'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Utilisateurs actifs</span>
-                  <span className="font-medium">{system.system.activeUsers}</span>
+                  <span className="font-medium">{system?.system?.activeUsers}</span>
                 </div>
               </div>
             ) : (
@@ -723,14 +723,14 @@ function WebLogView() {
                               <div><span className="font-medium">Import:</span> {formatDate(log.importedAt || log.createdAt || '')}</div>
                               <div><span className="font-medium">Fichier:</span> {log.fileName || '—'}</div>
                               <div><span className="font-medium">Répertoire:</span> {log.sourceDirectory || '—'}</div>
-                              {log.metadata && (
+                              {log.metadata != null && typeof log.metadata === 'object' ? (
                                 <div className="col-span-full">
                                   <span className="font-medium">Métadonnées:</span>
                                   <pre className="mt-1 text-xs bg-background p-2 rounded overflow-auto max-h-40">
-                                    {JSON.stringify(log.metadata as any, null, 2)}
+                                    {JSON.stringify(log.metadata, null, 2) as string}
                                   </pre>
                                 </div>
-                              )}
+                              ) : null}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -1518,7 +1518,7 @@ function AdminAlertRulesTab() {
     setEditRule(r);
   };
 
-  const RuleForm = ({ onSave, saveLabel }: { onSave: () => void; saveLabel: string }) => (
+  const RuleForm = ({ onSave, saveLabel }: { onSave: () => void; saveLabel: string }): React.ReactElement => (
     <div className="space-y-3">
       <div className="space-y-1"><Label>Nom</Label><Input value={ruleName} onChange={(e) => setRuleName(e.target.value)} /></div>
       <div className="space-y-1"><Label>Description</Label><Textarea value={ruleDesc} onChange={(e) => setRuleDesc(e.target.value)} /></div>
