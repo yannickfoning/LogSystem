@@ -27,6 +27,7 @@ SET time_zone = "+00:00";
 -- Structure de la table `alerts`
 --
 
+DROP TABLE IF EXISTS `alerts`;
 CREATE TABLE `alerts` (
   `id` int(11) NOT NULL,
   `rule_id` int(11) DEFAULT NULL,
@@ -48,6 +49,7 @@ CREATE TABLE `alerts` (
 -- Structure de la table `alert_rules`
 --
 
+DROP TABLE IF EXISTS `alert_rules`;
 CREATE TABLE `alert_rules` (
   `id` int(11) NOT NULL,
   `name` varchar(255) NOT NULL,
@@ -80,6 +82,7 @@ INSERT INTO `alert_rules` (`id`, `name`, `description`, `condition_type`, `condi
 -- Structure de la table `anomalies`
 --
 
+DROP TABLE IF EXISTS `anomalies`;
 CREATE TABLE `anomalies` (
   `id` bigint(20) NOT NULL,
   `user_id` int(11) NOT NULL,
@@ -102,6 +105,7 @@ CREATE TABLE `anomalies` (
 -- Structure de la table `audit_log`
 --
 
+DROP TABLE IF EXISTS `audit_log`;
 CREATE TABLE `audit_log` (
   `id` int(11) NOT NULL,
   `user_id` int(11) DEFAULT NULL,
@@ -120,6 +124,7 @@ CREATE TABLE `audit_log` (
 -- Structure de la table `error_groups`
 --
 
+DROP TABLE IF EXISTS `error_groups`;
 CREATE TABLE `error_groups` (
   `id` int(11) NOT NULL,
   `fingerprint` varchar(40) NOT NULL,
@@ -148,6 +153,7 @@ CREATE TABLE `error_groups` (
 -- Structure de la table `import_jobs`
 --
 
+DROP TABLE IF EXISTS `import_jobs`;
 CREATE TABLE `import_jobs` (
   `id` varchar(36) NOT NULL,
   `filename` varchar(255) DEFAULT NULL,
@@ -176,6 +182,7 @@ CREATE TABLE `import_jobs` (
 -- Structure de la table `logs`
 --
 
+DROP TABLE IF EXISTS `logs`;
 CREATE TABLE `logs` (
   `id` bigint(20) NOT NULL,
   `raw_log` text DEFAULT NULL,
@@ -219,6 +226,7 @@ CREATE TABLE `logs` (
 -- Structure de la table `parser_metrics`
 --
 
+DROP TABLE IF EXISTS `parser_metrics`;
 CREATE TABLE `parser_metrics` (
   `id` bigint(20) NOT NULL,
   `format_type` varchar(50) DEFAULT NULL,
@@ -236,6 +244,7 @@ CREATE TABLE `parser_metrics` (
 -- Structure de la table `sessions`
 --
 
+DROP TABLE IF EXISTS `sessions`;
 CREATE TABLE `sessions` (
   `session_id` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
   `expires` int(11) UNSIGNED NOT NULL,
@@ -248,6 +257,7 @@ CREATE TABLE `sessions` (
 -- Structure de la table `users`
 --
 
+DROP TABLE IF EXISTS `users`;
 CREATE TABLE `users` (
   `id` int(11) NOT NULL,
   `email` varchar(255) NOT NULL,
@@ -274,6 +284,7 @@ INSERT INTO `users` (`id`, `email`, `password_hash`, `display_name`, `role`, `is
 -- Structure de la table `watch_log_metrics`
 --
 
+DROP TABLE IF EXISTS `watch_log_metrics`;
 CREATE TABLE `watch_log_metrics` (
   `id` bigint(20) NOT NULL,
   `user_id` int(11) NOT NULL,
@@ -294,6 +305,7 @@ CREATE TABLE `watch_log_metrics` (
 -- Structure de la table `watch_offsets`
 --
 
+DROP TABLE IF EXISTS `watch_offsets`;
 CREATE TABLE `watch_offsets` (
   `path` varchar(512) NOT NULL,
   `offset` bigint(20) DEFAULT 0,
@@ -518,38 +530,38 @@ ALTER TABLE `watch_log_metrics`
 --
 -- Contraintes pour la table `alerts`
 --
-ALTER TABLE `alerts`
-  ADD CONSTRAINT `fk_alerts_rule` FOREIGN KEY (`rule_id`) REFERENCES `alert_rules` (`id`) ON DELETE SET NULL;
+-- ALTER TABLE `alerts`
+--   -- ADD CONSTRAINT `fk_alerts_rule` FOREIGN KEY (`rule_id`) REFERENCES `alert_rules` (`id`) ON DELETE SET NULL;
 
 --
 -- Contraintes pour la table `alert_rules`
 --
-ALTER TABLE `alert_rules`
-  ADD CONSTRAINT `fk_alert_rules_user` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+-- ALTER TABLE `alert_rules`
+--   -- ADD CONSTRAINT `fk_alert_rules_user` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 
 --
 -- Contraintes pour la table `anomalies`
 --
-ALTER TABLE `anomalies`
-  ADD CONSTRAINT `anomalies_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+-- ALTER TABLE `anomalies`
+--   -- ADD CONSTRAINT `anomalies_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
 --
 -- Contraintes pour la table `import_jobs`
 --
-ALTER TABLE `import_jobs`
-  ADD CONSTRAINT `fk_import_jobs_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+-- ALTER TABLE `import_jobs`
+--   -- ADD CONSTRAINT `fk_import_jobs_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 
 --
 -- Contraintes pour la table `logs`
 --
-ALTER TABLE `logs`
-  ADD CONSTRAINT `fk_logs_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+-- ALTER TABLE `logs`
+--   -- ADD CONSTRAINT `fk_logs_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
 --
 -- Contraintes pour la table `watch_log_metrics`
 --
-ALTER TABLE `watch_log_metrics`
-  ADD CONSTRAINT `watch_log_metrics_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+-- ALTER TABLE `watch_log_metrics`
+--   -- ADD CONSTRAINT `watch_log_metrics_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
