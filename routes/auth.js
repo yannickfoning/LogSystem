@@ -177,5 +177,27 @@ router.put('/password', validateBody(passwordSchema), async (req, res) => {
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
-
+// Route temporaire création users — À SUPPRIMER APRÈS UTILISATION
+router.get('/init-users-7x9k2', async (req, res) => {
+  try {
+    const bcrypt = await import('bcryptjs');
+    const adminHash = await bcrypt.hash('Admin@2026!', 12);
+    const userHash  = await bcrypt.hash('User@2026!', 12);
+    await pool.execute(
+      `INSERT INTO users (email,password_hash,display_name,role,is_active,created_at)
+       VALUES (?,?,'Administrateur','admin',1,NOW())
+       ON DUPLICATE KEY UPDATE password_hash=VALUES(password_hash),is_active=1`,
+      ['admin@logsystem.com', adminHash]
+    );
+    await pool.execute(
+      `INSERT INTO users (email,password_hash,display_name,role,is_active,created_at)
+       VALUES (?,?,'Utilisateur Test','user',1,NOW())
+       ON DUPLICATE KEY UPDATE password_hash=VALUES(password_hash),is_active=1`,
+      ['user@logsystem.com', userHash]
+    );
+    res.json({ ok: true, message: 'Users créés', users: ['admin@logsystem.com', 'user@logsystem.com'] });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 export default router;

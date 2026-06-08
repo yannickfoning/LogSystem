@@ -1,4 +1,4 @@
-﻿SET NAMES utf8mb4;
+SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
 DROP TABLE IF EXISTS `users`;
@@ -40,8 +40,6 @@ CREATE TABLE `logs` (
   `timestamp_inferred` TINYINT(1) DEFAULT 0,
   `classification_confidence` DECIMAL(4,3) DEFAULT 0.500,
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
-  `file_created_at` DATETIME NULL COMMENT 'File birthtime from fs.stat',
-  `file_modified_at` DATETIME NULL COMMENT 'File mtime from fs.stat',
   INDEX `idx_timestamp` (`timestamp`),
   INDEX `idx_log_level` (`log_level`),
   INDEX `idx_fingerprint` (`fingerprint`),
@@ -160,6 +158,7 @@ CREATE TABLE `audit_log` (
   INDEX `idx_audit_created` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- FIX: "offset" est un mot réservé MySQL — renommé en "file_offset"
 DROP TABLE IF EXISTS `watch_offsets`;
 CREATE TABLE `watch_offsets` (
   `path` VARCHAR(1024) PRIMARY KEY,

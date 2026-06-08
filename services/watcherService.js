@@ -40,15 +40,7 @@ function getDirs() {
 }
 
 async function parseDirOwners() {
-  // Use first admin user if no explicit mapping configured
-  let defaultUserId = 1;
-  try {
-    const [adminRows] = await pool.execute(
-      "SELECT id FROM users WHERE role='admin' AND is_active=1 ORDER BY id ASC LIMIT 1"
-    );
-    if (adminRows.length > 0) defaultUserId = adminRows[0].id;
-  } catch(_) {}
-  const mapping = process.env.WATCH_DIR_USER_MAP || `./logs:${defaultUserId}`;
+  const mapping = process.env.WATCH_DIR_USER_MAP || './logs:1';
   const owners = {};
   const userIds = new Set();
   
@@ -76,8 +68,7 @@ async function parseDirOwners() {
     const validIds = new Set(users.map(u => u.id));
     for (const userId of userIds) {
       if (!validIds.has(userId)) {
-        logger.warn({ event: 'watcher_user_not_found', userId }, '[WATCHER] User not found — watcher disabled until user exists');
-        return;
+        throw new Error(`User ID ${userId} in WATCH_DIR_USER_MAP does not exist in database`);
       }
     }
   }
@@ -328,30 +319,11 @@ async function processLogFile(filePath, incremental = true) {
 }
 
 export async function startWatcher() {
-  // FIX #2: Retry with exponential backoff for DB readiness
-  const maxRetries = 3;
-  const delays = [2000, 5000, 10000]; // 2s, 5s, 10s
+  // S-06: Initialize dirOwners asynchronously with validation
+  dirOwners = await parseDirOwners();
   
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      // S-06: Initialize dirOwners asynchronously with validation
-      dirOwners = await parseDirOwners();
-      
-      // W-02: Load persisted offsets from database
-      await loadPersistedOffsets();
-      
-      // If we get here, DB is ready - break out of retry loop
-      break;
-    } catch (error) {
-      if (attempt === maxRetries) {
-        logger.error({ event: 'watcher_init_failed', attempt, error: error.message }, '[WATCHER]');
-        throw new Error(`Failed to initialize watcher after ${maxRetries} attempts: ${error.message}`);
-      }
-      
-      logger.warn({ event: 'watcher_retry', attempt, delay: delays[attempt - 1], error: error.message }, '[WATCHER]');
-      await new Promise(resolve => setTimeout(resolve, delays[attempt - 1]));
-    }
-  }
+  // W-02: Load persisted offsets from database
+  await loadPersistedOffsets();
   
   const dirs = getDirs();
   if (dirs.length === 0) {
@@ -443,46 +415,10 @@ export async function detectAnomalies(userId, windowMinutes = 10) {
       ? ((currentErrorRate / baselineErrorRate) * 100 - 100)
       : currentErrorRate > 0 ? 100 : 0;
 
-    // Z-score anomaly detection (point 8)
-    // Compute rolling 1h windows to get stddev for z-score
-    const [hourlyBuckets] = await conn.query(
-      `SELECT FLOOR(TIMESTAMPDIFF(MINUTE, DATE_SUB(NOW(), INTERVAL 24 HOUR), timestamp) / 60) as bucket,
-              COUNT(CASE WHEN log_level IN ('ERROR','CRITICAL','FATAL') THEN 1 END) as errors
-         FROM logs
-        WHERE user_id = ? AND timestamp >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
-        GROUP BY bucket ORDER BY bucket`,
-      [userId]
-    );
-
-    let zScore = 0;
-    let movingAvgAnomaly = false;
-    if (hourlyBuckets.length >= 3) {
-      const vals = hourlyBuckets.map(r => parseFloat(r.errors) || 0);
-      const mean = vals.reduce((s, v) => s + v, 0) / vals.length;
-      const variance = vals.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / vals.length;
-      const std = Math.sqrt(variance);
-      const latest = vals[vals.length - 1] || 0;
-      zScore = std > 0 ? (latest - mean) / std : 0;
-      // Moving average of last 3 windows
-      const last3 = vals.slice(-3);
-      const movAvg = last3.reduce((s, v) => s + v, 0) / last3.length;
-      movingAvgAnomaly = movAvg > mean * 1.8;
-    }
-
-    const isAnomaly = currentErrorRate > baselineErrorRate * 1.5
-      || currentErrorRate > 30
-      || Math.abs(zScore) > 2.5
-      || movingAvgAnomaly;
-
-    const anomalyType = [];
-    if (currentErrorRate > 30) anomalyType.push('high_error_rate');
-    if (currentErrorRate > baselineErrorRate * 1.5) anomalyType.push('error_spike');
-    if (Math.abs(zScore) > 2.5) anomalyType.push('zscore_outlier');
-    if (movingAvgAnomaly) anomalyType.push('moving_avg_spike');
+    const isAnomaly = currentErrorRate > baselineErrorRate * 1.5 || currentErrorRate > 30;
 
     return {
       anomaly_detected: isAnomaly,
-      anomaly_types: anomalyType,
       window_minutes: windowMinutes,
       current_count: current.count,
       baseline_count: baseline.count,
@@ -491,9 +427,7 @@ export async function detectAnomalies(userId, windowMinutes = 10) {
       current_rate: parseFloat(currentErrorRate.toFixed(2)),
       baseline_rate: parseFloat(baselineErrorRate.toFixed(2)),
       threshold_exceeded: currentErrorRate > 30,
-      rate_increase_percent: parseFloat(rateIncrease.toFixed(1)),
-      z_score: parseFloat(zScore.toFixed(2)),
-      moving_avg_anomaly: movingAvgAnomaly
+      rate_increase_percent: parseFloat(rateIncrease.toFixed(1))
     };
   } catch (error) {
     logger.error({ event: 'anomaly_detection_error', error: error.message }, '[WATCHER]');
@@ -558,45 +492,15 @@ export async function getWatchStats(userId) {
 
     return {
       stats: {
-        total_logs: stats[0]?.total_logs ?? 0,
-        debug_count: stats[0]?.debug_count ?? 0,
-        info_count: stats[0]?.info_count ?? 0,
-        warning_count: stats[0]?.warning_count ?? 0,
-        error_count: stats[0]?.error_count ?? 0,
-        critical_count: stats[0]?.critical_count ?? 0,
-        fatal_count: stats[0]?.fatal_count ?? 0,
-        sources: stats[0]?.sources ?? 0,
-        services: stats[0]?.services ?? 0,
-        modules: stats[0]?.modules ?? 0,
-        first_log: stats[0]?.first_log ?? null,
-        last_log: stats[0]?.last_log ?? null,
+        ...(stats[0] || {}),
         logs_per_min
       },
       top_errors: topErrors || [],
       throughput: throughput || []
     };
   } catch (error) {
-    logger.error({ event: 'stats_error', userId, error: error.message }, '[WATCHER]');
-    // Always return valid default object for SSE
-    return {
-      stats: {
-        total_logs: 0,
-        debug_count: 0,
-        info_count: 0,
-        warning_count: 0,
-        error_count: 0,
-        critical_count: 0,
-        fatal_count: 0,
-        sources: 0,
-        services: 0,
-        modules: 0,
-        first_log: null,
-        last_log: null,
-        logs_per_min: 0
-      },
-      top_errors: [],
-      throughput: []
-    };
+    logger.error({ event: 'stats_error', error: error.message }, '[WATCHER]');
+    return { error: error.message };
   } finally {
     if (conn) {
       try { conn.release(); } catch (_) {}

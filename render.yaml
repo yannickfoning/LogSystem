@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: logsystem
+    env: node
+    region: frankfurt
+    plan: starter
+    buildCommand: npm install --legacy-peer-deps && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Aiven MySQL Configuration
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: DB_SSL
+        value: "true"
+      # Application Configuration
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: BCRYPT_ROUNDS
+        value: "12"
+      - key: RETENTION_CRON_HOUR
+        value: "3"
+      - key: IMPORT_BATCH_SIZE
+        value: "500"

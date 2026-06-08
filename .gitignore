@@ -1,43 +1,52 @@
 # Dépendances
 node_modules/
-npm-debug.log*
+.pnp
+.pnp.js
 
-# Variables d'environnement — JAMAIS versionner .env
+# Next.js
+.next/
+out/
+build/
+
+# Variables d'environnement — NE JAMAIS COMMITTER
 .env
 .env.local
 .env.*.local
-!.env.example
 
-# SEC-02: Exclure les fichiers sensibles
-cookies.txt
-*.cookies
-test-plan.json
-scripts/dev-scripts/
+# Prisma — ne pas committer les migrations auto-générées en dev
+# prisma/migrations/   # Décommentez si vous gérez les migrations manuellement
 
-# Logs générés
-logs/*.log
-logs/*.gz
-!logs/.gitkeep
-
-# Uploads temporaires
+# Uploads & logs
 uploads/
-tmp/
+logs/
+backups/
+/tmp/
 
-# Build outputs
-dist/
-build/
-.next/
+# Fichiers sensibles
+*.pem
+*.key
+ca.pem
+cookies.txt
 
 # OS
 .DS_Store
 Thumbs.db
 
 # IDE
-.idea/
 .vscode/
+.idea/
 *.swp
 *.swo
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
 
 # Tests
 coverage/
 .nyc_output/
+
+# Misc
+*.tgz

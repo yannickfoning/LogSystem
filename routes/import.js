@@ -1,81 +1,144 @@
-import { Router } from 'express';
-import multer from 'multer';
-import logger from '../config/logger.js';
-import { v4 as uuidv4 } from 'uuid';
-import pool from '../config/database.js';
-import { requireAuth, userScope } from '../middleware/auth.js';
-import { parseLogContent, detectFormat } from '../lib/processing/universalParser.js';
-import { normalizeMessage } from '../lib/processing/normalize.js';
-import { classifyLog } from '../lib/processing/classify.js';
-import { generateFingerprint } from '../lib/processing/fingerprint.js';
-import { normalizeLevel } from '../config/database.js';
-import { alertEngineBus } from '../services/alertEngine.js';
-import { alertWorker } from '../workers/alertWorker.js';
-import { recordAudit } from '../middleware/audit.js';
-import { validateBody, importUploadSchema } from '../middleware/validation.js';
-import { invalidateDashboard } from '../services/cacheService.js';
-import { extractArchive, isArchive } from '../lib/processing/archiveHandler.js';
+import { Router } from "express";
+import multer from "multer";
+import logger from "../config/logger.js";
+import { v4 as uuidv4 } from "uuid";
+import pool from "../config/database.js";
+import { requireAuth, userScope } from "../middleware/auth.js";
+import {
+  parseLogContent,
+  detectFormat,
+} from "../lib/processing/universalParser.js";
+import { normalizeMessage } from "../lib/processing/normalize.js";
+import { classifyLog } from "../lib/processing/classify.js";
+import { generateFingerprint } from "../lib/processing/fingerprint.js";
+import { normalizeLevel } from "../config/database.js";
+import { alertEngineBus } from "../services/alertEngine.js";
+import { alertWorker } from "../workers/alertWorker.js";
+import { recordAudit } from "../middleware/audit.js";
+import { validateBody, importUploadSchema } from "../middleware/validation.js";
+import { invalidateDashboard } from "../services/cacheService.js";
+import { extractArchive, isArchive } from "../lib/processing/archiveHandler.js";
 
 const router = Router();
 router.use(requireAuth);
-const RETURN_GAP_DAYS = parseInt(process.env.ERROR_RETURN_GAP_DAYS || '7', 10);
+const RETURN_GAP_DAYS = parseInt(process.env.ERROR_RETURN_GAP_DAYS || "7", 10);
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: parseInt(process.env.UPLOAD_MAX_SIZE || '52428800', 10),
-    files: 1
+    fileSize: parseInt(process.env.UPLOAD_MAX_SIZE || "52428800", 10),
+    files: parseInt(process.env.UPLOAD_MAX_FILES || "10", 10),
   },
   fileFilter: (req, file, cb) => {
     const filename = file.originalname;
-    if (!filename || filename.trim().length === 0) return cb(new Error('Nom de fichier requis'));
-    if (filename.length > 255) return cb(new Error('Nom de fichier trop long (max 255 caractères)'));
+    if (!filename || filename.trim().length === 0)
+      return cb(new Error("Nom de fichier requis"));
+    if (filename.length > 255)
+      return cb(new Error("Nom de fichier trop long (max 255 caractères)"));
 
     const validNamePattern = /^[a-zA-Z0-9._\-\s]+$/;
-    if (!validNamePattern.test(filename)) return cb(new Error('Nom de fichier contient des caractères non autorisés'));
+    if (!validNamePattern.test(filename))
+      return cb(
+        new Error("Nom de fichier contient des caractères non autorisés"),
+      );
 
     const allowedMimeTypes = [
-      'text/plain', 'text/log', 'application/json', 'application/jsonl',
-      'text/x-log', 'application/octet-stream', 'application/zip',
-      'application/gzip', 'application/x-gzip', 'application/x-tar',
-      'application/x-brotli', 'application/zstd', 'application/vnd.rar',
-      'application/x-rar-compressed',
-      'application/x-7z-compressed'
+      "text/plain",
+      "text/log",
+      "application/json",
+      "application/jsonl",
+      "text/x-log",
+      "application/octet-stream",
+      "application/zip",
+      "application/gzip",
+      "application/x-gzip",
+      "application/x-tar",
+      "application/x-brotli",
+      "application/zstd",
+      "application/vnd.rar",
+      "application/x-rar-compressed",
+      "application/x-7z-compressed",
     ];
     if (file.mimetype && !allowedMimeTypes.includes(file.mimetype)) {
       return cb(new Error(`Type MIME non supporté: ${file.mimetype}`));
     }
 
-    const ext = filename.split('.').pop().toLowerCase();
-    const allowedExtensions = ['log', 'txt', 'json', 'jsonl', 'csv', 'xml', 'zip', 'gz', 'gzip', 'tar', 'tgz', 'br', 'brotli', 'zst', 'zstandard', 'rar', '7z'];
+    const ext = filename.split(".").pop().toLowerCase();
+    const allowedExtensions = [
+      "log",
+      "txt",
+      "json",
+      "jsonl",
+      "csv",
+      "xml",
+      "zip",
+      "gz",
+      "gzip",
+      "tar",
+      "tgz",
+      "br",
+      "brotli",
+      "zst",
+      "zstandard",
+      "rar",
+      "7z",
+    ];
     if (!allowedExtensions.includes(ext)) {
-      return cb(new Error(`Extension non supportée. Utilisez: ${allowedExtensions.join(', ')}`));
+      return cb(
+        new Error(
+          `Extension non supportée. Utilisez: ${allowedExtensions.join(", ")}`,
+        ),
+      );
     }
 
     cb(null, true);
-  }
+  },
 });
 
 // Ordre de sévérité pour error_groups
-const SEV_ORDER = { DEBUG: 0, INFO: 1, WARNING: 2, ERROR: 3, CRITICAL: 4, FATAL: 5 };
+const SEV_ORDER = {
+  DEBUG: 0,
+  INFO: 1,
+  WARNING: 2,
+  ERROR: 3,
+  CRITICAL: 4,
+  FATAL: 5,
+};
 
-async function processImport(jobId, buffer, filename, userId, source, service, locale) {
+async function processImport(
+  jobId,
+  buffer,
+  filename,
+  userId,
+  source,
+  service,
+  locale,
+) {
   // normalize variable scopes to avoid temporal dead zone
   const importSource = source ?? null;
   const importService = service ?? null;
-  const dateLocale = locale || process.env.LOG_DATE_LOCALE || 'fr'; // FIX 2a
-  const batchSize = Math.min(parseInt(process.env.IMPORT_BATCH_SIZE || '2000', 10), 5000);
+  const dateLocale = locale || process.env.LOG_DATE_LOCALE || "fr"; // FIX 2a
+  const batchSize = Math.min(
+    parseInt(process.env.IMPORT_BATCH_SIZE || "2000", 10),
+    5000,
+  );
 
   let filesToProcess = [];
 
   if (isArchive(filename)) {
-    logger.info({ event: 'archive_detected', file: filename }, '[IMPORT]');
+    logger.info({ event: "archive_detected", file: filename }, "[IMPORT]");
     try {
       const extracted = await extractArchive(buffer, filename);
       filesToProcess = extracted;
-      logger.info({ event: 'archive_extracted', count: filesToProcess.length }, '[IMPORT]');
+      logger.info(
+        { event: "archive_extracted", count: filesToProcess.length },
+        "[IMPORT]",
+      );
     } catch (e) {
-      logger.error({ event: 'archive_extraction_error', error: e.message }, '[IMPORT]');
+      logger.error(
+        { event: "archive_extraction_error", error: e.message },
+        "[IMPORT]",
+      );
       throw e;
     }
   } else {
@@ -86,13 +149,23 @@ async function processImport(jobId, buffer, filename, userId, source, service, l
 
   for (const file of filesToProcess) {
     const detectedFormat = detectFormat(file.content);
-    logger.info({ event: 'format_detected', format: detectedFormat, file: file.filename }, '[IMPORT]');
+    logger.info(
+      { event: "format_detected", format: detectedFormat, file: file.filename },
+      "[IMPORT]",
+    );
 
     let parsedLogs;
     try {
-        parsedLogs = await parseLogContent(file.content, detectedFormat, { source: importSource, service: importService, locale: dateLocale });
+      parsedLogs = await parseLogContent(file.content, detectedFormat, {
+        source: importSource,
+        service: importService,
+        locale: dateLocale,
+      });
     } catch (e) {
-      logger.error({ event: 'parsing_error', format: detectedFormat, error: e.message }, '[IMPORT]');
+      logger.error(
+        { event: "parsing_error", format: detectedFormat, error: e.message },
+        "[IMPORT]",
+      );
       parsedLogs = [];
     }
     allParsedLogs = allParsedLogs.concat(parsedLogs);
@@ -100,7 +173,7 @@ async function processImport(jobId, buffer, filename, userId, source, service, l
 
   const parsedLogs = allParsedLogs;
   const total = parsedLogs.length;
-  logger.info({ event: 'lines_parsed', count: total, jobId }, '[IMPORT]');
+  logger.info({ event: "lines_parsed", count: total, jobId }, "[IMPORT]");
 
   // AMÉLIORATION 1: Track import summary stats
   const importSummary = {
@@ -111,20 +184,24 @@ async function processImport(jobId, buffer, filename, userId, source, service, l
     missing_module: 0,
     missing_timestamp: 0,
     timestamp_inferred_count: 0,
-    errors: 0
+    errors: 0,
   };
 
   const conn = await pool.getConnection();
   try {
     await conn.execute(
-      'UPDATE import_jobs SET status = ?, total_lines = ?, started_at = NOW() WHERE id = ?',
-      ['processing', total, jobId]
+      "UPDATE import_jobs SET status = ?, total_lines = ?, started_at = NOW() WHERE id = ?",
+      ["processing", total, jobId],
     );
 
     if (total === 0) {
       await conn.execute(
-        'UPDATE import_jobs SET status = ?, error_message = ?, completed_at = NOW() WHERE id = ?',
-        ['failed', 'Aucune ligne parsée — vérifiez le format du fichier', jobId]
+        "UPDATE import_jobs SET status = ?, error_message = ?, completed_at = NOW() WHERE id = ?",
+        [
+          "failed",
+          "Aucune ligne parsée — vérifiez le format du fichier",
+          jobId,
+        ],
       );
       conn.release();
       return;
@@ -143,54 +220,77 @@ async function processImport(jobId, buffer, filename, userId, source, service, l
         if (!logEntry.timestamp) {
           importSummary.missing_timestamp++;
           importSummary.skipped++;
-          logger.warn({ event: 'missing_timestamp', logIndex: i, jobId }, '[IMPORT]');
+          logger.warn(
+            { event: "missing_timestamp", logIndex: i, jobId },
+            "[IMPORT]",
+          );
           continue;
         }
 
         // Validate and warn about missing user/module
         if (!logEntry.target_user) {
           importSummary.missing_user++;
-          logger.warn({ event: 'missing_user', logIndex: i, jobId }, '[IMPORT]');
+          logger.warn(
+            { event: "missing_user", logIndex: i, jobId },
+            "[IMPORT]",
+          );
           // Don't skip — allow null target_user
         }
-        
+
         if (logEntry.timestamp_inferred) {
           importSummary.timestamp_inferred_count++;
         }
-        
+
         if (!logEntry.module) {
           importSummary.missing_module++;
-          logger.warn({ event: 'missing_module', logIndex: i, jobId }, '[IMPORT]');
+          logger.warn(
+            { event: "missing_module", logIndex: i, jobId },
+            "[IMPORT]",
+          );
           // Don't skip — allow null module
         }
 
         // Validate log_level and message exist
         if (!logEntry.log_level) {
-          logEntry.log_level = 'INFO';
+          logEntry.log_level = "INFO";
         }
         if (!logEntry.message) {
           importSummary.skipped++;
-          logger.warn({ event: 'missing_message', logIndex: i, jobId }, '[IMPORT]');
+          logger.warn(
+            { event: "missing_message", logIndex: i, jobId },
+            "[IMPORT]",
+          );
           continue;
         }
 
         // FIX: uniquement les colonnes qui existent dans le schéma SQL
         const normalized = {
-          raw_log:            logEntry.raw_log || JSON.stringify(logEntry),
-          timestamp:          logEntry.timestamp || new Date().toISOString().slice(0, 19).replace('T', ' '),
-          created_time:       logEntry.created_time || String(logEntry.timestamp || '').slice(11, 19) || null,
-          timezone:           logEntry.timezone || null,
-          log_level:          normalizeLevel(logEntry.log_level || 'INFO'),
-          source:             logEntry.source || logEntry.source_server || importSource || null,
-          source_server:      logEntry.source_server || logEntry.host || logEntry.source || importSource || null,
-          service:            logEntry.service || importService || null,
-          message:            logEntry.message || '',
-          client_ip:          logEntry.ip_address || logEntry.client_ip || null,  // FIX: ip_address → client_ip
-          module:             logEntry.module || null,
-          error_type:         logEntry.error_type || null,
-          stack_trace:        logEntry.stack_trace || null,
-          target_user:        logEntry.target_user || null,
-          parser_format:      logEntry.log_format || null,
+          raw_log: logEntry.raw_log || JSON.stringify(logEntry),
+          timestamp:
+            logEntry.timestamp ||
+            new Date().toISOString().slice(0, 19).replace("T", " "),
+          created_time:
+            logEntry.created_time ||
+            String(logEntry.timestamp || "").slice(11, 19) ||
+            null,
+          timezone: logEntry.timezone || null,
+          log_level: normalizeLevel(logEntry.log_level || "INFO"),
+          source:
+            logEntry.source || logEntry.source_server || importSource || null,
+          source_server:
+            logEntry.source_server ||
+            logEntry.host ||
+            logEntry.source ||
+            importSource ||
+            null,
+          service: logEntry.service || importService || null,
+          message: logEntry.message || "",
+          client_ip: logEntry.ip_address || logEntry.client_ip || null, // FIX: ip_address → client_ip
+          module: logEntry.module || null,
+          error_type: logEntry.error_type || null,
+          stack_trace: logEntry.stack_trace || null,
+          target_user: logEntry.target_user || null,
+          parser_format: logEntry.log_format || null,
           timestamp_inferred: logEntry.timestamp_inferred ? 1 : 0,
           classification_confidence: logEntry.classification_confidence || null,
           file_created_at: logEntry.file_created_at || null,
@@ -199,8 +299,17 @@ async function processImport(jobId, buffer, filename, userId, source, service, l
         };
 
         normalized.normalized_message = normalizeMessage(normalized.message);
-        normalized.event_type = classifyLog(normalized.message, normalized.source, normalized.service);
-        normalized.fingerprint = generateFingerprint(normalized.service, normalized.event_type, normalized.normalized_message, userId);
+        normalized.event_type = classifyLog(
+          normalized.message,
+          normalized.source,
+          normalized.service,
+        );
+        normalized.fingerprint = generateFingerprint(
+          normalized.service,
+          normalized.event_type,
+          normalized.normalized_message,
+          userId,
+        );
 
         batch.push(normalized);
 
@@ -212,14 +321,17 @@ async function processImport(jobId, buffer, filename, userId, source, service, l
           alertWorker.broadcastLogBatch(insertedBatch, { userId, jobId });
           batch = [];
           await conn.execute(
-            'UPDATE import_jobs SET processed_lines = ?, error_count = ? WHERE id = ?',
-            [processed, errors, jobId]
+            "UPDATE import_jobs SET processed_lines = ?, error_count = ? WHERE id = ?",
+            [processed, errors, jobId],
           );
         }
       } catch (e) {
         errors++;
         importSummary.errors++;
-        logger.error({ event: 'processing_error', lineIndex: i, jobId, error: e.message }, '[IMPORT]');
+        logger.error(
+          { event: "processing_error", lineIndex: i, jobId, error: e.message },
+          "[IMPORT]",
+        );
       }
     }
 
@@ -233,24 +345,40 @@ async function processImport(jobId, buffer, filename, userId, source, service, l
 
     // FIX 2c: Store import_summary for later retrieval
     await conn.execute(
-      'UPDATE import_jobs SET status = ?, processed_lines = ?, error_count = ?, skipped_lines = ?, import_summary = ?, completed_at = NOW() WHERE id = ?',
-      ['completed', processed, errors, (importSummary.skipped || 0), JSON.stringify(importSummary), jobId]
+      "UPDATE import_jobs SET status = ?, processed_lines = ?, error_count = ?, skipped_lines = ?, import_summary = ?, completed_at = NOW() WHERE id = ?",
+      [
+        "completed",
+        processed,
+        errors,
+        importSummary.skipped || 0,
+        JSON.stringify(importSummary),
+        jobId,
+      ],
     );
 
-    logger.info({ event: 'import_completed', jobId, summary: importSummary }, '[IMPORT]');
+    logger.info(
+      { event: "import_completed", jobId, summary: importSummary },
+      "[IMPORT]",
+    );
 
     if (userId && processed > 0) {
       setImmediate(() => {
-        alertEngineBus.emit('logs.inserted', { userId, count: processed, summary: importSummary });
+        alertEngineBus.emit("logs.inserted", {
+          userId,
+          count: processed,
+          summary: importSummary,
+        });
       });
       await invalidateDashboard(userId);
     }
-
   } catch (e) {
-    logger.error({ event: 'import_failed', jobId, error: e.message }, '[IMPORT]');
+    logger.error(
+      { event: "import_failed", jobId, error: e.message },
+      "[IMPORT]",
+    );
     await conn.execute(
-      'UPDATE import_jobs SET status = ?, error_message = ?, completed_at = NOW() WHERE id = ?',
-      ['failed', e.message.substring(0, 1000), jobId]
+      "UPDATE import_jobs SET status = ?, error_message = ?, completed_at = NOW() WHERE id = ?",
+      ["failed", e.message.substring(0, 1000), jobId],
     );
   } finally {
     conn.release();
@@ -261,7 +389,7 @@ async function insertBatch(conn, batch, userId) {
   await conn.beginTransaction();
   try {
     // FIX: colonnes alignées exactement sur le schéma SQL de la table logs
-    const logValues = batch.map(entry => [
+    const logValues = batch.map((entry) => [
       entry.raw_log,
       entry.timestamp,
       entry.created_time,
@@ -275,7 +403,7 @@ async function insertBatch(conn, batch, userId) {
       entry.event_type,
       entry.fingerprint,
       userId || null,
-      entry.client_ip,       // FIX: était ip_address
+      entry.client_ip, // FIX: était ip_address
       entry.module,
       entry.error_type,
       entry.stack_trace,
@@ -284,7 +412,7 @@ async function insertBatch(conn, batch, userId) {
       entry.timestamp_inferred,
       entry.classification_confidence,
       entry.file_created_at || null,
-      entry.file_modified_at || null
+      entry.file_modified_at || null,
     ]);
 
     await conn.query(
@@ -294,27 +422,29 @@ async function insertBatch(conn, batch, userId) {
         stack_trace, target_user, parser_format, timestamp_inferred, classification_confidence,
         file_created_at, file_modified_at
       ) VALUES ?`,
-      [logValues]
+      [logValues],
     );
 
     // FIX: error_groups — severity_max est VARCHAR donc on compare avec FIELD()
     // pour éviter GREATEST() sur des types incompatibles
-    const errorGroupValues = batch.map(entry => [
+    const errorGroupValues = batch.map((entry) => [
       entry.fingerprint,
-      (entry.message || '').slice(0, 500),
+      (entry.message || "").slice(0, 500),
       entry.event_type,
-      entry.log_level,   // severity_max = niveau texte ('ERROR', 'FATAL'...)
+      entry.log_level, // severity_max = niveau texte ('ERROR', 'FATAL'...)
       1,
       entry.timestamp,
       entry.timestamp,
       entry.source_server,
       entry.service,
       entry.error_type,
-      userId || null
+      userId || null,
     ]);
 
     if (errorGroupValues.length > 0) {
-      const placeholders = errorGroupValues.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(',');
+      const placeholders = errorGroupValues
+        .map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .join(",");
       const flatParams = errorGroupValues.flat();
 
       // FIX: utiliser FIELD() pour comparer les niveaux texte correctement
@@ -361,7 +491,13 @@ async function insertBatch(conn, batch, userId) {
              VALUES(severity_max),
              severity_max
            )`,
-        [...flatParams, RETURN_GAP_DAYS, RETURN_GAP_DAYS, RETURN_GAP_DAYS, RETURN_GAP_DAYS]
+        [
+          ...flatParams,
+          RETURN_GAP_DAYS,
+          RETURN_GAP_DAYS,
+          RETURN_GAP_DAYS,
+          RETURN_GAP_DAYS,
+        ],
       );
     }
 
@@ -373,111 +509,153 @@ async function insertBatch(conn, batch, userId) {
 }
 
 // ── POST /upload ──────────────────────────────────────────────────────────────
-router.post('/upload', upload.single('file'), validateBody(importUploadSchema), async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ error: 'Aucun fichier fourni' });
+router.post(
+  "/upload",
+  upload.single("file"),
+  validateBody(importUploadSchema),
+  async (req, res) => {
+    try {
+      if (!req.file)
+        return res.status(400).json({ error: "Aucun fichier fourni" });
 
-    const jobId = uuidv4();
-    const userId = req.session.user.id;
-    const source = req.body.source || null;
-    const service = req.body.service || null;
-    const locale = req.body.locale || null; // FIX 2a
+      const jobId = uuidv4();
+      const userId = req.session.user.id;
+      const source = req.body.source || null;
+      const service = req.body.service || null;
+      const locale = req.body.locale || null; // FIX 2a
 
-    await pool.execute(
-      'INSERT INTO import_jobs (id, filename, user_id, import_source, import_service) VALUES (?, ?, ?, ?, ?)',
-      [jobId, req.file.originalname, userId, source, service]
-    );
+      const fileHash = await import("crypto").then(({ createHash }) =>
+        createHash("sha256").update(req.file.buffer).digest("hex"),
+      );
 
-    processImport(jobId, req.file.buffer, req.file.originalname, userId, source, service, locale)
-      .catch(e => logger.error({ event: 'import_fatal', jobId, error: e.message }, '[IMPORT]'));
+      await pool.execute(
+        "INSERT INTO import_jobs (id, filename, file_size, file_hash, import_ip_address, user_id, import_source, import_service) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+          jobId,
+          req.file.originalname,
+          req.file.size || null,
+          fileHash,
+          req.ip,
+          userId,
+          source,
+          service,
+        ],
+      );
 
-    await recordAudit({
-      userId,
-      userEmail: req.session.user.email,
-      action: 'import_upload',
-      resourceType: 'import_job',
-      resourceId: jobId,
-      details: `File: ${req.file.originalname}`,
-      ipAddress: req.ip
-    });
+      processImport(
+        jobId,
+        req.file.buffer,
+        req.file.originalname,
+        userId,
+        source,
+        service,
+        locale,
+      ).catch((e) =>
+        logger.error(
+          { event: "import_fatal", jobId, error: e.message },
+          "[IMPORT]",
+        ),
+      );
 
-    res.json({ job_id: jobId, filename: req.file.originalname });
-  } catch (e) {
-    logger.error({ event: 'upload_error', error: e.message }, '[IMPORT]');
-    res.status(500).json({ error: e.message || "Erreur lors de l'upload" });
-  }
-});
+      await recordAudit({
+        userId,
+        userEmail: req.session.user.email,
+        action: "import_upload",
+        resourceType: "import_job",
+        resourceId: jobId,
+        details: {
+          file: req.file.originalname,
+          size: req.file.size || null,
+          hash: fileHash,
+        },
+        ipAddress: req.ip,
+      });
+
+      res.json({ job_id: jobId, filename: req.file.originalname });
+    } catch (e) {
+      logger.error({ event: "upload_error", error: e.message }, "[IMPORT]");
+      res.status(500).json({ error: e.message || "Erreur lors de l'upload" });
+    }
+  },
+);
 
 // ── GET /jobs ─────────────────────────────────────────────────────────────────
-router.get('/jobs', async (req, res) => {
+router.get("/jobs", async (req, res) => {
   try {
     const scope = userScope(req);
     const [rows] = await pool.execute(
-      'SELECT * FROM import_jobs WHERE 1=1' + scope.sql + ' ORDER BY created_at DESC LIMIT 20',
-      scope.params
+      "SELECT * FROM import_jobs WHERE 1=1" +
+        scope.sql +
+        " ORDER BY created_at DESC LIMIT 20",
+      scope.params,
     );
     res.json(rows);
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur' });
+    res.status(500).json({ error: "Erreur serveur" });
   }
 });
 
 // ── GET /jobs/:id ─────────────────────────────────────────────────────────────
-router.get('/jobs/:id', async (req, res) => {
+router.get("/jobs/:id", async (req, res) => {
   try {
     const scope = userScope(req);
     const [rows] = await pool.execute(
-      'SELECT * FROM import_jobs WHERE id = ?' + scope.sql,
-      [req.params.id, ...scope.params]
+      "SELECT * FROM import_jobs WHERE id = ?" + scope.sql,
+      [req.params.id, ...scope.params],
     );
-    if (rows.length === 0) return res.status(404).json({ error: 'Job non trouvé' });
+    if (rows.length === 0)
+      return res.status(404).json({ error: "Job non trouvé" });
     res.json(rows[0]);
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur' });
+    res.status(500).json({ error: "Erreur serveur" });
   }
 });
 
 // ── GET /jobs/:id/summary ─────────────────────────────────────────────────────
 // AMÉLIORATION 1: Return detailed import summary for display
-router.get('/jobs/:id/summary', async (req, res) => {
+router.get("/jobs/:id/summary", async (req, res) => {
   try {
     const scope = userScope(req);
     const [jobRows] = await pool.execute(
-      'SELECT id, total_lines, processed_lines, error_count, status FROM import_jobs WHERE id = ?' + scope.sql,
-      [req.params.id, ...scope.params]
+      "SELECT id, total_lines, processed_lines, error_count, status FROM import_jobs WHERE id = ?" +
+        scope.sql,
+      [req.params.id, ...scope.params],
     );
-    
+
     if (jobRows.length === 0) {
-      return res.status(404).json({ error: 'Job non trouvé' });
+      return res.status(404).json({ error: "Job non trouvé" });
     }
-    
+
     const job = jobRows[0];
     const total = job.total_lines || 0;
     const inserted = job.processed_lines || 0;
     const errors = job.error_count || 0;
-    const skipped = job.skipped_lines != null ? job.skipped_lines : Math.max(0, total - inserted - errors);
-    
+    const skipped =
+      job.skipped_lines != null
+        ? job.skipped_lines
+        : Math.max(0, total - inserted - errors);
+
     // Calculate from logs: count by target_user and module presence
     let missing_user = 0;
     let missing_module = 0;
-    
-    if (job.status === 'completed' && total > 0) {
+
+    if (job.status === "completed" && total > 0) {
       const [stats] = await pool.execute(
-        `SELECT 
+        `SELECT
           SUM(CASE WHEN target_user IS NULL THEN 1 ELSE 0 END) as cnt_missing_user,
           SUM(CASE WHEN module IS NULL THEN 1 ELSE 0 END) as cnt_missing_module
-         FROM logs 
+         FROM logs
          WHERE created_at >= DATE_SUB(NOW(), INTERVAL 5 MINUTE) AND user_id = ?
          LIMIT ${inserted}`,
-        [req.session.user.id]
+        [req.session.user.id],
       );
-      
+
       if (stats && stats[0]) {
         missing_user = stats[0].cnt_missing_user || 0;
         missing_module = stats[0].cnt_missing_module || 0;
       }
     }
-    
+
     const summary = {
       total,
       inserted,
@@ -490,13 +668,13 @@ router.get('/jobs/:id/summary', async (req, res) => {
       missing_module,
       missing_timestamp: skipped > 0 ? skipped : 0,
       errors,
-      status: job.status
+      status: job.status,
     };
-    
+
     res.json(summary);
   } catch (e) {
-    logger.error({ event: 'summary_error', error: e.message }, '[IMPORT]');
-    res.status(500).json({ error: 'Erreur lors du calcul du résumé' });
+    logger.error({ event: "summary_error", error: e.message }, "[IMPORT]");
+    res.status(500).json({ error: "Erreur lors du calcul du résumé" });
   }
 });
 

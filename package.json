@@ -1,7 +1,7 @@
 {
-  "name": "logsystem-v4",
+  "name": "logsystem",
   "version": "4.0.0",
-  "description": "LogSystem V4 - Plateforme de gestion et monitoring de logs",
+  "description": "LogSystem - Plateforme de gestion et monitoring de logs",
   "type": "module",
   "engines": {
     "node": ">=18.0.0",
@@ -11,12 +11,12 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "seed": "node scripts/seed.js",
+    "create-admin": "node scripts/create-default-users.js",
     "schema": "node scripts/apply-schema.js",
     "secret": "node scripts/tools/generate-secret.js",
     "test": "vitest"
   },
   "dependencies": {
-    "7zip-min": "^1.4.3",
     "bcrypt": "^5.1.1",
     "chokidar": "^3.6.0",
     "compression": "^1.7.4",
@@ -30,9 +30,7 @@
     "helmet": "^7.1.0",
     "iconv-lite": "^0.6.3",
     "multer": "^1.4.5-lts.1",
-    "mysql": "^2.18.1",
-    "mysql2": "^2.3.3",
-    "node-unrar-js": "^2.0.1",
+    "mysql2": "^3.10.0",
     "pdfkit": "^0.15.0",
     "pino": "^10.3.1",
     "redis": "^4.7.0",
