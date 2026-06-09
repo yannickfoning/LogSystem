@@ -289,13 +289,13 @@ router.get('/trends', async (req, res) => {
   try {
     const scope = userScope(req);
     const { window_hours = 24 } = req.query;
-    const windowHours = Math.min(parseInt(window_hours) || 24, 720); // max 30 jours
+    const windowHours = Math.min(parseInt(window_hours) || 24, 8760); // Augmenté à 1 an pour historique
 
     // Compter les logs par niveau sur la fenêtre
     const [byLevel] = await pool.execute(
       `SELECT log_level, COUNT(*) as count
        FROM logs 
-       WHERE timestamp >= DATE_SUB(NOW(), INTERVAL ? HOUR) ${scope.sql || ''}
+       WHERE imported_at >= DATE_SUB(NOW(), INTERVAL ? HOUR) ${scope.sql || ''}
        GROUP BY log_level
        ORDER BY FIELD(log_level, 'FATAL', 'CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG')`,
       [windowHours, ...(scope.params || [])]
@@ -305,7 +305,7 @@ router.get('/trends', async (req, res) => {
     const [topErrors] = await pool.execute(
       `SELECT fingerprint, error_type, event_type, COUNT(*) as count, MAX(timestamp) as last_seen
        FROM logs 
-       WHERE timestamp >= DATE_SUB(NOW(), INTERVAL ? HOUR) 
+       WHERE imported_at >= DATE_SUB(NOW(), INTERVAL ? HOUR) 
          AND log_level IN ('ERROR', 'CRITICAL', 'FATAL') ${scope.sql || ''}
        GROUP BY fingerprint
        ORDER BY count DESC
@@ -318,7 +318,7 @@ router.get('/trends', async (req, res) => {
       `SELECT service, COUNT(*) as count, 
               COUNT(CASE WHEN log_level IN ('ERROR', 'CRITICAL', 'FATAL') THEN 1 END) as error_count
        FROM logs 
-       WHERE timestamp >= DATE_SUB(NOW(), INTERVAL ? HOUR) AND service IS NOT NULL ${scope.sql || ''}
+       WHERE imported_at >= DATE_SUB(NOW(), INTERVAL ? HOUR) AND service IS NOT NULL ${scope.sql || ''}
        GROUP BY service
        ORDER BY count DESC
        LIMIT 10`,
@@ -330,21 +330,21 @@ router.get('/trends', async (req, res) => {
       `SELECT module, COUNT(*) as count, 
               COUNT(CASE WHEN log_level IN ('ERROR', 'CRITICAL', 'FATAL') THEN 1 END) as error_count
        FROM logs 
-       WHERE timestamp >= DATE_SUB(NOW(), INTERVAL ? HOUR) AND module IS NOT NULL ${scope.sql || ''}
+       WHERE imported_at >= DATE_SUB(NOW(), INTERVAL ? HOUR) AND module IS NOT NULL ${scope.sql || ''}
        GROUP BY module
        ORDER BY count DESC
        LIMIT 10`,
       [windowHours, ...(scope.params || [])]
     );
 
-    // Hourly throughput (dernières 24h)
+    // Ingestion throughput (basé sur imported_at pour voir les imports récents)
     const [hourly] = await pool.execute(
-      `SELECT DATE_FORMAT(timestamp, '%Y-%m-%d %H:00') as hour, COUNT(*) as count
+      `SELECT DATE_FORMAT(imported_at, '%Y-%m-%d %H:00') as hour, COUNT(*) as count
        FROM logs 
-       WHERE timestamp >= DATE_SUB(NOW(), INTERVAL 24 HOUR) ${scope.sql || ''}
-       GROUP BY DATE_FORMAT(timestamp, '%Y-%m-%d %H:00')
+       WHERE imported_at >= DATE_SUB(NOW(), INTERVAL ? HOUR) ${scope.sql || ''}
+       GROUP BY hour
        ORDER BY hour DESC`,
-      scope.params || []
+      [windowHours, ...(scope.params || [])]
     );
 
     res.json({

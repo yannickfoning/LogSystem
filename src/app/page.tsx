@@ -112,6 +112,27 @@ const NAV_ITEMS: { key: TabKey; label: string; icon: React.ElementType; adminOnl
 
 // ─── Helpers ─────────────────────────────────────────────────
 
+function getSeverityStyles(severity: string) {
+  const styles: Record<string, string> = {
+    low: 'bg-emerald-500/20 text-emerald-500',
+    medium: 'bg-amber-500/20 text-amber-500',
+    high: 'bg-red-500/20 text-red-500',
+    critical: 'bg-purple-500/20 text-purple-500',
+  };
+  return styles[severity] || 'bg-slate-500/20 text-slate-500';
+}
+
+function getStatColorClass(color: string) {
+  const map: Record<string, string> = {
+    '#6366f1': 'bg-indigo-500/20 text-indigo-500',
+    '#10b981': 'bg-emerald-500/20 text-emerald-500',
+    '#ef4444': 'bg-red-500/20 text-red-500',
+    '#881337': 'bg-rose-900/20 text-rose-700',
+    '#f59e0b': 'bg-amber-500/20 text-amber-500',
+  };
+  return map[color] || 'bg-slate-500/20 text-slate-500';
+}
+
 function formatDate(d: string) {
   if (!d) return '—';
   return new Date(d).toLocaleString('fr-FR');
@@ -269,14 +290,15 @@ function StatCard({
   title, value, icon: Icon, color, subtitle,
 }: {
   title: string; value: number | string; icon: React.ElementType;
-  color: string; subtitle?: string;
+  color: string; subtitle?: string; // color used as key for Tailwind mapping
 }) {
+  const colorClass = getStatColorClass(color);
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardContent className="p-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: color + '20' }}>
-            <Icon className="h-5 w-5" style={{ color }} />
+          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${colorClass.split(' ')[0]}`}>
+            <Icon className={`h-5 w-5 ${colorClass.split(' ')[1]}`} />
           </div>
           <div className="min-w-0">
             <p className="text-sm text-muted-foreground truncate">{title}</p>
@@ -747,8 +769,8 @@ function WebLogView() {
       {/* Pagination */}
       <div className="flex flex-col min-[480px]:flex-row min-[480px]:items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          {pagination.total > 0
-            ? `${(pagination.page - 1) * pagination.limit + 1}-${Math.min(pagination.page * pagination.limit, pagination.total)} sur ${pagination.total}`
+          {pagination.total > 0 && pagination.totalPages > 0
+            ? `Page ${pagination.page} sur ${pagination.totalPages} (${(pagination.page - 1) * pagination.limit + 1}-${Math.min(pagination.page * pagination.limit, pagination.total)} sur ${pagination.total})`
             : 'Aucun résultat'}
         </p>
         <div className="flex gap-2">
@@ -886,6 +908,8 @@ function ImportView() {
               multiple
               className="hidden"
               onChange={(e) => handleUpload(e.target.files)}
+              aria-label="Upload log files"
+              title="Select log files to import"
             />
           </div>
         </CardContent>
@@ -1088,7 +1112,7 @@ function AlertsView() {
                       <div className="flex items-center gap-2 flex-wrap mb-1">
                         <Badge variant="outline">{alert.type}</Badge>
                         <Badge
-                          style={{ backgroundColor: SEVERITY_COLORS[alert.severity] + '20', color: SEVERITY_COLORS[alert.severity] }}
+                          className={getSeverityStyles(alert.severity)}
                           variant="secondary"
                         >
                           {alert.severity}
@@ -1572,7 +1596,7 @@ function AdminAlertRulesTab() {
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-sm">{rule.name}</span>
                     <Badge
-                      style={{ backgroundColor: SEVERITY_COLORS[rule.severity] + '20', color: SEVERITY_COLORS[rule.severity] }}
+                      className={getSeverityStyles(rule.severity)}
                       variant="secondary"
                     >
                       {rule.severity}
@@ -1810,7 +1834,7 @@ function AdminAnomaliesTab() {
                   <TableRow key={a.id}>
                     <TableCell><Badge variant="outline">{a.type}</Badge></TableCell>
                     <TableCell>
-                      <Badge style={{ backgroundColor: SEVERITY_COLORS[a.severity] + '20', color: SEVERITY_COLORS[a.severity] }} variant="secondary">
+                      <Badge className={getSeverityStyles(a.severity)} variant="secondary">
                         {a.severity}
                       </Badge>
                     </TableCell>
@@ -2029,7 +2053,7 @@ function MainApp() {
         <SidebarInset>
           <div className="min-h-screen flex flex-col">
             {/* Header */}
-            <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+            <header className="sticky top-0 z-40 bg-background/95 backdrop-blur [-webkit-backdrop-filter:blur(8px)] supports-[backdrop-filter]:bg-background/60 border-b">
               <div className="flex items-center gap-3 px-4 py-3">
                 <SidebarTrigger />
                 <Separator orientation="vertical" className="h-5" />

@@ -427,19 +427,21 @@ async function insertBatch(conn, batch, userId) {
 
     // FIX: error_groups — severity_max est VARCHAR donc on compare avec FIELD()
     // pour éviter GREATEST() sur des types incompatibles
-    const errorGroupValues = batch.map((entry) => [
-      entry.fingerprint,
-      (entry.message || "").slice(0, 500),
-      entry.event_type,
-      entry.log_level, // severity_max = niveau texte ('ERROR', 'FATAL'...)
-      1,
-      entry.timestamp,
-      entry.timestamp,
-      entry.source_server,
-      entry.service,
-      entry.error_type,
-      userId || null,
-    ]);
+    const errorGroupValues = batch
+      .filter(entry => ['ERROR', 'CRITICAL', 'FATAL'].includes(entry.log_level))
+      .map((entry) => [
+        entry.fingerprint,
+        (entry.message || "").slice(0, 500),
+        entry.event_type,
+        entry.log_level,
+        1,
+        entry.timestamp,
+        entry.timestamp,
+        entry.source_server,
+        entry.service,
+        entry.error_type,
+        userId || null,
+      ]);
 
     if (errorGroupValues.length > 0) {
       const placeholders = errorGroupValues

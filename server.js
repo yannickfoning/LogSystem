@@ -97,22 +97,9 @@ app.use((req, res, next) => {
     hsts: process.env.NODE_ENV === 'production'
       ? { maxAge: 31536000, includeSubDomains: true }
       : false,
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", `'nonce-${res.locals.cspNonce}'`, "https://cdnjs.cloudflare.com", "https://unpkg.com"],
-        // FIX: scriptSrcAttr unsafe-inline supprimé — utilisez le nonce sur les handlers inline
-        styleSrc: ["'self'", `'nonce-${res.locals.cspNonce}'`, "https://cdnjs.cloudflare.com"],
-        styleSrcAttr: ["'unsafe-inline'"],
-        imgSrc: ["'self'", "data:", "https:"],
-        connectSrc: ["'self'"],
-        fontSrc: ["'self'", "https://cdnjs.cloudflare.com"],
-        objectSrc: ["'none'"],
-        mediaSrc: ["'self'"],
-        frameSrc: ["'none'"],
-      }
-    },
-    crossOriginEmbedderPolicy: false
+    frameguard: false, // Disabled in favor of CSP frame-ancestors
+    contentSecurityPolicy: false, // Managed by createHtmlCspMiddleware for HTML
+    crossOriginEmbedderPolicy: false,
   })(req, res, next);
 });
 
@@ -161,6 +148,15 @@ app.use((req, res, next) => {
   next();
 });
 
+// Cache-Control headers for API responses (no caching for dynamic content)
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+  }
+  next();
+});
+
 app.use(csrfMiddleware);
 app.use(csrfValidation);
 
@@ -168,9 +164,8 @@ app.use('/admin.html', requireAdminPage);
 app.use(['/dashboard.html', '/search.html', '/import.html', '/watchlog.html'], requireAuthPage);
 app.use((req, res, next) => {
   if (req.path.endsWith('.html')) {
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
   }
   next();
 });
@@ -294,4 +289,3 @@ start().catch((err) => {
   logger.fatal({ event: 'startupFailed', message: err.message, stack: err.stack });
   process.exit(1);
 });
-
