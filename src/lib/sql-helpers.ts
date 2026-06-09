@@ -75,7 +75,10 @@ export const db = {
       if (args?.where?.timestamp?.gte) { conditions.push('timestamp >= ?'); params.push(args.where.timestamp.gte); }
       if (conditions.length > 0) sql += ' WHERE ' + conditions.join(' AND ');
       if (args?.orderBy) sql += ' ORDER BY timestamp DESC';
-      if (args?.take) { sql += ` LIMIT ${args.take}`; }
+      if (args?.take) {
+        const takeVal = parseInt(args.take, 10) || 50;
+        sql += ' LIMIT ' + takeVal;
+      }
       return await query(sql, params);
     },
     findFirst: async (where: any) => {
@@ -126,7 +129,12 @@ export const db = {
     groupBy: async (args: any) => {
       const { by, where } = args;
       const field = by[0];
-      let sql = `SELECT ${field}, COUNT(*) as _count FROM logs`;
+      // Validate field to prevent SQL injection
+      const allowedFields = ['logLevel', 'source', 'sourceServer', 'service', 'errorType', 'eventType'];
+      if (!allowedFields.includes(field)) {
+        throw new Error('Invalid field for groupBy');
+      }
+      let sql = 'SELECT ' + field + ', COUNT(*) as _count FROM logs';
       const params: any[] = [];
       
       if (where) {
@@ -144,7 +152,7 @@ export const db = {
         }
       }
       
-      sql += ` GROUP BY ${field}`;
+      sql += ' GROUP BY ' + field;
       
       const rows = await query(sql, params);
       return rows.map((row: any) => ({
@@ -161,7 +169,10 @@ export const db = {
       if (args?.where?.status) { sql += ' WHERE status = ?'; params.push(args.where.status); }
       if (args?.where?.ruleId) { sql += ' WHERE ruleId = ?'; params.push(args.where.ruleId); }
       if (args?.orderBy) sql += ' ORDER BY createdAt DESC';
-      if (args?.take) { sql += ` LIMIT ${args.take}`; }
+      if (args?.take) {
+        const takeVal = parseInt(args.take, 10) || 50;
+        sql += ' LIMIT ' + takeVal;
+      }
       return await query(sql, params);
     },
     findFirst: async (where: any) => {
@@ -274,7 +285,10 @@ export const db = {
       const params: any[] = [];
       if (args?.where?.userId) { sql += ' WHERE userId = ?'; params.push(args.where.userId); }
       if (args?.orderBy) sql += ' ORDER BY createdAt DESC';
-      if (args?.take) { sql += ` LIMIT ${args.take}`; }
+      if (args?.take) {
+        const takeVal = parseInt(args.take, 10) || 50;
+        sql += ' LIMIT ' + takeVal;
+      }
       return await query(sql, params);
     },
     count: async (where?: any) => {
@@ -296,7 +310,10 @@ export const db = {
       const params: any[] = [];
       if (args?.where?.userId) { sql += ' WHERE userId = ?'; params.push(args.where.userId); }
       if (args?.orderBy) sql += ' ORDER BY detectedAt DESC';
-      if (args?.take) { sql += ` LIMIT ${args.take}`; }
+      if (args?.take) {
+        const takeVal = parseInt(args.take, 10) || 50;
+        sql += ' LIMIT ' + takeVal;
+      }
       return await query(sql, params);
     }
   },
@@ -307,7 +324,10 @@ export const db = {
       if (args?.where?.userId) { sql += ' WHERE userId = ?'; params.push(args.where.userId); }
       if (args?.where?.status) { sql += ' WHERE status = ?'; params.push(args.where.status); }
       if (args?.orderBy) sql += ' ORDER BY occurrenceCount DESC';
-      if (args?.take) { sql += ` LIMIT ${args.take}`; }
+      if (args?.take) {
+        const takeVal = parseInt(args.take, 10) || 50;
+        sql += ' LIMIT ' + takeVal;
+      }
       return await query(sql, params);
     },
     findFirst: async (where: any) => {
@@ -372,7 +392,10 @@ export const db = {
       const params: any[] = [];
       if (args?.where?.userId) { sql += ' WHERE userId = ?'; params.push(args.where.userId); }
       if (args?.orderBy) sql += ' ORDER BY createdAt DESC';
-      if (args?.take) { sql += ` LIMIT ${args.take}`; }
+      if (args?.take) {
+        const takeVal = parseInt(args.take, 10) || 50;
+        sql += ' LIMIT ' + takeVal;
+      }
       return await query(sql, params);
     }
   },

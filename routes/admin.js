@@ -502,7 +502,8 @@ router.get("/audit", async (req, res) => {
       },
     });
   } catch (e) {
-    res.status(500).json({ error: "Erreur serveur" });
+    logger.error({ event: 'audit_error', error: e.message }, '[ADMIN]');
+    res.status(500).json({ error: "Erreur serveur", details: e.message });
   }
 });
 

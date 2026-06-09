@@ -308,7 +308,8 @@ router.get('/recent-logs', async (req, res) => {
     );
     res.json(rows);
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur' });
+    logger.error({ event: 'recent_logs_error', error: e.message }, '[DASHBOARD]');
+    res.status(500).json({ error: 'Erreur serveur', details: e.message });
   }
 });
 
@@ -328,7 +329,8 @@ router.get('/alerts', async (req, res) => {
     const [rows] = await pool.execute(sql, params);
     res.json(rows);
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur' });
+    logger.error({ event: 'alerts_error', error: e.message, sql: e.sql }, '[DASHBOARD ALERTS]');
+    res.status(500).json({ error: 'Erreur serveur', details: e.message });
   }
 });
 
