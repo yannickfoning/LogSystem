@@ -75,7 +75,7 @@ export const db = {
       if (args?.where?.timestamp?.gte) { conditions.push('timestamp >= ?'); params.push(args.where.timestamp.gte); }
       if (conditions.length > 0) sql += ' WHERE ' + conditions.join(' AND ');
       if (args?.orderBy) sql += ' ORDER BY timestamp DESC';
-      if (args?.take) { sql += ' LIMIT ?'; params.push(args.take); }
+      if (args?.take) { sql += ` LIMIT ${args.take}`; }
       return await query(sql, params);
     },
     findFirst: async (where: any) => {
@@ -161,7 +161,7 @@ export const db = {
       if (args?.where?.status) { sql += ' WHERE status = ?'; params.push(args.where.status); }
       if (args?.where?.ruleId) { sql += ' WHERE ruleId = ?'; params.push(args.where.ruleId); }
       if (args?.orderBy) sql += ' ORDER BY createdAt DESC';
-      if (args?.take) { sql += ' LIMIT ?'; params.push(args.take); }
+      if (args?.take) { sql += ` LIMIT ${args.take}`; }
       return await query(sql, params);
     },
     findFirst: async (where: any) => {
@@ -274,7 +274,7 @@ export const db = {
       const params: any[] = [];
       if (args?.where?.userId) { sql += ' WHERE userId = ?'; params.push(args.where.userId); }
       if (args?.orderBy) sql += ' ORDER BY createdAt DESC';
-      if (args?.take) { sql += ' LIMIT ?'; params.push(args.take); }
+      if (args?.take) { sql += ` LIMIT ${args.take}`; }
       return await query(sql, params);
     },
     count: async (where?: any) => {
@@ -296,7 +296,7 @@ export const db = {
       const params: any[] = [];
       if (args?.where?.userId) { sql += ' WHERE userId = ?'; params.push(args.where.userId); }
       if (args?.orderBy) sql += ' ORDER BY detectedAt DESC';
-      if (args?.take) { sql += ' LIMIT ?'; params.push(args.take); }
+      if (args?.take) { sql += ` LIMIT ${args.take}`; }
       return await query(sql, params);
     }
   },
@@ -307,7 +307,7 @@ export const db = {
       if (args?.where?.userId) { sql += ' WHERE userId = ?'; params.push(args.where.userId); }
       if (args?.where?.status) { sql += ' WHERE status = ?'; params.push(args.where.status); }
       if (args?.orderBy) sql += ' ORDER BY occurrenceCount DESC';
-      if (args?.take) { sql += ' LIMIT ?'; params.push(args.take); }
+      if (args?.take) { sql += ` LIMIT ${args.take}`; }
       return await query(sql, params);
     },
     findFirst: async (where: any) => {
@@ -372,7 +372,7 @@ export const db = {
       const params: any[] = [];
       if (args?.where?.userId) { sql += ' WHERE userId = ?'; params.push(args.where.userId); }
       if (args?.orderBy) sql += ' ORDER BY createdAt DESC';
-      if (args?.take) { sql += ' LIMIT ?'; params.push(args.take); }
+      if (args?.take) { sql += ` LIMIT ${args.take}`; }
       return await query(sql, params);
     }
   },
