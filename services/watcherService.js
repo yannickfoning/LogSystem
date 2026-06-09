@@ -40,12 +40,20 @@ function getDirs() {
 }
 
 async function parseDirOwners() {
-  const mapping = process.env.WATCH_DIR_USER_MAP || './logs:1';
+  const mapping = process.env.WATCH_DIR_USER_MAP;
   const owners = {};
   const userIds = new Set();
   
+  if (!mapping || mapping.trim() === '') {
+    logger.info({ event: 'watcher_no_mapping' }, '[WATCHER] No directory-to-user mapping defined.');
+    return owners;
+  }
+
   for (const entry of mapping.split(',')) {
-    const [dir, userId] = entry.trim().split(':');
+    const trimmed = entry.trim();
+    if (!trimmed) continue;
+
+    const [dir, userId] = trimmed.split(':');
     if (!dir || !userId) {
       throw new Error(`Invalid WATCH_DIR_USER_MAP entry: ${entry}`);
     }
@@ -68,7 +76,7 @@ async function parseDirOwners() {
     const validIds = new Set(users.map(u => u.id));
     for (const userId of userIds) {
       if (!validIds.has(userId)) {
-        throw new Error(`User ID ${userId} in WATCH_DIR_USER_MAP does not exist in database`);
+        logger.warn({ event: 'invalid_watcher_user', userId }, `User ID ${userId} in WATCH_DIR_USER_MAP does not exist in database. Logs for this directory will be orphaned.`);
       }
     }
   }
