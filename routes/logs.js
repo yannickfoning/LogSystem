@@ -226,8 +226,8 @@ router.get('/', async (req, res) => {
       const pages = Math.max(1, Math.ceil(total / limitVal));
       const offset = (pageVal - 1) * limitVal;
       const [rows] = await pool.execute(
-        `SELECT ${LOG_COLUMNS} FROM logs WHERE 1=1 ${filterSql} ORDER BY ${sortBy} ${orderBy} LIMIT ? OFFSET ?`,
-        [...filterParams, limitVal, offset]
+        `SELECT ${LOG_COLUMNS} FROM logs WHERE 1=1 ${filterSql} ORDER BY ${sortBy} ${orderBy} LIMIT ${limitVal} OFFSET ${offset}`,
+        filterParams
       );
       return res.json({
         data: rows,
@@ -242,8 +242,7 @@ router.get('/', async (req, res) => {
       sql += ' AND id < ?';
       params.push(last_id);
     }
-    sql += ` ORDER BY ${sortBy} ${orderBy} LIMIT ?`;
-    params.push(limitVal + 1);
+    sql += ` ORDER BY ${sortBy} ${orderBy} LIMIT ${limitVal + 1}`;
 
     const [rows] = await pool.execute(sql, params);
 
@@ -459,8 +458,8 @@ router.get('/directory', async (req, res) => {
        WHERE 1=1 ${filters}
        GROUP BY COALESCE(source_server, source, 'Inconnu'), COALESCE(service, 'Inconnu'), COALESCE(error_type, event_type, 'generic'), fingerprint
        ORDER BY occurrence_count DESC, last_seen DESC
-       LIMIT ?`,
-      [...params, limit]
+       LIMIT ${limit}`,
+      params
     );
     res.json({ data: rows });
   } catch (e) {
