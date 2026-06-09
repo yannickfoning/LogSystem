@@ -27,8 +27,11 @@ export async function GET() {
 
     return NextResponse.json(rules);
   } catch (error) {
-    if (error instanceof Error && (error.message === 'Unauthorized' || error.message === 'Forbidden: Admin access required')) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: error.message }, { status: 401 });
+    }
+    if (error instanceof Error && error.message === 'Forbidden: Admin access required') {
+      return NextResponse.json({ error: error.message }, { status: 403 });
     }
     console.error('Alert rules list error:', error);
     return NextResponse.json({ error: 'Failed to load alert rules' }, { status: 500 });
@@ -51,8 +54,11 @@ export async function POST(request: Request) {
 
     return NextResponse.json(rule, { status: 201 });
   } catch (error) {
-    if (error instanceof Error && (error.message === 'Unauthorized' || error.message === 'Forbidden: Admin access required')) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: error.message }, { status: 401 });
+    }
+    if (error instanceof Error && error.message === 'Forbidden: Admin access required') {
+      return NextResponse.json({ error: error.message }, { status: 403 });
     }
     console.error('Create alert rule error:', error);
     return NextResponse.json({ error: 'Failed to create alert rule' }, { status: 500 });

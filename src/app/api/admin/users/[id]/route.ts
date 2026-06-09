@@ -33,8 +33,11 @@ export async function GET(
 
     return NextResponse.json(user);
   } catch (error) {
-    if (error instanceof Error && (error.message === 'Unauthorized' || error.message === 'Forbidden: Admin access required')) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: error.message }, { status: 401 });
+    }
+    if (error instanceof Error && error.message === 'Forbidden: Admin access required') {
+      return NextResponse.json({ error: error.message }, { status: 403 });
     }
     console.error('User detail error:', error);
     return NextResponse.json({ error: 'Failed to load user' }, { status: 500 });
@@ -88,8 +91,11 @@ export async function PUT(
 
     return NextResponse.json(updated);
   } catch (error) {
-    if (error instanceof Error && (error.message === 'Unauthorized' || error.message === 'Forbidden: Admin access required')) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: error.message }, { status: 401 });
+    }
+    if (error instanceof Error && error.message === 'Forbidden: Admin access required') {
+      return NextResponse.json({ error: error.message }, { status: 403 });
     }
     console.error('User update error:', error);
     return NextResponse.json({ error: 'Failed to update user' }, { status: 500 });
@@ -130,8 +136,11 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    if (error instanceof Error && (error.message === 'Unauthorized' || error.message === 'Forbidden: Admin access required')) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: error.message }, { status: 401 });
+    }
+    if (error instanceof Error && error.message === 'Forbidden: Admin access required') {
+      return NextResponse.json({ error: error.message }, { status: 403 });
     }
     console.error('User delete error:', error);
     return NextResponse.json({ error: 'Failed to delete user' }, { status: 500 });

@@ -4,7 +4,9 @@
  * Aucun token Bearer / aucun header Authorization / aucun localStorage.
  */
 
-import type { AlertQueryParams } from './api-types';
+import type {
+  AlertQueryParams, LogQueryParams, PurgePayload, AuditLogQueryParams,
+} from './api-types';
 
 const fetchApi = async (url: string, options: RequestInit = {}) => {
   const res = await fetch(url, {
@@ -56,23 +58,23 @@ export const api = {
     system: () => fetchApi('/api/dashboard/system'),
   },
   logs: {
-    list: (params: Record<string, unknown>) => {
+    list: (params: LogQueryParams) => {
       const q = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== '' && v !== null).map(([k, v]) => [k, String(v)])));
       return fetchApi(`/api/logs?${q}`);
     },
-    exportCsv: (params: Record<string, unknown>) => api.logs.export.csv(params).then(r => r.blob()),
-    exportJson: (params: Record<string, unknown>) => api.logs.export.json(params).then(r => r.blob()),
+    exportCsv: (params: LogQueryParams) => api.logs.export.csv(params).then(r => r.blob()),
+    exportJson: (params: LogQueryParams) => api.logs.export.json(params).then(r => r.blob()),
     get: (id: string) => fetchApi(`/api/logs/${id}`),
     export: {
-      csv: (params: Record<string, unknown>) => {
+      csv: (params: LogQueryParams) => {
         const q = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])));
         return fetchApiNoJson(`/api/logs/export/csv?${q}`);
       },
-      json: (params: Record<string, unknown>) => {
+      json: (params: LogQueryParams) => {
         const q = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])));
         return fetchApiNoJson(`/api/logs/export/json?${q}`);
       },
-      pdf: (params: Record<string, unknown>) => {
+      pdf: (params: LogQueryParams) => {
         const q = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])));
         return fetchApiNoJson(`/api/logs/export/pdf?${q}`);
       },
@@ -130,20 +132,20 @@ export const api = {
     createAlertRule: (data: Record<string, unknown>) => api.alerts.rules.create(normalizeRulePayload(data)),
     updateAlertRule: (id: string, data: Record<string, unknown>) => api.alerts.rules.update(id, normalizeRulePayload(data)),
     deleteAlertRule: (id: string) => api.alerts.rules.delete(id),
-    getAuditLogs: (params?: Record<string, unknown>) => api.admin.audit(params),
+    getAuditLogs: (params?: AuditLogQueryParams) => api.admin.audit(params),
     getAnomalies: async (params?: Record<string, unknown>) => {
       const q = params ? new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))) : '';
       const data = await fetchApi(`/api/admin/anomalies${q ? '?' + q : ''}`);
       return Array.isArray(data) ? { anomalies: data, pagination: { total: data.length } } : data;
     },
     runAnomalyDetection: () => fetchApi('/api/admin/anomalies', { method: 'POST' }),
-    purgeLogs: (data: Record<string, unknown>) => api.admin.purge(data),
-    audit: (params?: Record<string, unknown>) => {
+    purgeLogs: (data: PurgePayload) => api.admin.purge(data),
+    audit: (params?: AuditLogQueryParams) => {
       const q = params ? new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))) : '';
       return fetchApi(`/api/admin/audit${q ? '?' + q : ''}`);
     },
     anomalies: () => fetchApi('/api/admin/anomalies'),
-    purge: (data: Record<string, unknown>) => fetchApi('/api/admin/purge', { method: 'POST', body: JSON.stringify(data) }),
+    purge: (data: PurgePayload) => fetchApi('/api/admin/purge', { method: 'POST', body: JSON.stringify(data) }),
   },
   health: () => fetchApi('/api/health'),
 };

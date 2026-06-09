@@ -1,5 +1,3 @@
-import { ReactNode } from "react";
-
 export interface DashboardSummary { totalLogs: number; totalErrors?: number; totalAlerts?: number; totalUsers?: number; userCount?: number; unreadAlerts: number; todayCount?: number; todayLogs?: number; infoCount?: number; warningCount?: number; errorCount?: number; fatalCount?: number; criticalCount?: number; levelsBreakdown?: Record<string, number>; }
 export interface DashboardTrends { trends: Array<{ date: string; count: number; errorCount: number }> }
 export interface DashboardTopErrors { topErrors?: Array<Record<string, unknown>>; errors?: Array<Record<string, unknown>> }
@@ -73,7 +71,7 @@ export interface CreateAlertRulePayload {
 }
 
 export interface ImportJob {
-  originalName: ReactNode;
+  originalName: string;
   id: string;
   filename?: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';

@@ -444,10 +444,10 @@ function DashboardView() {
                 <div className="space-y-3">
                   {topErrors.topErrors.map((eg, i) => (
                     <div key={i} className="flex items-start gap-3 p-2 rounded-md hover:bg-muted/50">
-                      <Badge variant="destructive" className="shrink-0 mt-0.5">{String(eg.count)}</Badge>
+                      <Badge variant="destructive" className="shrink-0 mt-0.5">{String(eg.count ?? 0)}</Badge>
                       <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{String(eg.message)}</p>
-                        <p className="text-xs text-muted-foreground">{String(eg.source)} · {eg.lastSeen ? formatDate(eg.lastSeen as any) : 'N/A'}</p>
+                        <p className="text-sm font-medium truncate">{String(eg.message ?? '')}</p>
+                        <p className="text-xs text-muted-foreground">{String(eg.source ?? '')} · {eg.lastSeen ? formatDate(String(eg.lastSeen)) : 'N/A'}</p>
                       </div>
                     </div>
                   ))}
@@ -465,27 +465,27 @@ function DashboardView() {
             <CardTitle className="text-base">État du système</CardTitle>
           </CardHeader>
           <CardContent>
-            {(system as any)?.system ? (
+            {system?.system ? (
               <div className="space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Uptime</span>
-                  <span className="font-medium">{formatUptime((system as any).system?.uptime || 0)}</span>
+                  <span className="font-medium">{formatUptime(system.system.uptime ?? 0)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Total logs</span>
-                  <span className="font-medium">{(system as any).system?.totalLogs?.toLocaleString('fr-FR') || '0'}</span>
+                  <span className="font-medium">{system.system.totalLogs?.toLocaleString('fr-FR') ?? '0'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Taille DB</span>
-                  <span className="font-medium">{system?.system?.dbSize}</span>
+                  <span className="font-medium">{system.system.dbSize ?? '—'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Dernier import</span>
-                  <span className="font-medium">{system?.system?.lastImport ? formatDate(system.system.lastImport) : 'Aucun'}</span>
+                  <span className="font-medium">{system.system.lastImport ? formatDate(system.system.lastImport) : 'Aucun'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Utilisateurs actifs</span>
-                  <span className="font-medium">{system?.system?.activeUsers}</span>
+                  <span className="font-medium">{system.system.activeUsers ?? 0}</span>
                 </div>
               </div>
             ) : (
@@ -727,7 +727,7 @@ function WebLogView() {
                                 <div className="col-span-full">
                                   <span className="font-medium">Métadonnées:</span>
                                   <pre className="mt-1 text-xs bg-background p-2 rounded overflow-auto max-h-40">
-                                    {JSON.stringify(log.metadata, null, 2) as string}
+                                    {JSON.stringify(log.metadata, null, 2)}
                                   </pre>
                                 </div>
                               ) : null}

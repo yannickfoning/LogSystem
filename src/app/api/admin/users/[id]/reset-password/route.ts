@@ -47,8 +47,11 @@ export async function POST(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    if (error instanceof Error && (error.message === 'Unauthorized' || error.message === 'Forbidden: Admin access required')) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: error.message }, { status: 401 });
+    }
+    if (error instanceof Error && error.message === 'Forbidden: Admin access required') {
+      return NextResponse.json({ error: error.message }, { status: 403 });
     }
     console.error('Reset password error:', error);
     return NextResponse.json({ error: 'Failed to reset password' }, { status: 500 });
