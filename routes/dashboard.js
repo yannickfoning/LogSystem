@@ -15,8 +15,9 @@ function alertScope(req) {
   if (!user) {
     return { sql: ' AND 1=0', params: [] };
   }
-  return { sql: ' AND user_id = ?', params: [user.id] };
+  return { sql: ' AND user_id = ?', params: [parseInt(user.id, 10)] };
 }
+
 
 // PUT /alerts/read-all — MUST be first (static route)
 router.put('/alerts/read-all', async (req, res) => {

@@ -91,5 +91,6 @@ export function userScope(req) {
   if (user.role === "admin" || user.role === "analyst") {
     return { sql: "", params: [] }; // Admin/analyst global - no user filter
   }
-  return { sql: " AND user_id = ?", params: [user.id] };
+  return { sql: " AND user_id = ?", params: [parseInt(user.id, 10)] };
 }
+
