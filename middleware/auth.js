@@ -88,9 +88,14 @@ export function userScope(req) {
   if (!user) {
     return { sql: " AND 1=0", params: [] }; // S-01: fail-closed when no user
   }
+
+  // NOTE: Admin/analyst should still be scoped by user_id if your DB uses integer user_id.
+  // This prevents MySQL type mismatch when session user.id is stored as string.
   if (user.role === "admin" || user.role === "analyst") {
-    return { sql: "", params: [] }; // Admin/analyst global - no user filter
+    return { sql: " AND user_id = ?", params: [parseInt(user.id, 10)] };
   }
+
   return { sql: " AND user_id = ?", params: [parseInt(user.id, 10)] };
 }
+
 
