@@ -52,7 +52,7 @@ router.get('/', async (req, res) => {
     // AMÉLIORATION 1: User scope (S-03 & S-07 multi-tenant)
     // FIX #9: Normalized scope handling - userScope now returns '' for admin, ' AND user_id = ?' for users
     if (scope.sql) {
-      whereConditions.push(scope.sql.trim());
+      whereConditions.push(scope.sql.trim().replace(/^AND\s+/i, ''));
       params.push(...scope.params);
     }
 
@@ -212,7 +212,7 @@ router.get('/error-directory', async (req, res) => {
     let params = [];
 
     if (scope.sql) {
-      whereConditions.push(scope.sql.replace(/AND\s*/, ''));
+      whereConditions.push(scope.sql.trim().replace(/^AND\s+/i, ''));
       params.push(...scope.params);
     }
 
@@ -247,12 +247,13 @@ router.get('/error-directory', async (req, res) => {
     const enriched = [];
     for (const group of groups) {
       // Logs récents pour ce fingerprint
+      const logScope = scope.sql ? `AND ${scope.sql.replace('AND', '')}` : '';
       const [recentLogs] = await pool.execute(
         `SELECT id, timestamp, message, log_level FROM logs 
-         WHERE fingerprint = ? AND user_id = ? 
+         WHERE fingerprint = ? ${logScope}
          ORDER BY timestamp DESC 
          LIMIT 3`,
-        [group.fingerprint, req.session.user.id]
+        [group.fingerprint, ...(scope.params || [])]
       );
 
       enriched.push({
@@ -303,7 +304,14 @@ router.get('/trends', async (req, res) => {
 
     // Top 10 erreurs par occurrence
     const [topErrors] = await pool.execute(
-      `SELECT fingerprint, error_type, event_type, COUNT(*) as count, MAX(timestamp) as last_seen
+      `SELECT 
+        fingerprint, 
+        MAX(error_type) as error_type, 
+        MAX(event_type) as event_type, 
+        COUNT(*) as count, 
+        MAX(timestamp) as lastSeen,
+        MAX(message) as message,
+        MAX(service) as source
        FROM logs 
        WHERE imported_at >= DATE_SUB(NOW(), INTERVAL ? HOUR) 
          AND log_level IN ('ERROR', 'CRITICAL', 'FATAL') ${scope.sql || ''}
@@ -339,21 +347,24 @@ router.get('/trends', async (req, res) => {
 
     // Ingestion throughput (basé sur imported_at pour voir les imports récents)
     const [hourly] = await pool.execute(
-      `SELECT DATE_FORMAT(imported_at, '%Y-%m-%d %H:00') as hour, COUNT(*) as count
+      `SELECT 
+        DATE_FORMAT(imported_at, '%Y-%m-%d %H:00') as date, 
+        COUNT(*) as count,
+        COUNT(CASE WHEN log_level IN ('ERROR', 'CRITICAL', 'FATAL') THEN 1 END) as errorCount
        FROM logs 
        WHERE imported_at >= DATE_SUB(NOW(), INTERVAL ? HOUR) ${scope.sql || ''}
-       GROUP BY hour
-       ORDER BY hour DESC`,
+       GROUP BY date
+       ORDER BY date DESC`,
       [windowHours, ...(scope.params || [])]
     );
 
     res.json({
       window_hours: windowHours,
-      by_level: byLevel,
-      top_errors: topErrors,
-      top_services: topServices,
-      top_modules: topModules,
-      hourly_throughput: hourly
+      byLevel: byLevel,
+      topErrors: topErrors,
+      topServices: topServices,
+      topModules: topModules,
+      trends: hourly
     });
   } catch (e) {
     logger.error({ event: 'trends_error', error: e.message }, '[API]');

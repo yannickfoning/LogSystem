@@ -28,7 +28,11 @@ function debounceEvalUser(userId) {
   const timerId = setTimeout(async () => {
     debounceTimers.delete(key);
     try {
-      await evalAllForUser(userId);
+      if (userId) {
+        await evalAllForUser(userId);
+      } else {
+        logger.debug('[ALERT] Skipping debounced evaluation for null userId');
+      }
     } catch (e) {
       logger.error({ event: 'debounced_eval_error', userId, error: e.message }, '[ALERT]');
     }

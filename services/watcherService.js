@@ -175,6 +175,10 @@ async function processLogFile(filePath, incremental = true) {
     // FIX #9: Enrichissement hors DB pour optimiser les connexions
     const userId = findOwnerForPath(filePath) || null;
     
+    if (!userId) {
+      logger.warn({ event: 'orphan_log_detected', filePath }, '[WATCHER] File has no assigned owner in WATCH_DIR_USER_MAP. Logs will be imported with user_id = NULL.');
+    }
+
     const entries = parsed.map(entry => ({
       ...entry,
       normalized_message: normalizeMessage(entry.message),
@@ -317,7 +321,7 @@ async function processLogFile(filePath, incremental = true) {
     logger.info({ event: 'lines_processed', count: parsed.length, filePath }, '[WATCHER]');
     
     // FIX #5: Déclencher évaluation alertes + flux temps réel (Watch Log)
-    if (userId && parsed.length > 0) {
+    if (parsed.length > 0) {
       alertWorker.broadcastLogBatch(entries, { userId });
       alertEngineBus.emit('logs.inserted', { userId, count: parsed.length });
     }
@@ -380,10 +384,16 @@ export function stopWatcher() {
 }
 
 export function getWatcherStatus() {
+  const dirs = getDirs();
+  const mappedDirs = Object.keys(dirOwners || {});
+  const resolvedDirs = dirs.map(d => path.resolve(d));
+  const unmappedCount = resolvedDirs.filter(d => !mappedDirs.includes(d)).length;
+
   return {
     running: watcher !== null,
     watched_files: fileOffsets.size,
-    dirs: getDirs(),
+    dirs,
+    unmapped_dirs: unmappedCount,
     inflight: inflightProcesses.size
   };
 }

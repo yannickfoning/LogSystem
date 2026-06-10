@@ -6,8 +6,8 @@ import {
   LayoutDashboard, FileText, Upload, Bell, Shield, LogOut, Sun, Moon,
   ChevronDown, ChevronRight, Search, RefreshCw, Download, Trash2, Plus,
   Eye, CheckCircle, XCircle, AlertTriangle, Activity, Server, Users,
-  Loader2, Settings, FileBarChart, Bug, Clock, Filter, X, Menu,
-  UserPlus, Key, ToggleLeft, ToggleRight, Play, Zap, FolderOpen,
+  Loader2, Settings, FileBarChart, Clock, Filter, X, Menu,
+  UserPlus, Key, ToggleLeft, ToggleRight, Play, Zap, FolderOpen, Bug,
   Info, AlertOctagon, Skull, Stethoscope, ClipboardList, ArrowUpDown,
   ChevronLeft, ChevronRightIcon, MoreHorizontal, BellRing, Archive
 } from 'lucide-react';
@@ -19,7 +19,7 @@ import {
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api-client';
 import type {
-  AuthUser, DashboardSummary, DashboardTrends, DashboardTopErrors,
+  AuthUser, DashboardSummary, DashboardTrends, DashboardTopErrors, SystemHealth,
   DashboardRecentLogs, DashboardToday, DashboardSystem,
   LogEntry, LogQueryParams, LogListResponse,
   AlertItem, AlertRule, AlertQueryParams, AlertListResponse, CreateAlertRulePayload,
@@ -958,9 +958,9 @@ function ImportView() {
                     <TableRow key={job.id}>
                       <TableCell className="text-sm font-medium">{job.originalName}</TableCell>
                       <TableCell>{statusBadge(job.status)}</TableCell>
-                      <TableCell className="text-sm">{job.totalLines}</TableCell>
-                      <TableCell className="text-sm text-green-600">{job.importedLines}</TableCell>
-                      <TableCell className="text-sm text-amber-600">{job.skippedLines}</TableCell>
+                      <TableCell className="text-sm">{job.total_lines || job.totalLines}</TableCell>
+                      <TableCell className="text-sm text-green-600">{job.processed_lines || job.processedLines}</TableCell>
+                      <TableCell className="text-sm text-amber-600">{job.skipped_lines || job.skippedLines}</TableCell>
                       <TableCell className="text-xs">{formatDate(job.createdAt)}</TableCell>
                     </TableRow>
                   ))
@@ -1192,6 +1192,7 @@ function AdminView() {
           <TabsTrigger value="audit"><ClipboardList className="h-4 w-4 mr-1" /> Piste d'audit</TabsTrigger>
           <TabsTrigger value="anomalies"><Bug className="h-4 w-4 mr-1" /> Anomalies</TabsTrigger>
           <TabsTrigger value="purge"><Archive className="h-4 w-4 mr-1" /> Purge</TabsTrigger>
+          <TabsTrigger value="system-health"><Stethoscope className="h-4 w-4 mr-1" /> Santé Système</TabsTrigger>
         </TabsList>
 
         <TabsContent value="users"><AdminUsersTab /></TabsContent>
@@ -1199,6 +1200,7 @@ function AdminView() {
         <TabsContent value="audit"><AdminAuditTab /></TabsContent>
         <TabsContent value="anomalies"><AdminAnomaliesTab /></TabsContent>
         <TabsContent value="purge"><AdminPurgeTab /></TabsContent>
+        <TabsContent value="system-health"><AdminSystemHealthTab /></TabsContent>
       </Tabs>
     </div>
   );
@@ -1963,6 +1965,172 @@ function AdminPurgeTab() {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// ─── Admin: System Health Tab ────────────────────────────────
+
+function AdminSystemHealthTab() {
+  const [health, setHealth] = useState<SystemHealth | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchHealth = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await api.admin.getSystemHealth();
+      setHealth(data);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Erreur santé système');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchHealth();
+  }, [fetchHealth]); // No polling, refresh on mount
+
+  const StatusItem = ({ label, value, status, icon: Icon, extra }: {
+    label: string;
+    value: string | number;
+    status: 'ok' | 'warn' | 'error';
+    icon: React.ElementType;
+    extra?: string;
+  }) => {
+    let badgeVariant: 'default' | 'outline' | 'destructive' = 'default';
+    let badgeClass = '';
+    let badgeEmoji = '';
+
+    switch (status) {
+      case 'ok':
+        badgeVariant = 'default';
+        badgeClass = 'bg-green-500 hover:bg-green-600 text-white border-0';
+        badgeEmoji = '🟢 ';
+        break;
+      case 'warn':
+        badgeVariant = 'outline';
+        badgeClass = 'text-orange-600 border-orange-200 bg-orange-50';
+        badgeEmoji = '🟠 ';
+        break;
+      case 'error':
+        badgeVariant = 'destructive';
+        badgeClass = ''; // default destructive styling is fine
+        badgeEmoji = '🔴 ';
+        break;
+    }
+
+    return (
+      <div className="flex items-center justify-between p-3 border rounded-lg bg-card">
+        <div className="flex items-center gap-3">
+          <div className={`p-2 rounded-full ${status === 'ok' ? 'bg-green-500/10 text-green-500' : status === 'warn' ? 'bg-orange-500/10 text-orange-500' : 'bg-red-500/10 text-red-500'}`}>
+            <Icon className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-sm font-medium">{label}</p>
+            {extra && <p className="text-xs text-muted-foreground">{extra}</p>}
+          </div>
+        </div>
+        <div className="flex flex-col items-end gap-1">
+          <Badge variant={badgeVariant} className={badgeClass}>
+            {badgeEmoji} {value}
+          </Badge>
+        </div>
+      </div>
+    );
+  };
+
+  if (loading && !health) {
+    return (
+      <Card>
+        <CardContent className="p-6 space-y-4">
+          {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Activity className="h-4 w-4 text-primary" /> Connectivité & Services
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <StatusItem 
+              label="Base de données" 
+              value={health?.databaseConnected ? "Connectée" : "Déconnectée"} 
+              status={health?.databaseConnected ? "ok" : "error"}
+              icon={Server}
+              extra={`Taille: ${health?.dbSizeMb} Mo`}
+            />
+            <StatusItem 
+              label="Service Cache (Redis)" 
+              value={health?.redisConnected ? "Actif" : "Désactivé"} 
+              status={health?.redisConnected ? "ok" : "warn"}
+              icon={Zap}
+              extra={health?.redisConnected ? "Mode hautes performances" : "Mode dégradé"}
+            />
+            <StatusItem 
+              label="Watchers de fichiers" 
+              value={health?.watcherRunning ? "Actif" : "Arrêté"} 
+              status={health?.watcherRunning ? "ok" : "error"}
+              icon={Eye}
+              extra={health?.watcherRunning 
+                ? `${health?.activeWatchers || 0} répertoires surveillés (${health?.watchedFiles || 0} fichiers)`
+                : `${health?.activeWatchers || 0} répertoires configurés`}
+            />
+            <StatusItem
+              label="Erreurs Watcher (24h)"
+              value={health?.watcherErrors24h ?? 'N/A'}
+              status={health?.watcherErrors24h === 0 ? "ok" : health?.watcherErrors24h && health.watcherErrors24h > 0 ? "error" : "warn"}
+              icon={Bug}
+              extra="Vérifiez les logs du Watcher"
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Shield className="h-4 w-4 text-primary" /> Intégrité des Données
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <StatusItem 
+              label="Logs orphelins" 
+              value={`${health?.orphanLogs} logs`} 
+              status={health?.orphanLogs === 0 ? "ok" : health?.orphanLogs > 100 ? "error" : "warn"}
+              icon={FolderOpen}
+              extra={health?.lastOrphanImport 
+                ? `Dernier: ${formatDate(health.lastOrphanImport)} (${health.orphanLogsAgeMinutes !== null ? `${health.orphanLogsAgeMinutes} min` : 'N/A'})` 
+                : "Aucun import détecté"}
+            />
+            <StatusItem 
+              label="Répertoires non mappés" 
+              value={`${health?.unmappedWatchDirectories} répertoire(s)`} 
+              status={health?.unmappedWatchDirectories === 0 ? "ok" : "error"}
+              icon={AlertTriangle}
+              extra="Vérifiez WATCH_DIR_USER_MAP"
+            />
+            <StatusItem
+              label="Groupes d'erreurs ouverts"
+              value={`${health?.openErrorGroups} groupes`}
+              status={health?.openErrorGroups === 0 ? "ok" : "warn"}
+              icon={Bug}
+              extra="Groupes d'erreurs non résolus"
+            />
+          </CardContent>
+        </Card>
+      </div>
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={fetchHealth} disabled={loading}>
+          <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} /> Rafraîchir
+        </Button>
+      </div>
+    </div>
   );
 }
 

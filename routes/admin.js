@@ -576,36 +576,64 @@ router.post("/purge", validateBody(purgeSchema), async (req, res) => {
 
 router.get("/system-stats", async (req, res) => {
   try {
-    const user = req.session.user;
-    const scopeSql = " AND user_id = ?";
-    const scopeParams = [user.id];
-
     const [users] = await pool.execute("SELECT COUNT(*) as cnt FROM users");
     const [dbSize] = await pool.execute(
       "SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) as size_mb FROM information_schema.tables WHERE table_schema = DATABASE()",
     );
-    const [errorGroups] = await pool.execute(
-      'SELECT COUNT(*) as cnt FROM error_groups WHERE status = "open" AND user_id = ?',
-      [user.id],
+
+    // Métriques globales sur les logs orphelins (Admin)
+    const [orphanData] = await pool.execute(
+      "SELECT COUNT(*) as cnt, MAX(imported_at) as last_import FROM logs WHERE user_id IS NULL"
     );
-    const [alerts] = await pool.execute(
-      `SELECT COUNT(*) as cnt FROM alerts WHERE status = 'new'${scopeSql}`,
-      scopeParams,
-    );
+
+    // État du Watcher
+    const { getWatcherStatus } = await import("../services/watcherService.js");
+    const watcherStatus = getWatcherStatus();
+
+    // État du Cache (Redis)
+    const { getCacheStatus } = await import("../services/cacheService.js").catch(() => ({ 
+      getCacheStatus: () => Promise.resolve({ connected: false }) 
+    }));
+    
+    let cacheStatus = { connected: false };
+    try {
+      if (typeof getCacheStatus === 'function') {
+        cacheStatus = await getCacheStatus();
+      }
+    } catch (e) {
+      logger.warn({ event: 'redis_status_check_failed', error: e.message }, '[ADMIN]');
+      cacheStatus = { connected: false };
+    }
+
     const [totalLogs] = await pool.execute(
-      "SELECT COUNT(*) as cnt FROM logs WHERE user_id = ?",
-      scopeParams,
+      "SELECT COUNT(*) as cnt FROM logs"
+    );
+
+    const [openErrorGroups] = await pool.execute(
+      'SELECT COUNT(*) as cnt FROM error_groups WHERE status = "open"'
     );
 
     res.json({
-      total_users: users[0].cnt,
-      db_size_mb: dbSize[0].size_mb || 0,
-      open_error_groups: errorGroups[0].cnt,
-      new_alerts: alerts[0].cnt,
-      total_logs: totalLogs[0].cnt,
-      scope: "user",
+      totalUsers: users[0].cnt,
+      dbSizeMb: dbSize[0].size_mb || 0,
+      orphanLogs: orphanData[0].cnt,
+      lastOrphanImport: orphanData[0].last_import,
+      orphanLogsAgeMinutes: orphanData[0].last_import
+        ? Math.floor((Date.now() - new Date(orphanData[0].last_import).getTime()) / 60000)
+        : null,
+      watcherRunning: watcherStatus.running,
+      activeWatchers: watcherStatus.running ? watcherStatus.dirs.length : 0, // Number of *active* configured directories
+      unmappedWatchDirectories: watcherStatus.unmapped_dirs || 0,
+      redisConnected: Boolean(cacheStatus.connected),
+      databaseConnected: true,
+      totalLogs: totalLogs[0].cnt,
+      openErrorGroups: openErrorGroups[0].cnt,
+      watchedFiles: watcherStatus.watched_files,
+      inflightProcesses: watcherStatus.inflight
+      // watcherErrors24h: 0, // Placeholder for future implementation
     });
   } catch (e) {
+    logger.error({ event: 'system_stats_error', error: e.message }, '[ADMIN]');
     res.status(500).json({ error: "Erreur serveur" });
   }
 });

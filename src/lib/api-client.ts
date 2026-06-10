@@ -133,6 +133,7 @@ export const api = {
     updateAlertRule: (id: string, data: Record<string, unknown>) => api.alerts.rules.update(id, normalizeRulePayload(data)),
     deleteAlertRule: (id: string) => api.alerts.rules.delete(id),
     getAuditLogs: (params?: AuditLogQueryParams) => api.admin.audit(params),
+    getSystemHealth: () => fetchApi('/api/admin/system-stats'),
     getAnomalies: async (params?: Record<string, unknown>) => {
       const q = params ? new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))) : '';
       const data = await fetchApi(`/api/admin/anomalies${q ? '?' + q : ''}`);
@@ -149,6 +150,24 @@ export const api = {
   },
   health: () => fetchApi('/api/health'),
 };
+
+export interface SystemHealth {
+  totalUsers: number;
+  dbSizeMb: number;
+  orphanLogs: number;
+  watcherRunning: boolean;
+  lastOrphanImport: string | null;
+  orphanLogsAgeMinutes: number | null;
+  activeWatchers: number;
+  unmappedWatchDirectories: number;
+  redisConnected: boolean;
+  databaseConnected: boolean;
+  totalLogs: number;
+  openErrorGroups: number;
+  watchedFiles: number;
+  inflightProcesses: number;
+  watcherErrors24h?: number; // Optional, as it's a placeholder for now
+}
 
 function normalizeRulePayload(data: Record<string, unknown>): Record<string, unknown> {
   const copy = { ...data };
