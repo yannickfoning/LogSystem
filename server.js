@@ -218,6 +218,11 @@ app.use((err, req, res, _next) => {
 async function start() {
   try {
     await testConnection();
+    logger.info({
+      event: 'db_connected',
+      env: process.env.NODE_ENV || 'development',
+      database: `${process.env.DB_USER}@${process.env.DB_HOST}/${process.env.DB_NAME}`
+    }, '[DB]');
   } catch (e) {
     logger.error({ event: 'db_connection_failed', error: e.message }, '[FATAL]');
     process.exit(1);

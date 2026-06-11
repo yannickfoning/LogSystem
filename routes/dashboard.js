@@ -98,20 +98,42 @@ router.get('/summary', async (req, res) => {
       scope.params
     );
 
+    // Compter les utilisateurs
+    const [userCount] = await pool.execute('SELECT COUNT(*) as cnt FROM users WHERE is_active = 1');
+
+    // Niveaux par clé
+    const levels = {};
+    for (const row of levelRows) {
+      levels[String(row.log_level || '').toUpperCase()] = Number(row.cnt);
+    }
+
     const data = {
-      total_logs: total[0].cnt,
-      today_logs: today[0].cnt,
-      error_count: errorCount[0].cnt,
-      unread_alerts: unreadAlerts[0].cnt,
-      fatal_count: fatalCount[0].cnt,
-      critical_count: criticalCount[0].cnt,
-      source_count: sourceCount[0].cnt
+      // camelCase pour le frontend Next.js
+      totalLogs: Number(total[0].cnt),
+      todayCount: Number(today[0].cnt),
+      todayLogs: Number(today[0].cnt),
+      errorCount: Number(errorCount[0].cnt),
+      unreadAlerts: Number(unreadAlerts[0].cnt),
+      fatalCount: Number(fatalCount[0].cnt),
+      criticalCount: Number(criticalCount[0].cnt),
+      infoCount: Number(levels['INFO'] || 0),
+      warningCount: Number(levels['WARNING'] || 0),
+      userCount: Number(userCount[0].cnt),
+      sourceCount: Number(sourceCount[0].cnt),
+      // snake_case pour compatibilité
+      total_logs: Number(total[0].cnt),
+      today_logs: Number(today[0].cnt),
+      error_count: Number(errorCount[0].cnt),
+      unread_alerts: Number(unreadAlerts[0].cnt),
+      fatal_count: Number(fatalCount[0].cnt),
+      critical_count: Number(criticalCount[0].cnt),
     };
+
     for (const row of levelRows) {
       const key = 'level_' + String(row.log_level || '').toLowerCase();
-      data[key] = row.cnt;
+      data[key] = Number(row.cnt);
     }
-    
+
     // P-09: Cache the result with 30s TTL
     await setCachedDashboard(userId, data);
     res.json(data);
@@ -252,7 +274,15 @@ router.get('/trends', async (req, res) => {
        ...scope.params]
     );
 
+    // Format attendu par le frontend Next.js
+    const trendsArray = dates.map((date, i) => ({
+      date,
+      count: dailyTotal[i],
+      errorCount: (seriesData['ERROR']?.[i] || 0) + (seriesData['CRITICAL']?.[i] || 0) + (seriesData['FATAL']?.[i] || 0),
+    }));
+
     res.json({
+      trends: trendsArray,
       dates,
       labels: dates,
       series: seriesData,
@@ -292,7 +322,15 @@ router.get('/top-errors', async (req, res) => {
        LIMIT ?`,
       [...scope.params, limit]
     );
-    res.json(rows);
+    // Format attendu par le frontend Next.js
+    const normalized = rows.map(r => ({
+      ...r,
+      count: r.occurrence_count,
+      message: r.title || r.event_type,
+      source: r.source_server,
+      lastSeen: r.last_seen,
+    }));
+    res.json({ topErrors: normalized, errors: normalized });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
   }
@@ -307,7 +345,17 @@ router.get('/recent-logs', async (req, res) => {
       'SELECT * FROM logs WHERE 1=1' + scope.sql + ' ORDER BY id DESC LIMIT ?',
       [...scope.params, limit]
     );
-    res.json(rows);
+    // Normaliser les champs pour le frontend Next.js (camelCase)
+    const normalized = rows.map(r => ({
+      ...r,
+      logLevel: r.log_level || r.logLevel,
+      importedAt: r.imported_at || r.importedAt,
+      createdAt: r.created_at || r.createdAt,
+      sourceDirectory: r.source_directory || r.sourceDirectory,
+      fileName: r.file_name || r.fileName,
+    }));
+    // Retourner les deux formats pour compatibilité
+    res.json({ recentLogs: normalized, logs: normalized });
   } catch (e) {
     logger.error({ event: 'recent_logs_error', error: e.message }, '[DASHBOARD]');
     res.status(500).json({ error: 'Erreur serveur', details: e.message });
@@ -474,9 +522,23 @@ router.get('/system', async (req, res) => {
     status.watcher = getWatcherStatus();
   } catch (e) { status.watcher = { running: false, error: e.message }; }
 
-  res.json(status);
-});
+  // Format attendu par le frontend Next.js: { system: {...} }
+  const [totalLogsRow] = await pool.execute('SELECT COUNT(*) as cnt FROM logs').catch(() => [[{cnt:0}]]);
+  const [lastImportRow] = await pool.execute('SELECT MAX(created_at) as last FROM import_jobs').catch(() => [[{last:null}]]);
+  const [activeUsersRow] = await pool.execute('SELECT COUNT(*) as cnt FROM users WHERE is_active = 1').catch(() => [[{cnt:0}]]);
 
+  res.json({
+    system: {
+      ...status,
+      uptime: process.uptime(),
+      totalLogs: Number(totalLogsRow[0].cnt),
+      dbSize: 'N/A',
+      lastImport: lastImportRow[0].last,
+      activeUsers: Number(activeUsersRow[0].cnt),
+    },
+    ...status
+  });
+});
 
 // FIX BUG-ALERT-04: GET /alerts/:id - endpoint manquant (showAlertDetail l'utilise)
 router.get('/alerts/:id', async (req, res) => {

@@ -8,6 +8,7 @@
 ## 📦 Pre-Deployment Checklist
 
 ### 1. Dependencies Installation
+
 ```bash
 # Install all dependencies (including newly added compression & redis)
 npm install
@@ -17,6 +18,7 @@ npm list compression redis
 ```
 
 ### 2. Database Schema Migration
+
 ```bash
 # Apply schema updates (new tables, indexes, columns)
 node scripts/apply-schema.js
@@ -26,7 +28,9 @@ mysql -u $DB_USER -p$DB_PASSWORD $DB_NAME < db/schema.sql
 ```
 
 ### 3. Environment Configuration
+
 Create/update `.env`:
+
 ```bash
 # Core
 NODE_ENV=production
@@ -65,6 +69,7 @@ WATCH_DIR_USER_MAP={"1": "/var/log/myapp"}  # Map user_id → directory path
 ### Phase 1: Security Testing
 
 #### S-01/S-02: User Isolation & Admin Scope
+
 ```bash
 # Test 1: Non-admin sees only own data
 curl -b cookies.txt \
@@ -82,6 +87,7 @@ curl -b cookies.txt \
 ```
 
 #### S-04: CSRF Token Validation
+
 ```bash
 # Test 1: Missing CSRF token → 403
 curl -X POST http://localhost:3000/api/auth/logout \
@@ -101,6 +107,7 @@ curl -X POST http://localhost:3000/api/auth/logout \
 ```
 
 #### S-08/S-09: Timing-Safe Authentication
+
 ```bash
 # Test 1: Non-existent user response time should match failed hash
 time curl -X POST http://localhost:3000/api/auth/login \
@@ -118,6 +125,7 @@ time curl -X POST http://localhost:3000/api/auth/login \
 ### Phase 2: Performance Testing
 
 #### P-01: Bulk Insert Speed
+
 ```bash
 # Test 1: Import 10k log lines via upload
 time curl -F "file=@test-10k.log" \
@@ -127,6 +135,7 @@ time curl -F "file=@test-10k.log" \
 ```
 
 #### P-03: FULLTEXT Search
+
 ```bash
 # Test 1: Search with MATCH AGAINST (should use index)
 time curl -b cookies.txt \
@@ -136,6 +145,7 @@ time curl -b cookies.txt \
 ```
 
 #### P-04: Keyset Pagination
+
 ```bash
 # Test 1: First page
 curl -b cookies.txt \
@@ -152,6 +162,7 @@ curl -b cookies.txt \
 ```
 
 #### P-06: Alert Debouncing
+
 ```bash
 # Test 1: Import logs that trigger rule evaluation multiple times
 # Monitor alert eval count during import:
@@ -167,6 +178,7 @@ done
 ```
 
 #### P-09: Dashboard Cache (30s TTL)
+
 ```bash
 # Test 1: First request (cache miss)
 time curl -b cookies.txt \
@@ -185,6 +197,7 @@ time curl -b cookies.txt \
 ```
 
 #### P-10: PDF Export Limit
+
 ```bash
 # Test 1: Request PDF with 10k logs
 curl -b cookies.txt \
@@ -198,6 +211,7 @@ pdftotext large.pdf - | wc -l
 ```
 
 #### P-13: HTTP Compression
+
 ```bash
 # Test 1: Check compression header
 curl -I -b cookies.txt \
@@ -209,6 +223,7 @@ curl -I -b cookies.txt \
 ### Phase 3: Data Integrity Testing
 
 #### L-03: Format Detection
+
 ```bash
 # Test JSON import
 curl -F "file=@logs.json" \
@@ -231,6 +246,7 @@ curl -b cookies.txt http://localhost:3000/api/dashboard/summary
 ```
 
 #### L-04: Fingerprint User Scoping
+
 ```sql
 -- Verify fingerprints are unique per user+message
 SELECT fingerprint, user_id, COUNT(*) as cnt
@@ -242,6 +258,7 @@ GROUP BY fingerprint, user_id;
 ```
 
 #### L-06: Timestamp Validation
+
 ```bash
 # Upload CSV with out-of-range timestamps
 # (e.g., year 2000, year 2050)
@@ -258,6 +275,7 @@ curl -b cookies.txt \
 ### Phase 4: Real-Time Testing (Alerts)
 
 #### A-02: Alert TTL Buffer
+
 ```bash
 # Subscribe to SSE stream
 curl -N -H "Last-Event-ID: 0" \
@@ -272,6 +290,7 @@ curl -N -H "Last-Event-ID: 0" \
 ```
 
 #### A-04: Severity Filtering
+
 ```bash
 # Test 1: Subscribe to all alerts
 curl -N \
@@ -288,6 +307,7 @@ curl -N \
 ```
 
 #### A-06: Alert Status Update
+
 ```bash
 # Test PATCH endpoint
 curl -X PATCH -b cookies.txt \
@@ -302,6 +322,7 @@ curl -X PATCH -b cookies.txt \
 ### Phase 5: Watch Log Testing (W-01, W-02, W-03)
 
 #### W-01: File Mutex (No Race Conditions)
+
 ```bash
 # Simulate rapid file updates
 for i in {1..100}; do
@@ -317,6 +338,7 @@ curl -b cookies.txt \
 ```
 
 #### W-02: Offset Persistence
+
 ```bash
 # 1. Write 100 lines to watched log
 echo "Line 1" >> /var/log/myapp/test.log
@@ -334,6 +356,7 @@ pm2 restart LogSystem
 ```
 
 #### W-03: Log Rotation Detection
+
 ```bash
 # 1. Add 100 lines to test.log
 for i in {1..100}; do
@@ -360,6 +383,7 @@ curl -b cookies.txt http://localhost:3000/api/dashboard/summary
 ## 📊 Load Testing
 
 ### Using Apache Bench (ab)
+
 ```bash
 # Test 1: Dashboard API under load
 ab -n 1000 -c 10 -b cookies.txt \
@@ -373,6 +397,7 @@ ab -n 1000 -c 10 -b cookies.txt \
 ```
 
 ### Using k6
+
 ```javascript
 // test-load.js
 import http from 'k6/http';
@@ -398,6 +423,7 @@ export default function () {
 ```
 
 Run:
+
 ```bash
 k6 run test-load.js
 ```
@@ -407,27 +433,32 @@ k6 run test-load.js
 ## 🔍 Debugging Commands
 
 ### View Alert Evaluation Logs
+
 ```bash
 tail -f logs/app.log | grep -i "evalAllForUser"
 ```
 
 ### Monitor Cache Hits/Misses
+
 ```bash
 tail -f logs/app.log | grep "\[CACHE\]"
 ```
 
 ### Check Watch Log Processing
+
 ```bash
 tail -f logs/app.log | grep "\[WATCHER\]"
 ```
 
 ### Monitor File Offset Persistence
+
 ```bash
 mysql -u $DB_USER -p$DB_PASSWORD $DB_NAME \
   -e "SELECT * FROM watch_offsets ORDER BY updated_at DESC LIMIT 10;"
 ```
 
 ### Check Alert Buffer Size
+
 ```bash
 tail -f logs/app.log | grep "Alert buffer"
 ```
@@ -437,18 +468,21 @@ tail -f logs/app.log | grep "Alert buffer"
 ## 🚀 Rollout Strategy
 
 ### Stage 1: Staging (Pre-Production)
+
 1. Deploy to staging environment
 2. Run all test phases
 3. Perform 48-hour soak test
 4. Monitor for crashes, memory leaks, error rates
 
 ### Stage 2: Canary Release (5% of users)
+
 1. Deploy to 1 production server
 2. Monitor error rates, latency, alert metrics
 3. Verify no regressions vs previous version
 4. Maintain for 24 hours
 
 ### Stage 3: Gradual Rollout (25% → 100%)
+
 1. Deploy to 25% of servers
 2. Monitor for 24 hours
 3. If stable, deploy to 50%
@@ -456,6 +490,7 @@ tail -f logs/app.log | grep "Alert buffer"
 5. Total rollout window: 3-5 days
 
 ### Rollback Plan
+
 ```bash
 # If critical issues detected:
 git revert <commit-hash>
@@ -471,7 +506,6 @@ pm2 restart all
 After deployment, establish baseline metrics:
 
 | Metric | Target | Alert Threshold |
-|--------|--------|-----------------|
 | API Response Time (p95) | < 200ms | > 500ms |
 | Dashboard Cache Hit Ratio | > 80% | < 50% |
 | Alert Evaluation Time | < 500ms/user | > 2s |
