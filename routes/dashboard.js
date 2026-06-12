@@ -6,6 +6,12 @@ import { getCachedDashboard, setCachedDashboard, invalidateDashboard } from '../
 import { getWatcherStatus } from '../services/watcherService.js';
 import { getRedisClient } from '../services/cacheService.js';
 
+// Helper function to safely parse integers from query parameters
+function asInt(v, def = 10) {
+  const n = parseInt(v, 10);
+  return isNaN(n) ? def : n;
+}
+
 const router = Router();
 
 router.use(requireAuth);
@@ -66,7 +72,7 @@ router.get('/summary', async (req, res) => {
     }
     
     const scope = userScope(req);
-    const [total] = await pool.execute('SELECT COUNT(*) as cnt FROM logs WHERE 1=1' + scope.sql, scope.params);
+    const [total] = await pool.execute('SELECT COUNT(*) as cnt FROM logs WHERE 1=1' + scope.sql, [...scope.params]);
     const todayStr = new Date().toISOString().slice(0, 10);
     const [today] = await pool.execute(
       'SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ?' + scope.sql,
@@ -149,7 +155,7 @@ router.get('/trends', async (req, res) => {
     let startDate, endDate, days;
     
     const startParam = req.query.start_date || req.query.date_from;
-    const endParam = req.query.end_date || req.query.date_to;
+    const endParam = req.query.end_date || req.query.date_to; // No asInt needed here, it's a date string
 
     // Priorité 1: dates explicites (nouveau système + alias frontend)
     if (startParam && endParam) {
@@ -167,7 +173,7 @@ router.get('/trends', async (req, res) => {
       }
     } 
     // Priorité 2: nombre de jours (compatibilité ancien système)
-    else {
+    else { // No asInt needed here, it's a date string
       days = parseInt(req.query.days || req.query.hours || '7', 10);
       const now = new Date();
       endDate = new Date(now);
@@ -311,7 +317,7 @@ router.get('/trends', async (req, res) => {
 router.get('/top-errors', async (req, res) => {
   try {
     const scope = userScope(req);
-    const limit = parseInt(req.query.limit || '10', 10);
+    const limit = asInt(req.query.limit, 10);
     const [rows] = await pool.execute(
       `SELECT id, fingerprint, title, event_type, error_type, severity_max, occurrence_count,
               first_seen, previous_seen, last_seen, returned_at, return_reason, return_count,
@@ -340,7 +346,7 @@ router.get('/top-errors', async (req, res) => {
 router.get('/recent-logs', async (req, res) => {
   try {
     const scope = userScope(req);
-    const limit = parseInt(req.query.limit || '10', 10);
+    const limit = asInt(req.query.limit, 10);
     const [rows] = await pool.execute(
       'SELECT * FROM logs WHERE 1=1' + scope.sql + ' ORDER BY id DESC LIMIT ?',
       [...scope.params, limit]
@@ -366,7 +372,7 @@ router.get('/recent-logs', async (req, res) => {
 router.get('/alerts', async (req, res) => {
   try {
     const scope = alertScope(req);
-    const limit = parseInt(req.query.limit || '20', 10);
+    const limit = asInt(req.query.limit, 20);
     let sql = 'SELECT * FROM alerts WHERE 1=1' + scope.sql;
     const params = [...scope.params];
     if (req.query.status) {
