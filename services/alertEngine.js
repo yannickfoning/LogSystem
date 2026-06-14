@@ -100,7 +100,7 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
 
   if (conditionType === 'level') {
     const [rows] = await pool.execute(
-      'SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ? AND log_level = ? ' + userFilter, // Alerts based on event time
+      'SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ? AND log_level = ? ' + userFilter,
       [windowStart.toISOString().slice(0, 19).replace('T', ' '), normalizeLevel(conditionValue), ...scopedParams]
     );
     if (rows[0].cnt >= (rule.threshold_value ?? 1)) {
@@ -108,7 +108,7 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
     }
   } else if (conditionType === 'count') {
     const [rows] = await pool.execute(
-      'SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ? ' + userFilter, // Alerts based on event time
+      'SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ? ' + userFilter,
       [windowStart.toISOString().slice(0, 19).replace('T', ' '), ...scopedParams]
     );
     if (rows[0].cnt >= (rule.threshold_value ?? 100)) {
@@ -116,7 +116,7 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
     }
   } else if (conditionType === 'silence') {
     // FIX #3: Support pour 'Aucune activité'
-    const [rows] = await pool.execute( // Alerts based on event time
+    const [rows] = await pool.execute(
       'SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ? ' + userFilter,
       [windowStart.toISOString().slice(0, 19).replace('T', ' '), ...scopedParams]
     );
@@ -125,7 +125,7 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
     }
   } else if (conditionType === 'fingerprint') {
     const [rows] = await pool.execute(
-      'SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ? AND fingerprint = ? ' + userFilter, // Alerts based on event time
+      'SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ? AND fingerprint = ? ' + userFilter,
       [windowStart.toISOString().slice(0, 19).replace('T', ' '), conditionValue, ...scopedParams]
     );
     if (rows[0].cnt >= (rule.threshold_value ?? 1)) {
@@ -133,7 +133,7 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
     }
   } else if (conditionType === 'threshold') {
     const level = normalizeLevel(conditionValue);
-    const [rows] = await pool.execute( // Alerts based on event time
+    const [rows] = await pool.execute(
       'SELECT log_level, COUNT(*) as cnt FROM logs WHERE timestamp >= ? ' + userFilter + ' GROUP BY log_level',
       [windowStart.toISOString().slice(0, 19).replace('T', ' '), ...scopedParams]
     );
