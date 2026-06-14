@@ -93,6 +93,13 @@ const LEVEL_BG: Record<string, string> = {
   FATAL: 'bg-rose-200 text-rose-900 dark:bg-rose-900/60 dark:text-rose-100',
 };
 
+const SOURCE_STYLES: Record<string, string> = {
+  watch: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800',
+  import: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800',
+  api: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-800',
+  manual: 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/20 dark:text-slate-400 dark:border-slate-800',
+};
+
 const SEVERITY_COLORS: Record<string, string> = {
   low: '#10b981',
   medium: '#f59e0b',
@@ -534,6 +541,7 @@ function DashboardView() {
                 <TableRow>
                   <TableHead className="w-40">Horodatage</TableHead>
                   <TableHead className="w-24">Niveau</TableHead>
+                  <TableHead className="w-24">Provenance</TableHead>
                   <TableHead className="w-32">Source</TableHead>
                   <TableHead>Message</TableHead>
                 </TableRow>
@@ -547,6 +555,9 @@ function DashboardView() {
                         <Badge className={LEVEL_BG[log.logLevel] ?? 'bg-gray-100 text-gray-700'} variant="secondary">
                           {log.logLevel}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={SOURCE_STYLES[log.sourceType || 'watch']}>{log.sourceType?.toUpperCase()}</Badge>
                       </TableCell>
                       <TableCell className="text-sm">{log.source}</TableCell>
                       <TableCell className="text-sm max-w-xs truncate">{log.message}</TableCell>
@@ -588,6 +599,7 @@ function WebLogView() {
   const [timeFrom, setTimeFrom] = useState('');
   const [timeTo, setTimeTo] = useState('');
   const [directoryFilter, setDirectoryFilter] = useState('');
+  const [realtimeMode, setRealtimeMode] = useState(false);
 
   const fetchLogs = useCallback(async (page = 1) => {
     setLoading(true);
@@ -604,6 +616,7 @@ function WebLogView() {
         dateTo: endDate || undefined,
         timeFrom: timeFrom || undefined,
         timeTo: timeTo || undefined,
+        realtime: realtimeMode || undefined,
       };
       const data = await api.logs.list(params);
       setLogs(data.logs);
@@ -613,7 +626,7 @@ function WebLogView() {
     } finally {
       setLoading(false);
     }
-  }, [levelFilter, sourceFilter, serviceFilter, directoryFilter, searchFilter, startDate, endDate, timeFrom, timeTo]);
+  }, [levelFilter, sourceFilter, serviceFilter, directoryFilter, searchFilter, startDate, endDate, timeFrom, timeTo, realtimeMode]);
 
   useEffect(() => { fetchLogs(1); }, [fetchLogs]);
 
@@ -669,11 +682,19 @@ function WebLogView() {
             <Input type="time" value={timeFrom} onChange={(e) => setTimeFrom(e.target.value)} />
             <Input type="time" value={timeTo} onChange={(e) => setTimeTo(e.target.value)} />
           </div>
-          <div className="flex flex-col min-[480px]:flex-row min-[480px]:items-center gap-2 mt-3">
+          <div className="flex flex-col min-[480px]:flex-row min-[480px]:items-center gap-4 mt-3">
             <Button size="sm" onClick={() => fetchLogs(1)}>
               <Search className="h-4 w-4 mr-1" /> Rechercher
             </Button>
-            <Button size="sm" variant="outline" onClick={() => { setLevelFilter(''); setSourceFilter(''); setServiceFilter(''); setDirectoryFilter(''); setSearchFilter(''); setStartDate(''); setEndDate(''); setTimeFrom(''); setTimeTo(''); }}>
+            <div className="flex items-center gap-2 px-2 py-1 bg-muted/50 rounded-md border">
+              <Switch 
+                checked={realtimeMode} 
+                onCheckedChange={setRealtimeMode} 
+                id="realtime-mode"
+              />
+              <Label htmlFor="realtime-mode" className="text-xs font-medium cursor-pointer">Mode SOC (Live uniquement)</Label>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => { setLevelFilter(''); setSourceFilter(''); setServiceFilter(''); setDirectoryFilter(''); setSearchFilter(''); setStartDate(''); setEndDate(''); setTimeFrom(''); setTimeTo(''); setRealtimeMode(false); }}>
               <X className="h-4 w-4 mr-1" /> Réinitialiser
             </Button>
             <div className="min-[480px]:ml-auto flex gap-2">
@@ -737,14 +758,23 @@ function WebLogView() {
                       {expandedId === log.id && (
                         <TableRow>
                           <TableCell colSpan={5} className="bg-muted/30 p-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                              <div className="space-y-1">
+                                <p className="text-xs text-muted-foreground uppercase font-semibold">Temporalité SIEM</p>
+                                <div><span className="font-medium text-amber-600 dark:text-amber-400">Événement :</span> {formatDate(log.createdAtLog || log.timestamp)}</div>
+                                <div><span className="font-medium text-blue-600 dark:text-blue-400">Ingestion :</span> {formatDate(log.importedAt || log.createdAt || '')}</div>
+                              </div>
+                              <div className="space-y-1">
+                                <p className="text-xs text-muted-foreground uppercase font-semibold">Origine & Format</p>
                               <div><span className="font-medium">ID:</span> {log.id}</div>
                               <div><span className="font-medium">Service:</span> {log.service || '—'}</div>
-                              <div><span className="font-medium">Empreinte:</span> {log.fingerprint || '—'}</div>
-                              <div><span className="font-medium">Date log:</span> {formatDate(log.createdAtLog || log.timestamp)}</div>
-                              <div><span className="font-medium">Import:</span> {formatDate(log.importedAt || log.createdAt || '')}</div>
-                              <div><span className="font-medium">Fichier:</span> {log.fileName || '—'}</div>
-                              <div><span className="font-medium">Répertoire:</span> {log.sourceDirectory || '—'}</div>
+                              <div><span className="font-medium">Format:</span> <Badge variant="outline" className="text-[10px] h-4">{log.parserFormat || 'raw'}</Badge></div>
+                              </div>
+                              <div className="space-y-1">
+                                <p className="text-xs text-muted-foreground uppercase font-semibold">Fichier Source</p>
+                                <div className="truncate"><span className="font-medium">Nom:</span> {log.fileName || '—'}</div>
+                                <div className="truncate"><span className="font-medium">Chemin:</span> {log.sourceDirectory || '—'}</div>
+                              </div>
                               {log.metadata != null && typeof log.metadata === 'object' ? (
                                 <div className="col-span-full">
                                   <span className="font-medium">Métadonnées:</span>

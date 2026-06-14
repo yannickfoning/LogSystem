@@ -100,7 +100,7 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
 
   if (conditionType === 'level') {
     const [rows] = await pool.execute(
-      'SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ? AND log_level = ? ' + userFilter,
+      'SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ? AND log_level = ? ' + userFilter, // Alerts based on event time
       [windowStart.toISOString().slice(0, 19).replace('T', ' '), normalizeLevel(conditionValue), ...scopedParams]
     );
     if (rows[0].cnt >= (rule.threshold_value ?? 1)) {
@@ -108,7 +108,7 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
     }
   } else if (conditionType === 'count') {
     const [rows] = await pool.execute(
-      'SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ? ' + userFilter,
+      'SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ? ' + userFilter, // Alerts based on event time
       [windowStart.toISOString().slice(0, 19).replace('T', ' '), ...scopedParams]
     );
     if (rows[0].cnt >= (rule.threshold_value ?? 100)) {
@@ -116,7 +116,7 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
     }
   } else if (conditionType === 'silence') {
     // FIX #3: Support pour 'Aucune activité'
-    const [rows] = await pool.execute(
+    const [rows] = await pool.execute( // Alerts based on event time
       'SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ? ' + userFilter,
       [windowStart.toISOString().slice(0, 19).replace('T', ' '), ...scopedParams]
     );
@@ -125,7 +125,7 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
     }
   } else if (conditionType === 'fingerprint') {
     const [rows] = await pool.execute(
-      'SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ? AND fingerprint = ? ' + userFilter,
+      'SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ? AND fingerprint = ? ' + userFilter, // Alerts based on event time
       [windowStart.toISOString().slice(0, 19).replace('T', ' '), conditionValue, ...scopedParams]
     );
     if (rows[0].cnt >= (rule.threshold_value ?? 1)) {
@@ -133,7 +133,7 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
     }
   } else if (conditionType === 'threshold') {
     const level = normalizeLevel(conditionValue);
-    const [rows] = await pool.execute(
+    const [rows] = await pool.execute( // Alerts based on event time
       'SELECT log_level, COUNT(*) as cnt FROM logs WHERE timestamp >= ? ' + userFilter + ' GROUP BY log_level',
       [windowStart.toISOString().slice(0, 19).replace('T', ' '), ...scopedParams]
     );
@@ -196,7 +196,7 @@ async function createAlert(rule, message, targetUserId = null) {
     
     // Get count and sample logs
     const [samples] = await pool.execute(
-      `SELECT id, timestamp, message, module, target_user FROM logs 
+      `SELECT id, timestamp, message, module, target_user FROM logs // Sample logs for alert context use event time
        WHERE timestamp >= ? ${userFilter} 
        ORDER BY timestamp DESC LIMIT 3`,
       params
@@ -212,7 +212,7 @@ async function createAlert(rule, message, targetUserId = null) {
     
     // Get affected modules and users
     const [stats] = await pool.execute(
-      `SELECT DISTINCT module, target_user FROM logs 
+      `SELECT DISTINCT module, target_user FROM logs // Affected modules/users for alert context use event time
        WHERE timestamp >= ? ${userFilter}
        AND module IS NOT NULL`,
       params
@@ -335,8 +335,8 @@ async function evalSmartAlertsForUser(userId) {
   const [spikes] = await pool.execute(
     `SELECT COALESCE(error_type, event_type, 'unknown') as type_label, COUNT(*) as current_count
      FROM logs
-     WHERE user_id = ?
-       AND timestamp >= DATE_SUB(NOW(), INTERVAL 15 MINUTE)
+     WHERE user_id = ? // Error spikes are based on event time
+       AND timestamp >= DATE_SUB(NOW(), INTERVAL 15 MINUTE) 
        AND log_level IN ('ERROR','CRITICAL','FATAL')
      GROUP BY COALESCE(error_type, event_type, 'unknown')
      HAVING current_count >= 20

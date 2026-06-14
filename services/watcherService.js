@@ -191,7 +191,8 @@ async function processLogFile(filePath, incremental = true) {
       created_time: entry.created_time || String(entry.timestamp || '').slice(11, 19) || null,
       timezone: entry.timezone || null,
       timestamp_inferred: entry.timestamp_inferred ? 1 : 0,
-      classification_confidence: entry.classification_confidence || null
+      classification_confidence: entry.classification_confidence || null,
+      source_type: 'watch'
     }));
 
     // FIX #9: UNE seule connexion pour tout le fichier
@@ -214,6 +215,7 @@ async function processLogFile(filePath, incremental = true) {
         entry.event_type,
         entry.fingerprint,
         entry.user_id,
+        entry.source_type,
         entry.ip_address || entry.client_ip || null,
         entry.module || null,
         entry.error_type || null,
@@ -227,7 +229,7 @@ async function processLogFile(filePath, incremental = true) {
       const [logResult] = await conn.query(
         `INSERT IGNORE INTO logs (
           raw_log, timestamp, created_time, timezone, log_level, source, source_server, service, message, normalized_message,
-          event_type, fingerprint, user_id, client_ip, module, error_type, stack_trace,
+          event_type, fingerprint, user_id, source_type, client_ip, module, error_type, stack_trace,
           target_user, parser_format, timestamp_inferred, classification_confidence
         ) VALUES ?`,
         [logValues]
@@ -479,7 +481,7 @@ export async function getWatchStats(userId) {
         MIN(timestamp) as first_log,
         MAX(timestamp) as last_log
        FROM logs 
-       WHERE user_id = ? AND timestamp >= DATE_SUB(NOW(), INTERVAL 1 HOUR)`,
+       WHERE user_id = ? AND imported_at >= DATE_SUB(NOW(), INTERVAL 1 HOUR)`,
       [userId]
     );
 
@@ -487,7 +489,7 @@ export async function getWatchStats(userId) {
     const [topErrors] = await conn.query(
       `SELECT fingerprint, event_type, COUNT(*) as count, MAX(timestamp) as last_seen
        FROM logs
-       WHERE user_id = ? AND log_level IN ('ERROR', 'CRITICAL', 'FATAL') AND timestamp >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
+       WHERE user_id = ? AND log_level IN ('ERROR', 'CRITICAL', 'FATAL') AND imported_at >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
        GROUP BY fingerprint
        ORDER BY count DESC
        LIMIT 5`,
@@ -496,10 +498,10 @@ export async function getWatchStats(userId) {
 
     // Throughput per minute (last 60 minutes)
     const [throughput] = await conn.query(
-      `SELECT DATE_FORMAT(timestamp, '%Y-%m-%d %H:%i') as minute, COUNT(*) as count
+      `SELECT DATE_FORMAT(imported_at, '%Y-%m-%d %H:%i') as minute, COUNT(*) as count
        FROM logs
-       WHERE user_id = ? AND timestamp >= DATE_SUB(NOW(), INTERVAL 60 MINUTE)
-       GROUP BY DATE_FORMAT(timestamp, '%Y-%m-%d %H:%i')
+       WHERE user_id = ? AND imported_at >= DATE_SUB(NOW(), INTERVAL 60 MINUTE)
+       GROUP BY minute
        ORDER BY minute DESC`,
       [userId]
     );

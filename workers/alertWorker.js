@@ -23,13 +23,16 @@ function normalizeLogPayload(log) {
     event_type: 'log',
     id: log.id,
     timestamp: log.timestamp,
+    imported_at: log.imported_at,
     log_level: log.log_level,
     message: log.message,
     source: log.source,
+    source_type: log.source_type,
     service: log.service,
     user_id: log.user_id ?? null,
     created_at: log.created_at,
-    job_id: log.job_id
+    job_id: log.job_id,
+    ingested_realtime: log.ingested_realtime
   };
 }
 

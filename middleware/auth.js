@@ -91,11 +91,9 @@ export function userScope(req) {
 
   // NOTE: Admin/analyst should still be scoped by user_id if your DB uses integer user_id.
   // This prevents MySQL type mismatch when session user.id is stored as string.
-  if (user.role === "admin" || user.role === "analyst") {
-    return { sql: " AND user_id = ?", params: [parseInt(user.id, 10)] };
+  if (user.role === "admin") {
+    return { sql: "", params: [] }; // Admins can see everything
   }
 
   return { sql: " AND user_id = ?", params: [parseInt(user.id, 10)] };
 }
-
-

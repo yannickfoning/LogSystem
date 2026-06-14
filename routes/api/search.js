@@ -39,6 +39,8 @@ router.get('/', async (req, res) => {
       fingerprint = null,
       from_timestamp = null,
       to_timestamp = null,
+      from_imported_at = null,
+      to_imported_at = null,
       limit = 50,
       offset = 0
     } = req.query;
@@ -116,6 +118,18 @@ router.get('/', async (req, res) => {
     if (to_timestamp) {
       const ts = normalizeTimestamp(to_timestamp);
       whereConditions.push('timestamp <= ?');
+      params.push(ts);
+    }
+
+    if (from_imported_at) {
+      const ts = normalizeTimestamp(from_imported_at);
+      whereConditions.push('imported_at >= ?');
+      params.push(ts);
+    }
+
+    if (to_imported_at) {
+      const ts = normalizeTimestamp(to_imported_at);
+      whereConditions.push('imported_at <= ?');
       params.push(ts);
     }
 

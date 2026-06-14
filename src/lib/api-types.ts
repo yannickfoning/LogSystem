@@ -22,7 +22,7 @@ export interface LogEntry { id: string; timestamp: string; createdAt?: string; l
 
 export interface LogQueryParams {
   [key: string]: unknown;
-  page?: number; limit?: number; level?: string; logLevel?: string; source?: string; service?: string; application?: string; directory?: string; search?: string; keyword?: string; dateFrom?: string; dateTo?: string; startDate?: string; endDate?: string; timeFrom?: string; timeTo?: string;
+  page?: number; limit?: number; level?: string; logLevel?: string; source?: string; service?: string; application?: string; directory?: string; search?: string; keyword?: string; dateFrom?: string; dateTo?: string; startDate?: string; endDate?: string; timeFrom?: string; timeTo?: string; realtime?: boolean | string;
 }
 
 export interface LogListResponse { logs: LogEntry[]; pagination: { page: number; limit: number; total: number; totalPages: number } }

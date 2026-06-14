@@ -39,6 +39,12 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'logs' AND COLUMN_NAME = 'classification_confidence') THEN
         ALTER TABLE logs ADD COLUMN classification_confidence DECIMAL(4,3) DEFAULT 0.500 AFTER timestamp_inferred;
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'logs' AND COLUMN_NAME = 'source_type') THEN
+        ALTER TABLE logs ADD COLUMN source_type ENUM('watch', 'import', 'api', 'manual') DEFAULT 'watch' AFTER user_id;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'logs' AND COLUMN_NAME = 'ingested_realtime') THEN
+        ALTER TABLE logs ADD COLUMN ingested_realtime TINYINT(1) DEFAULT 1 AFTER source_type;
+    END IF;
 
     -- Index pour logs
     IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'logs' AND INDEX_NAME = 'idx_logs_source_server') THEN
@@ -55,6 +61,9 @@ BEGIN
     END IF;
     IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'logs' AND INDEX_NAME = 'idx_logs_imported_at') THEN
         CREATE INDEX idx_logs_imported_at ON logs(imported_at);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'logs' AND INDEX_NAME = 'idx_logs_realtime') THEN
+        CREATE INDEX idx_logs_realtime ON logs(ingested_realtime, imported_at);
     END IF;
 END //
 DELIMITER ;

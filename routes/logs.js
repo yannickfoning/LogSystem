@@ -14,8 +14,8 @@ const DEFAULT_LIMIT = 50;
 const LOG_COLUMNS = 'id, timestamp, created_time, imported_at, log_level, source, source_server, service, message, normalized_message, event_type, error_type, fingerprint, user_id, target_user, module, parser_format, timestamp_inferred, created_at';
 
 // ── Helper : filtres SQL partagés ─────────────────────────────────────────────
-function buildFilters(query, userScopeFilter) {
-  const { log_level, source, source_server, service, event_type, error_type, fingerprint, date_from, date_to, imported_from, imported_to, search } = query;
+function buildFilters(query, userScopeFilter, useImportedAtForDateRange = false) {
+  const { log_level, source, source_server, service, event_type, error_type, fingerprint, date_from, date_to, imported_from, imported_to, search, from_timestamp, to_timestamp, realtime } = query;
   let sql = userScopeFilter.sql;
   const params = [...userScopeFilter.params];
 
@@ -26,10 +26,22 @@ function buildFilters(query, userScopeFilter) {
   if (event_type) { sql += ' AND event_type = ?'; params.push(event_type); }
   if (error_type) { sql += ' AND error_type = ?'; params.push(error_type); }
   if (fingerprint) { sql += ' AND fingerprint = ?'; params.push(fingerprint); }
+
+  // Support pour le Monitoring Live (flux temps réel uniquement)
+  if (realtime === 'true' || realtime === '1') {
+    sql += " AND ingested_realtime = 1 AND source_type IN ('watch', 'api', 'manual')";
+  }
+
   // FIX SEARCH-02: Valider le format des dates avant injection dans la requete
   const ISO_RE = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2})?$/;
   if (date_from && ISO_RE.test(date_from)) { sql += ' AND timestamp >= ?';  params.push(date_from.replace('T',' ')); }
   if (date_to   && ISO_RE.test(date_to))   { sql += ' AND timestamp <= ?';  params.push(date_to.replace('T',' ')); }
+
+  // New: explicit timestamp filters
+  if (from_timestamp && ISO_RE.test(from_timestamp)) { sql += ' AND timestamp >= ?'; params.push(from_timestamp.replace('T',' ')); }
+  if (to_timestamp && ISO_RE.test(to_timestamp)) { sql += ' AND timestamp <= ?'; params.push(to_timestamp.replace('T',' ')); }
+
+  // New: explicit imported_at filters
   if (imported_from && ISO_RE.test(imported_from)) { sql += ' AND imported_at >= ?'; params.push(imported_from.replace('T',' ')); }
   if (imported_to && ISO_RE.test(imported_to)) { sql += ' AND imported_at <= ?'; params.push(imported_to.replace('T',' ')); }
 

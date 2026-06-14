@@ -82,7 +82,7 @@
             <i class="fas fa-stream"></i> Flux en direct
           </div>
           <div class="stream-controls">
-            <select class="stream-filter" id="filterLevel">
+            <select class="stream-filter" id="filterLevel" aria-label="Filtrer par niveau" title="Filtrer par niveau">
               <option value="" data-i18n="watchlog.stream.filter.all">Tous les niveaux</option>
               <option value="DEBUG">DEBUG</option>
               <option value="INFO">INFO</option>
@@ -91,7 +91,7 @@
               <option value="CRITICAL">CRITICAL</option>
               <option value="FATAL">FATAL</option>
             </select>
-            <select class="stream-filter" id="filterService">
+            <select class="stream-filter" id="filterService" aria-label="Filtrer par service" title="Filtrer par service">
               <option value="" data-i18n="watchlog.stream.filter.services">Tous les services</option>
             </select>
           </div>
@@ -208,7 +208,7 @@
       sessionStartTime: Date.now(),
       buffer: [],
       seenLogIds: new Set(),
-      maxBuffer: 500,
+      maxBuffer: 1000,
       metrics: {
         total: 0,
         errors: 0,
@@ -529,30 +529,58 @@
       updateServiceList();
     }
 
-    function updateLogStream() {
-      const container = document.getElementById('logEntries');
-      const filtered = STATE.buffer.filter(log => {
-        if (STATE.filters.level && log.log_level !== STATE.filters.level) return false;
-        if (STATE.filters.service && log.service !== STATE.filters.service) return false;
-        return true;
-      });
+    const SOURCE_CONFIG = {
+      watch:  { color: '#10b981', label: 'WATCH' },
+      import: { color: '#3b82f6', label: 'IMPORT' },
+      api:    { color: '#6366f1', label: 'API' },
+      manual: { color: '#94a3b8', label: 'MANUAL' }
+    };
 
-      // FIX BUG-WATCH-02: Ajouter data-id pour click, afficher service
-      container.innerHTML = filtered.slice(0, 100).map(log => {
-        const time = new Date(log.timestamp || Date.now()).toLocaleTimeString('fr-FR');
-        const svc  = log.service ? `<div class="log-service" style="font-size:10px;color:var(--text2);margin-right:6px">${esc(log.service)}</div>` : '';
-        const idAttr = log.id ? ` data-log-id="${log.id}"` : '';
-        return `
-          <div class="log-entry"${idAttr} style="cursor:${log.id ? 'pointer' : 'default'}">
+    let renderPending = false;
+
+    function updateLogStream() {
+      if (renderPending) return;
+      renderPending = true;
+
+      window.requestAnimationFrame(() => {
+        renderPending = false;
+        const container = document.getElementById('logEntries');
+        if (!container) return;
+
+        const filtered = STATE.buffer.filter(log => {
+          if (STATE.filters.level && log.log_level !== STATE.filters.level) return false;
+          if (STATE.filters.service && log.service !== STATE.filters.service) return false;
+          return true;
+        });
+
+        const fragment = document.createDocumentFragment();
+        
+        filtered.slice(0, 100).forEach(log => {
+          const div = document.createElement('div');
+          div.className = 'log-entry';
+          if (log.id) {
+            div.style.cursor = 'pointer';
+            div.setAttribute('data-log-id', log.id);
+          }
+
+          const time = new Date(log.timestamp || Date.now()).toLocaleTimeString('fr-FR');
+          const svc = log.service ? `<div class="log-service" style="font-size:10px;color:var(--text2);margin-right:6px">${esc(log.service)}</div>` : '';
+          const st = log.source_type || 'watch';
+          const conf = SOURCE_CONFIG[st] || SOURCE_CONFIG.watch;
+          const sourceBadge = `<span style="font-size:9px; padding: 1px 4px; border: 1px solid ${conf.color}; color: ${conf.color}; background: ${conf.color}11; border-radius: 4px; margin-right: 6px; font-weight: bold;">${conf.label}</span>`;
+          
+          div.innerHTML = `
             <div class="log-time">${time}</div>
             <div class="log-level ${escAttr(log.log_level)}">${esc(log.log_level)}</div>
+            ${sourceBadge}
             ${svc}
-            ${log.event_type ? '<div class="log-meta" style="font-size:10px;color:var(--text2);margin-bottom:4px">Type: '+esc(log.event_type)+'</div>' : ''}
-            ${log.fingerprint ? '<div class="log-meta" style="font-size:10px;color:var(--text2);margin-bottom:4px">Empreinte: '+esc(log.fingerprint.slice(0,16))+'</div>' : ''}
             <div class="log-message">${esc((log.message || "").slice(0, 200))}</div>
-          </div>
-        `;
-      }).join('');
+          `;
+          fragment.appendChild(div);
+        });
+
+        container.replaceChildren(fragment);
+      });
     }
 
     function updateHeatmap() {
@@ -581,23 +609,21 @@
       }).join('');
     }
 
-    function updateServiceList() {
-      const list = document.getElementById('serviceList');
-      const sorted = Array.from(STATE.metrics.services.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
-      list.innerHTML = sorted.map(([service, count]) => `
-        <li class="service-item">
-          <span class="service-name">${esc(service)}</span>
-          <span class="service-count">${count}</span>
-        </li>
-      `).join('');
+    function updateUI() {
+      // Update metrics
+      const elapsedMin = Math.max((Date.now() - STATE.sessionStartTime) / 60000, 0.0167); // min 1s
+      const logsPerMin = Math.round(STATE.metrics.total / elapsedMin) || 0;
+      document.getElementById('metricsLogsPerMin').textContent = logsPerMin;
+      document.getElementById('metricsErrors').textContent = STATE.metrics.errors;
+      document.getElementById('metricsServices').textContent = STATE.metrics.services.size;
+      const errorRate = STATE.metrics.total > 0 ? Math.round((STATE.metrics.errors / STATE.metrics.total) * 100) : 0;
+      document.getElementById('metricsErrorRate').textContent = errorRate + '%';
 
-      // Update service filter dropdown
-      const filterService = document.getElementById('filterService');
-      const currentValue = filterService.value;
-      filterService.innerHTML = '<option value="">' + (window.i18n ? window.i18n.t('watchlog.stream.filter.services') : 'Tous les services') + '</option>' + sorted.map(([service]) => `
-        <option value="${escAttr(service)}">${esc(service)}</option>
-      `).join('');
-      filterService.value = currentValue;
+      // Update components
+      updateLogStream();
+      updateHeatmap();
+      updateLevelChart();
+      updateServiceList();
     }
 
     // Event Listeners
@@ -687,6 +713,16 @@
          ['Type evenement',l.event_type],['IP client',l.client_ip],
          ['Utilisateur cible',l.target_user],['Type erreur',l.error_type]
         ].forEach(function(kv){ if(kv[1]!=null&&kv[1]!=='') html+='<p><strong>'+esc(kv[0])+':</strong> '+esc(String(kv[1]))+'</p>'; });
+        
+        // Ajout des informations SIEM de provenance et temporalite
+        const st = l.source_type || 'watch';
+        const conf = SOURCE_CONFIG[st] || SOURCE_CONFIG.watch;
+        const ingestedAt = l.imported_at || l.created_at;
+
+        html += `<p><strong>Provenance:</strong> <span style="font-size:10px; padding: 2px 6px; border: 1px solid ${conf.color}; color: ${conf.color}; background: ${conf.color}11; border-radius: 4px; font-weight: bold;">${conf.label}</span></p>`;
+        html += `<p><strong style="color:#f59e0b">Temps Événement:</strong> ${fmtDT(l.timestamp)}</p>`;
+        html += `<p><strong style="color:#3b82f6">Temps Ingestion:</strong> ${ingestedAt ? fmtDT(ingestedAt) : 'N/A'}</p>`;
+        
         html += '<p><strong>Message:</strong></p><pre style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;white-space:pre-wrap;font-size:11px;max-height:150px;overflow:auto">'+esc(l.message||'')+'</pre>';
         if (l.stack_trace) html += '<p><strong>Stack trace:</strong></p><pre style="background:rgba(80,0,0,0.3);color:#ff9999;padding:10px;border-radius:6px;white-space:pre-wrap;font-size:10px;max-height:150px;overflow:auto">'+esc(l.stack_trace)+'</pre>';
         html += '</div>';

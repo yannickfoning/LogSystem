@@ -75,11 +75,11 @@ router.get('/summary', async (req, res) => {
     const [total] = await pool.execute('SELECT COUNT(*) as cnt FROM logs WHERE 1=1' + scope.sql, [...scope.params]);
     const todayStr = new Date().toISOString().slice(0, 10);
     const [today] = await pool.execute(
-      'SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ?' + scope.sql,
+      'SELECT COUNT(*) as cnt FROM logs WHERE imported_at >= ?' + scope.sql,
       [todayStr + ' 00:00:00', ...scope.params]
     );
     const [errorCount] = await pool.execute(
-      "SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ? AND log_level IN ('ERROR', 'CRITICAL', 'FATAL')" + scope.sql,
+      "SELECT COUNT(*) as cnt FROM logs WHERE imported_at >= ? AND log_level IN ('ERROR', 'CRITICAL', 'FATAL')" + scope.sql,
       [todayStr + ' 00:00:00', ...scope.params]
     );
     const alertFilter = alertScope(req);
@@ -229,12 +229,12 @@ router.get('/trends', async (req, res) => {
     // Requête optimisée avec dates de début/fin explicites
     const scope = userScope(req);
     const [rows] = await pool.execute(
-      `SELECT DATE_FORMAT(timestamp, '%Y-%m-%d') AS day,
+      `SELECT DATE_FORMAT(imported_at, '%Y-%m-%d') AS day,
               log_level,
               COUNT(*) AS cnt
        FROM logs
-       WHERE timestamp >= ? AND timestamp <= ?${scope.sql}
-       GROUP BY DATE_FORMAT(timestamp, '%Y-%m-%d'), log_level
+       WHERE imported_at >= ? AND imported_at <= ?${scope.sql}
+       GROUP BY day, log_level
        ORDER BY day ASC`,
       [startDate.toISOString().slice(0, 19).replace('T', ' '), 
        endDate.toISOString().slice(0, 19).replace('T', ' '), 
@@ -262,7 +262,7 @@ router.get('/trends', async (req, res) => {
               COUNT(DISTINCT service) as unique_services,
               COUNT(DISTINCT source) as unique_sources
        FROM logs
-       WHERE timestamp >= ? AND timestamp <= ?${scope.sql}`,
+       WHERE imported_at >= ? AND imported_at <= ?${scope.sql}`,
       [startDate.toISOString().slice(0, 19).replace('T', ' '), 
        endDate.toISOString().slice(0, 19).replace('T', ' '), 
        ...scope.params]
@@ -410,10 +410,10 @@ router.get('/hourly', async (req, res) => {
   try {
     const scope = userScope(req);
     const [rows] = await pool.execute(
-      `SELECT HOUR(timestamp) as hour, COUNT(*) as cnt
+      `SELECT HOUR(imported_at) as hour, COUNT(*) as cnt
        FROM logs
-       WHERE timestamp >= DATE_SUB(NOW(), INTERVAL 24 HOUR)${scope.sql}
-       GROUP BY HOUR(timestamp)
+       WHERE imported_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)${scope.sql}
+       GROUP BY hour
        ORDER BY hour`,
       scope.params
     );
@@ -439,15 +439,15 @@ router.get('/today', async (req, res) => {
               SUM(CASE WHEN log_level IN ('ERROR', 'CRITICAL', 'FATAL') THEN 1 ELSE 0 END) as error_count,
               COUNT(DISTINCT user_id) as active_users
        FROM logs
-       WHERE timestamp >= ? AND timestamp <= ?${scope.sql}`,
+       WHERE imported_at >= ? AND imported_at <= ?${scope.sql}`,
       [startSql, endSql, ...scope.params]
     );
 
     const [activityPeaks] = await pool.execute(
-      `SELECT HOUR(timestamp) as hour, COUNT(*) as cnt
+      `SELECT HOUR(imported_at) as hour, COUNT(*) as cnt
        FROM logs
-       WHERE timestamp >= ? AND timestamp <= ?${scope.sql}
-       GROUP BY HOUR(timestamp)
+       WHERE imported_at >= ? AND imported_at <= ?${scope.sql}
+       GROUP BY hour
        ORDER BY cnt DESC
        LIMIT 5`,
       [startSql, endSql, ...scope.params]
@@ -456,7 +456,7 @@ router.get('/today', async (req, res) => {
     const [moduleRows] = await pool.execute(
       `SELECT COALESCE(module, source, 'unknown') as module, COUNT(*) as cnt
        FROM logs
-       WHERE timestamp >= ? AND timestamp <= ?${scope.sql}
+       WHERE imported_at >= ? AND imported_at <= ?${scope.sql}
        GROUP BY COALESCE(module, source, 'unknown')
        ORDER BY cnt DESC
        LIMIT 10`,
@@ -483,7 +483,7 @@ router.get('/today', async (req, res) => {
     const [mainTrends] = await pool.execute(
       `SELECT log_level, COUNT(*) as cnt
        FROM logs
-       WHERE timestamp >= ? AND timestamp <= ?${scope.sql}
+       WHERE imported_at >= ? AND imported_at <= ?${scope.sql}
        GROUP BY log_level
        ORDER BY cnt DESC`,
       [startSql, endSql, ...scope.params]
