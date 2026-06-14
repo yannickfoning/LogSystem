@@ -196,7 +196,7 @@ async function createAlert(rule, message, targetUserId = null) {
     
     // Get count and sample logs
     const [samples] = await pool.execute(
-      `SELECT id, timestamp, message, module, target_user FROM logs // Sample logs for alert context use event time
+      `SELECT id, timestamp, message, module, target_user FROM logs 
        WHERE timestamp >= ? ${userFilter} 
        ORDER BY timestamp DESC LIMIT 3`,
       params
@@ -212,7 +212,7 @@ async function createAlert(rule, message, targetUserId = null) {
     
     // Get affected modules and users
     const [stats] = await pool.execute(
-      `SELECT DISTINCT module, target_user FROM logs // Affected modules/users for alert context use event time
+      `SELECT DISTINCT module, target_user FROM logs 
        WHERE timestamp >= ? ${userFilter}
        AND module IS NOT NULL`,
       params
@@ -335,7 +335,7 @@ async function evalSmartAlertsForUser(userId) {
   const [spikes] = await pool.execute(
     `SELECT COALESCE(error_type, event_type, 'unknown') as type_label, COUNT(*) as current_count
      FROM logs
-     WHERE user_id = ? // Error spikes are based on event time
+     WHERE user_id = ? 
        AND timestamp >= DATE_SUB(NOW(), INTERVAL 15 MINUTE) 
        AND log_level IN ('ERROR','CRITICAL','FATAL')
      GROUP BY COALESCE(error_type, event_type, 'unknown')
