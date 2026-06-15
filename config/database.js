@@ -3,8 +3,6 @@ import dotenv from 'dotenv';
 import logger from './logger.js';
 import fs from 'fs'; // Required for reading CA certificate
 
-dotenv.config();
-
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT || '3306', 10),

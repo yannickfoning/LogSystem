@@ -1,8 +1,7 @@
 import logger from '../config/logger.js';
 import pool from '../config/database.js';
-import { levelSeverity } from '../config/database.js';
-import { normalizeLevel } from '../config/database.js';
 import EventEmitter from 'events';
+import { levelSeverity, normalizeLevel } from '../utils/logLevelUtils.js'; // Import from new utility file
 
 const ALERT_EVAL_INTERVAL = parseInt(process.env.ALERT_EVAL_INTERVAL || '60000', 10);
 const SAFETY_INTERVAL = parseInt(process.env.SAFETY_INTERVAL || ALERT_EVAL_INTERVAL.toString(), 10); // Fix #3: Use ALERT_EVAL_INTERVAL (60s) instead of 10s to prevent DB saturation
