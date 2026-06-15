@@ -17,13 +17,13 @@
 -- TABLE: logs — Colonnes
 -- ============================================================================
 
-ALTER TABLE logs ADD COLUMN created_time TIME NULL AFTER timestamp;
-ALTER TABLE logs ADD COLUMN imported_at DATETIME DEFAULT CURRENT_TIMESTAMP AFTER created_time;
-ALTER TABLE logs ADD COLUMN timezone VARCHAR(64) NULL AFTER imported_at;
-ALTER TABLE logs ADD COLUMN source_server VARCHAR(255) NULL AFTER source;
-ALTER TABLE logs ADD COLUMN parser_format VARCHAR(50) NULL AFTER target_user;
-ALTER TABLE logs ADD COLUMN timestamp_inferred TINYINT(1) DEFAULT 0 AFTER parser_format;
-ALTER TABLE logs ADD COLUMN classification_confidence DECIMAL(4,3) DEFAULT 0.500 AFTER timestamp_inferred;
+ALTER TABLE logs ADD created_time TIME NULL AFTER timestamp;
+ALTER TABLE logs ADD imported_at DATETIME DEFAULT CURRENT_TIMESTAMP AFTER created_time;
+ALTER TABLE logs ADD timezone VARCHAR(64) NULL AFTER imported_at;
+ALTER TABLE logs ADD source_server VARCHAR(255) NULL AFTER source;
+ALTER TABLE logs ADD parser_format VARCHAR(50) NULL AFTER target_user;
+ALTER TABLE logs ADD timestamp_inferred TINYINT(1) DEFAULT 0 AFTER parser_format;
+ALTER TABLE logs ADD classification_confidence DECIMAL(4,3) DEFAULT 0.500 AFTER timestamp_inferred;
 ALTER TABLE logs ADD COLUMN source_type ENUM('watch', 'import', 'api', 'manual') DEFAULT 'watch' AFTER user_id;
 ALTER TABLE logs ADD COLUMN ingested_realtime TINYINT(1) DEFAULT 1 AFTER source_type;
 

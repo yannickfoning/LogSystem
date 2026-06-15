@@ -162,8 +162,8 @@ async function runIsolationTests(userA, userB) {
   if (searchRes.ok) {
     const searchData = await searchRes.json();
 
-    // Utilisation de la vérification de contrat robuste
-    if (isResultEmpty(searchData)) {
+    // Correction de la ReferenceError (Point 3 - v5.9)
+    if (isDataPayloadEmpty(searchData)) {
       console.log('✅ OK (Aucune donnée renvoyée par erreur)');
     } else {
       console.log(`❌ ÉCHEC (Données trouvées dans la réponse alors qu'aucun résultat n'était attendu)`);
