@@ -101,7 +101,7 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
   if (conditionType === 'level') {
     const [rows] = await pool.execute(
       'SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ? AND log_level = ? ' + userFilter,
-      [windowStart.toISOString().slice(0, 19).replace('T', ' '), normalizeLevel(conditionValue), ...scopedParams]
+      [windowStart, normalizeLevel(conditionValue), ...scopedParams]
     );
     if (rows[0].cnt >= (rule.threshold_value ?? 1)) {
       return createAlert(rule, `Level ${conditionValue} detected ${rows[0].cnt} times in last ${rule.time_window_minutes}min`, targetUserId);
@@ -109,7 +109,7 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
   } else if (conditionType === 'count') {
     const [rows] = await pool.execute(
       'SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ? ' + userFilter,
-      [windowStart.toISOString().slice(0, 19).replace('T', ' '), ...scopedParams]
+      [windowStart, ...scopedParams]
     );
     if (rows[0].cnt >= (rule.threshold_value ?? 100)) {
       return createAlert(rule, `Total log count ${rows[0].cnt} exceeds threshold ${rule.threshold_value} in last ${rule.time_window_minutes}min`, targetUserId);
@@ -118,7 +118,7 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
     // FIX #3: Support pour 'Aucune activité'
     const [rows] = await pool.execute(
       'SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ? ' + userFilter,
-      [windowStart.toISOString().slice(0, 19).replace('T', ' '), ...scopedParams]
+      [windowStart, ...scopedParams]
     );
     if (rows[0].cnt === 0) {
       return createAlert(rule, `Aucune activité depuis ${rule.time_window_minutes} minutes`, targetUserId);
@@ -126,7 +126,7 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
   } else if (conditionType === 'fingerprint') {
     const [rows] = await pool.execute(
       'SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ? AND fingerprint = ? ' + userFilter,
-      [windowStart.toISOString().slice(0, 19).replace('T', ' '), conditionValue, ...scopedParams]
+      [windowStart, conditionValue, ...scopedParams]
     );
     if (rows[0].cnt >= (rule.threshold_value ?? 1)) {
       return createAlert(rule, `Fingerprint ${conditionValue.slice(0, 12)}... occurred ${rows[0].cnt} times in last ${rule.time_window_minutes}min`, targetUserId);
@@ -135,7 +135,7 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
     const level = normalizeLevel(conditionValue);
     const [rows] = await pool.execute(
       'SELECT log_level, COUNT(*) as cnt FROM logs WHERE timestamp >= ? ' + userFilter + ' GROUP BY log_level',
-      [windowStart.toISOString().slice(0, 19).replace('T', ' '), ...scopedParams]
+      [windowStart, ...scopedParams]
     );
     let triggered = false;
     let msg = '';
@@ -192,7 +192,7 @@ async function createAlert(rule, message, targetUserId = null) {
   try {
     const windowStart = new Date(Date.now() - rule.time_window_minutes * 60000);
     const userFilter = userId ? ' AND user_id = ?' : '';
-    const params = userId ? [windowStart.toISOString().slice(0, 19).replace('T', ' '), userId] : [windowStart.toISOString().slice(0, 19).replace('T', ' ')];
+    const params = userId ? [windowStart, userId] : [windowStart];
     
     // Get count and sample logs
     const [samples] = await pool.execute(
@@ -394,8 +394,19 @@ async function evalAll() {
       'SELECT id FROM users WHERE is_active = 1'
     );
     let total = 0;
+    
+    const timeout = (ms) => new Promise((_, reject) => 
+      setTimeout(() => reject(new Error(`Evaluation timeout after ${ms}ms`)), ms)
+    );
+
     for (const row of users) {
-      total += await evalAllForUser(row.id);
+      // P-03: Protection individuelle par utilisateur pour garantir la continuité du cycle
+      try {
+        total += await Promise.race([evalAllForUser(row.id), timeout(30000)]);
+      } catch (userEvalError) {
+        // L'échec d'un utilisateur n'arrête pas la boucle globale
+        logger.error({ event: 'eval_user_failed', userId: row.id, error: userEvalError.message, nextAction: 'continuing_loop' }, '[ALERT]');
+      }
     }
     return total;
   } catch (e) {

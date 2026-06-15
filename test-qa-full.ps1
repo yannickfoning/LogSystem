@@ -432,18 +432,30 @@ Write-Host "8. DATA ISOLATION" -ForegroundColor Cyan
 Write-Host "═══════════════════════════════════════" -ForegroundColor Cyan
 
 # Data isolation
-Write-Host "`n8.1 Data Isolation Between Users" -ForegroundColor Yellow
-$adminSummary = Invoke-ApiCall -Method "GET" -Endpoint "/api/dashboard/summary" -Session $adminSession
-$userSummary = Invoke-ApiCall -Method "GET" -Endpoint "/api/dashboard/summary" -Session $userSession
-if ($adminSummary.success -and $userSummary.success) {
-    if ($adminSummary.content.total_logs -ne $userSummary.content.total_logs) {
-        $results["data_isolation"] = "OK"
-        $testDetails["data_isolation"] = "Isolation works: Admin=$($adminSummary.content.total_logs), User=$($userSummary.content.total_logs)"
-        Write-Host "✅ OK - Admin: $($adminSummary.content.total_logs), User: $($userSummary.content.total_logs)" -ForegroundColor Green
+Write-Host "`n8.1 Data Isolation Between Users (User cannot see Admin logs)" -ForegroundColor Yellow
+# Note: Ici on simule la vérification de non-existence de données croisées
+$searchAsUser = Invoke-ApiCall -Method "GET" -Endpoint "/api/logs?search=admin" -Session $userSession
+$searchAsAdmin = Invoke-ApiCall -Method "GET" -Endpoint "/api/logs?search=admin" -Session $adminSession
+
+if ($searchAsUser.success -and $searchAsAdmin.success) {
+    $userLogs = $searchAsUser.content.logs | Where-Object { $_.message -match "admin" }
+    if ($userLogs.Count -eq 0) {
+        $adminSummary = Invoke-ApiCall -Method "GET" -Endpoint "/api/dashboard/summary" -Session $adminSession
+        $userSummary = Invoke-ApiCall -Method "GET" -Endpoint "/api/dashboard/summary" -Session $userSession
+        
+        if ($adminSummary.content.total_logs -ne $userSummary.content.total_logs) {
+            $results["data_isolation"] = "OK"
+            $testDetails["data_isolation"] = "Isolation stricte validée : L'utilisateur ne voit pas les logs admin et les compteurs sont distincts."
+            Write-Host "✅ OK - Isolation validée (Admin: $($adminSummary.content.total_logs), User: $($userSummary.content.total_logs))" -ForegroundColor Green
+        } else {
+            $results["data_isolation"] = "PARTIAL"
+            $testDetails["data_isolation"] = "Les compteurs sont identiques ($($adminSummary.content.total_logs)). Vérifiez si les données de test sont bien séparées."
+            Write-Host "⚠️ PARTIAL - Compteurs identiques, vérification manuelle requise" -ForegroundColor Yellow
+        }
     } else {
-        $results["data_isolation"] = "PARTIAL"
-        $testDetails["data_isolation"] = "Both have same count: $($adminSummary.content.total_logs)"
-        Write-Host "⚠️ PARTIAL - Both have same count: $($adminSummary.content.total_logs)" -ForegroundColor Yellow
+        $results["data_isolation"] = "KO"
+        $testDetails["data_isolation"] = "FUITE DE DONNÉES : L'utilisateur voit des logs contenant 'admin'"
+        Write-Host "❌ KO - CRITICAL: DATA LEAK DETECTED" -ForegroundColor Red
     }
 } else {
     $results["data_isolation"] = "KO"

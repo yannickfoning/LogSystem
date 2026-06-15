@@ -89,6 +89,17 @@ Le schema Prisma a été converti en schema SQL natif. Les tables existantes son
 
 ### Tables
 
+### Index Recommandés pour la Production
+
+```sql
+CREATE INDEX idx_logs_user_timestamp ON logs(user_id, timestamp);
+CREATE INDEX idx_logs_user_imported ON logs(user_id, imported_at);
+CREATE INDEX idx_logs_fingerprint ON logs(fingerprint);
+CREATE INDEX idx_logs_user_fingerprint_ts ON logs(user_id, fingerprint, timestamp);
+CREATE INDEX idx_logs_realtime ON logs(ingested_realtime, imported_at);
+CREATE INDEX idx_alerts_user_status ON alerts(user_id, status, created_at);
+```
+
 - `users` - Utilisateurs
 - `logs` - Logs
 - `alerts` - Alertes
