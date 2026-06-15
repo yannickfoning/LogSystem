@@ -44,6 +44,8 @@ DB_USER=loguser
 DB_PASSWORD=<secure-password>
 DB_NAME=logsystem
 
+# Database Connection Pooling
+DB_CONNECTION_LIMIT=10 # Max number of connections in the pool. Adjust based on expected load.
 # Optional: Redis for caching (P-09)
 REDIS_HOST=localhost
 REDIS_PORT=6379

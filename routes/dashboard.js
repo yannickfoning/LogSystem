@@ -60,6 +60,24 @@ router.put('/alerts/:id/read', async (req, res) => {
   }
 });
 
+/**
+ * Alias POST pour la compatibilité frontend (Bug 7)
+ * Le frontend appelle /api/alerts/read-all en POST mais la route originale est PUT
+ */
+router.post('/alerts/read-all', async (req, res) => {
+  try {
+    const scope = alertScope(req);
+    await pool.execute(
+      "UPDATE alerts SET status = 'read', read_at = NOW() WHERE status = 'new'" + scope.sql,
+      [...scope.params]
+    );
+    res.json({ success: true });
+  } catch (e) {
+    logger.error({ event: 'alert_read_all_alias_failed', error: e.message }, '[DASHBOARD]');
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 // GET /summary
 router.get('/summary', async (req, res) => {
   try {
@@ -73,6 +91,11 @@ router.get('/summary', async (req, res) => {
     
     const scope = userScope(req);
     const [total] = await pool.execute('SELECT COUNT(*) as cnt FROM logs WHERE 1=1' + scope.sql, [...scope.params]);
+    
+    /**
+     * Note : todayCount est basé sur 'imported_at' pour refléter l'activité d'ingestion (Bug 5).
+     * Pour les logs basés sur le temps événement, filtrer sur 'timestamp'.
+     */
     const todayStr = new Date().toISOString().slice(0, 10);
     const [today] = await pool.execute(
       'SELECT COUNT(*) as cnt FROM logs WHERE imported_at >= ?' + scope.sql,

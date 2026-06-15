@@ -24,7 +24,8 @@ DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=
 DB_NAME=log
-DB_SSL=false
+DB_SSL=false # Pour le développement local, pas de SSL. En production, toujours 'true'.
+DB_CONNECTION_LIMIT=10 # Nombre maximum de connexions dans le pool. Ajustez selon la charge.
 
 SESSION_SECRET=CHANGE_ME_WITH_A_LONG_SECRET
 
@@ -39,6 +40,8 @@ SESSION_SECRET=CHANGE_ME_WITH_A_LONG_SECRET
     - `SESSION_SECRET` : **Générez une clé secrète longue et aléatoire** (minimum 32 caractères, idéalement 64). Vous pouvez utiliser `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"` pour en générer une.
     - Assurez-vous que `DB_SSL=false`.
 
+    **Note de Sécurité**: L'utilisation de `root` pour le développement local est courante mais fortement déconseillée en production. En production, utilisez un utilisateur avec des privilèges minimaux.
+
 ### Configuration de Production (Render)
 
 Les variables d'environnement pour la production doivent être configurées directement sur la plateforme de déploiement (Render dans ce cas).
@@ -51,10 +54,10 @@ Les variables Aiven existantes (DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME,
 
 ### Démarrage Local
 
-1.  Assurez-vous que votre serveur MySQL local est en cours d'exécution et que la base de données `log` existe (ou créez-la).
-2.  Exécutez `npm install` pour installer les dépendances.
-3.  Démarrez l'application : `npm run dev` ou `node server.js`.
-4.  Au démarrage, vous verrez un log similaire à : `[DB] MySQL connection successful { event: 'db_connected', env: 'development', database: 'root@localhost/log' }`.
+1. Assurez-vous que votre serveur MySQL local est en cours d'exécution et que la base de données `log` existe (ou créez-la).
+2. Exécutez `npm install` pour installer les dépendances.
+3. Démarrez l'application : `npm run dev` ou `node server.js`.
+4. Au démarrage, vous verrez un log similaire à : `[DB] MySQL connection successful { event: 'db_connected', env: 'development', database: 'root@localhost/log' }`.
 
 ### Déploiement en Production
 
@@ -74,6 +77,8 @@ Les scripts de migration SQL (`db/migrations/*.sql`) sont conçus pour être agn
 - **Oubli de `.env` local** : Si le fichier `.env` n'est pas créé ou est mal configuré, l'application pourrait tenter de se connecter à des valeurs par défaut ou échouer.
 - **`SESSION_SECRET` non valide** : Un `SESSION_SECRET` trop court ou contenant "change-me" empêchera l'application de démarrer (vérification en place dans `server.js`).
 - **Conflit de port** : Si `PORT=3001` est déjà utilisé localement, l'application ne démarrera pas.
+
+- **Fuite de Connexions / Saturation DB**: Une mauvaise gestion des connexions (ouverture/fermeture à chaque requête) peut saturer la base de données. L'utilisation d'un pool de connexions est essentielle.
 
 ### Vérifications Essentielles
 

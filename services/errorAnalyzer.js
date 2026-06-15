@@ -258,6 +258,12 @@ export function suggestFix(errorType, message, stackTrace) {
     return 'Deadlock détecté en base de données. Revisitez l\'ordre des transactions et les verrous.';
   }
   
+  if (msg.includes('missing_user') || msg.includes('missing_module')) {
+    return 'Le parseur n\'a pas pu extraire les métadonnées. Vérifiez le format source ou la configuration du parser_format.';
+  }
+  if (msg.includes('connection limit exceeded')) {
+    return 'La base de données a atteint sa limite de connexions. Augmentez DB_CONNECTION_LIMIT ou optimisez l\'utilisation des connexions.';
+  }
   if (msg.includes('duplicate entry') || msg.includes('unique constraint')) {
     return 'Violation de contrainte UNIQUE en base de données. Vérifiez les doublons et les valeurs uniques.';
   }

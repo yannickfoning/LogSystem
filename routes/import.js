@@ -595,7 +595,20 @@ router.get("/jobs", async (req, res) => {
         " ORDER BY created_at DESC LIMIT 20",
       scope.params,
     );
-    res.json(rows);
+
+    // Normalisation de la réponse pour le frontend (Bug 4)
+    const normalized = rows.map(r => ({
+      ...r,
+      originalName: r.filename,
+      totalLines: r.total_lines,
+      importedLines: r.processed_lines,
+      processedLines: r.processed_lines,
+      skippedLines: r.skipped_lines,
+      createdAt: r.created_at,
+      completedAt: r.completed_at,
+    }));
+
+    res.json(normalized);
   } catch (e) {
     res.status(500).json({ error: "Erreur serveur" });
   }
