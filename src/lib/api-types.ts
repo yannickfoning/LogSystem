@@ -70,7 +70,7 @@ export interface CreateAlertRulePayload {
   name: string; description?: string; condition?: string; threshold?: number; timeframe?: number; conditionType?: string; conditionValue?: string; thresholdValue?: number | null; timeWindowMinutes?: number; severity: string; cooldownMinutes?: number; isActive?: boolean; enabled?: boolean;
 }
 
-export interface ImportJob {
+export interface ImportJob { total_lines?: number; processed_lines?: number; skipped_lines?: number;
   originalName: string;
   id: string;
   filename?: string;

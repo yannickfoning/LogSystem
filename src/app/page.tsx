@@ -2132,7 +2132,7 @@ function AdminSystemHealthTab() {
             <StatusItem 
               label="Logs orphelins" 
               value={`${health?.orphanLogs} logs`} 
-              status={health?.orphanLogs === 0 ? "ok" : health?.orphanLogs > 100 ? "error" : "warn"}
+              status={health?.orphanLogs === 0 ? "ok" : (health?.orphanLogs ?? 0) > 100 ? "error" : "warn"}
               icon={FolderOpen}
               extra={health?.lastOrphanImport 
                 ? `Dernier: ${formatDate(health.lastOrphanImport)} (${health.orphanLogsAgeMinutes !== null ? `${health.orphanLogsAgeMinutes} min` : 'N/A'})` 
