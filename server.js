@@ -48,13 +48,12 @@ import { alertWorker } from './workers/alertWorker.js';
 import { startAlertEngine, setAlertWorker, stopAlertEngine } from './services/alertEngine.js';
 import { startRetentionScheduler } from './services/retentionService.js';
 import { startWatcher, stopWatcher } from './services/watcherService.js';
-// BUG-03 FIX: Démarrer le service cache Redis qui n'était jamais initialisé
 import { startCacheService } from './services/cacheService.js';
 import { createHtmlCspMiddleware } from './middleware/htmlCsp.js';
 
 const app = express();
 app.set('trust proxy', 1);
-const PORT = parseInt(process.env.PORT || '3001', 10); // FIX: fallback cohérent avec .env
+const PORT = parseInt(process.env.PORT || '3001', 10);
 
 // Forcer HTTPS en production
 if (process.env.NODE_ENV === 'production') {
@@ -66,14 +65,12 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-// Session secret check
 const sessionSecret = process.env.SESSION_SECRET;
 if (!sessionSecret || sessionSecret.includes('change-me') || sessionSecret.length < 32) {
-  logger.fatal('[FATAL] SESSION_SECRET must be at least 32 characters and not contain "change-me". Exiting.');
+  logger.fatal('[FATAL] SESSION_SECRET must be at least 32 characters. Exiting.');
   process.exit(1);
 }
 
-// BUG-06 FIX: Nonce CSP dynamique par requête (au lieu d'un nonce statique global)
 app.use((req, res, next) => {
   res.locals.cspNonce = crypto.randomBytes(16).toString('base64');
   next();
@@ -81,9 +78,7 @@ app.use((req, res, next) => {
 
 app.use(compression({
   filter: (req, res) => {
-    if (req.path.endsWith('/stream') || req.headers.accept === 'text/event-stream') {
-      return false;
-    }
+    if (req.path.endsWith('/stream') || req.headers.accept === 'text/event-stream') return false;
     return compression.filter(req, res);
   }
 }));
@@ -91,15 +86,24 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
-// BUG-06 FIX: Helmet avec nonce dynamique via res.locals
 app.use((req, res, next) => {
   helmet({
-    hsts: process.env.NODE_ENV === 'production'
-      ? { maxAge: 31536000, includeSubDomains: true }
-      : false,
-    frameguard: false, // Disabled in favor of CSP frame-ancestors
-    contentSecurityPolicy: false, // Managed by createHtmlCspMiddleware for HTML
-    crossOriginEmbedderPolicy: false,
+    hsts: process.env.NODE_ENV === 'production' ? { maxAge: 31536000, includeSubDomains: true } : false,
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", `'nonce-${res.locals.cspNonce}'`, "https://cdnjs.cloudflare.com", "https://unpkg.com", "'unsafe-inline'", "'unsafe-eval'"],
+        styleSrc: ["'self'", `'nonce-${res.locals.cspNonce}'`, "https://cdnjs.cloudflare.com", "'unsafe-inline'"],
+        styleSrcAttr: ["'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'", "https://cdnjs.cloudflare.com", "https://fonts.gstatic.com"],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameSrc: ["'none'"],
+      }
+    },
+    crossOriginEmbedderPolicy: false
   })(req, res, next);
 });
 
@@ -107,11 +111,9 @@ const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 500, standardHe
 app.use(globalLimiter);
 
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
+  windowMs: 15 * 60 * 1000, max: 10,
   message: { error: 'Trop de tentatives de connexion. Réessayez dans 15 minutes.' },
-  standardHeaders: true,
-  legacyHeaders: false
+  standardHeaders: true, legacyHeaders: false
 });
 
 const MySQLSessionStore = MySQLStore(session);
@@ -134,10 +136,8 @@ app.use(session({
   store: sessionStore,
   cookie: {
     httpOnly: true,
-    // En dev, ne pas exiger HTTPS strictement sinon la session saute.
     secure: process.env.NODE_ENV === 'production',
     maxAge: 86400000,
-    // sameSite strict casse fréquemment les scripts/clients non-navigateurs.
     sameSite: 'lax'
   }
 }));
@@ -148,32 +148,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// Cache-Control headers for API responses (no caching for dynamic content)
-app.use((req, res, next) => {
-  if (req.path.startsWith('/api/')) {
-    res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-  }
-  next();
-});
-
 app.use(csrfMiddleware);
 app.use(csrfValidation);
 
-app.use('/admin.html', requireAdminPage);
-app.use(['/dashboard.html', '/search.html', '/import.html', '/watchlog.html'], requireAuthPage);
-app.use((req, res, next) => {
-  if (req.path.endsWith('.html')) {
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-  }
-  next();
-});
-const publicDir = path.join(__dirname, 'public');
-app.use(createHtmlCspMiddleware(publicDir));
-app.use(express.static(publicDir, { index: false }));
-
-// API Routes
+// ── API Routes (AVANT le frontend Next.js) ──────────────────────────────────
 app.use('/api/auth/login', loginLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/logs', requireAuth, scopeGuard, logsRoutes);
@@ -187,82 +165,99 @@ app.get('/api/alerts/stream', requireAuth, (req, res) => {
   alertWorker.addClient(res, req);
 });
 
-// SPA fallback
-app.get('/', (req, res) => {
-  if (req.session?.user) return res.redirect('/dashboard.html');
-  res.redirect('/login.html');
-});
-
+// Route d'initialisation des utilisateurs
 app.get('/init-users-7x9k2', async (req, res) => {
   try {
     const { default: bcrypt } = await import('bcrypt');
     const pool = (await import('./config/database.js')).default;
     const adminHash = await bcrypt.hash('Admin@2026!', 12);
-    const userHash  = await bcrypt.hash('User@2026!', 12);
+    const userHash = await bcrypt.hash('User@2026!', 12);
     await pool.execute(`INSERT INTO users (email,password_hash,display_name,role,is_active,created_at) VALUES (?,?,'Administrateur','admin',1,NOW()) ON DUPLICATE KEY UPDATE password_hash=VALUES(password_hash),is_active=1`, ['admin@logsystem.com', adminHash]);
     await pool.execute(`INSERT INTO users (email,password_hash,display_name,role,is_active,created_at) VALUES (?,?,'Utilisateur Test','user',1,NOW()) ON DUPLICATE KEY UPDATE password_hash=VALUES(password_hash),is_active=1`, ['user@logsystem.com', userHash]);
     res.json({ ok: true, users: ['admin@logsystem.com', 'user@logsystem.com'] });
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 404
-app.use((req, res) => { res.status(404).json({ error: 'Route non trouvée' }); });
+// ── Frontend Next.js (mode standalone) ──────────────────────────────────────
+// Le build Next.js est dans .next/standalone/server.js
+// On sert les fichiers statiques Next.js buildés
+const nextStaticDir = path.join(__dirname, '.next/static');
+const nextPublicDir = path.join(__dirname, 'public');
 
-// Global error handler
+if (fs.existsSync(nextStaticDir)) {
+  // Servir les assets statiques Next.js
+  app.use('/_next/static', express.static(nextStaticDir, { maxAge: '1y', immutable: true }));
+  app.use(express.static(nextPublicDir, { index: false }));
+
+  // Importer le handler Next.js standalone
+  const nextServerPath = path.join(__dirname, '.next/standalone/server.js');
+  if (fs.existsSync(nextServerPath)) {
+    logger.info('[NEXT] Using Next.js standalone server');
+    // Next.js standalone gère ses propres routes
+    const { default: nextHandler } = await import(nextServerPath).catch(() => ({ default: null }));
+    if (nextHandler) {
+      app.all('*', nextHandler);
+    }
+  } else {
+    // Fallback: servir index.html pour toutes les routes non-API
+    app.get('*', (req, res) => {
+      const indexPath = path.join(nextPublicDir, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(404).json({ error: 'Frontend not built' });
+      }
+    });
+  }
+} else {
+  // Next.js pas encore buildé — servir l'ancien frontend HTML
+  logger.warn('[NEXT] Next.js build not found, serving static HTML frontend');
+  const publicDir = path.join(__dirname, 'public');
+  app.use(createHtmlCspMiddleware(publicDir));
+  app.use(express.static(publicDir, { index: false }));
+
+  app.get('/', (req, res) => {
+    if (req.session?.user) return res.redirect('/dashboard.html');
+    res.redirect('/login.html');
+  });
+
+  app.use((req, res) => { res.status(404).json({ error: 'Route non trouvée' }); });
+}
+
 app.use((err, req, res, _next) => {
   logger.error('[ERROR]', err.message);
   res.status(500).json({ error: 'Erreur interne du serveur' });
 });
 
-// ── Start ───────────────────────────────────────────────────────────────────────────
+// ── Start ────────────────────────────────────────────────────────────────────
 async function start() {
   try {
     await testConnection();
-    logger.info({
-      event: 'db_connected',
-      env: process.env.NODE_ENV || 'development',
-      database: `${process.env.DB_USER}@${process.env.DB_HOST}/${process.env.DB_NAME}`
-    }, '[DB]');
+    logger.info({ event: 'db_connection_success', env: process.env.NODE_ENV }, '[DB]');
   } catch (e) {
     logger.error({ event: 'db_connection_failed', error: e.message }, '[FATAL]');
     process.exit(1);
   }
 
-  // MIGRATION: Run all pending migrations
   logger.info({ event: 'starting_migrations' }, '[MIGRATION]');
   const migrationsSucceeded = await runMigrations();
   if (!migrationsSucceeded) {
     logger.warn({ event: 'migrations_had_errors' }, '[MIGRATION]');
-    // Don't exit — continue running, migrations are idempotent
   }
 
-  // BUG-03 FIX: Démarrage explicite du service cache Redis
   const cacheStarted = await startCacheService();
   if (!cacheStarted) {
     logger.warn('[CACHE] Redis not available — running without cache (degraded mode)');
   }
 
   setAlertWorker(alertWorker);
-  try {
-    await startAlertEngine();
-  } catch (e) {
-    logger.error({ event: 'alertEngineStartFailed', message: e.message });
-  }
-  try {
-    startRetentionScheduler();
-  } catch (e) {
-    logger.error({ event: 'retentionStartFailed', message: e.message });
-  }
-  try {
-    await startWatcher();
-  } catch (e) {
-    logger.error({ event: 'watcherStartFailed', message: e.message });
-  }
+  try { await startAlertEngine(); } catch (e) { logger.error({ event: 'alertEngineStartFailed', message: e.message }); }
+  try { startRetentionScheduler(); } catch (e) { logger.error({ event: 'retentionStartFailed', message: e.message }); }
+  try { await startWatcher(); } catch (e) { logger.error({ event: 'watcherStartFailed', message: e.message }); }
 
   const logsDir = (process.env.WATCH_DIRS || './logs').split(',')[0].trim();
   if (!fs.existsSync(logsDir)) {
     fs.mkdirSync(logsDir, { recursive: true });
-    logger.info({ level: 'info', message: `[INIT] Created log directory: ${logsDir}` });
   }
 
   const server = app.listen(PORT, () => {
