@@ -2,6 +2,18 @@
 # yarn lockfile v1
 
 
+"7zip-bin@5.1.1":
+  version "5.1.1"
+  resolved "https://registry.yarnpkg.com/7zip-bin/-/7zip-bin-5.1.1.tgz#9274ec7460652f9c632c59addf24efb1684ef876"
+  integrity sha512-sAP4LldeWNz0lNzmTird3uWfFDWWTeg6V/MsmyyLR9X1idwKBWIgt/ZvinqQldJm3LecKEs1emkbquO6PCiLVQ==
+
+"7zip-min@^3.0.1":
+  version "3.0.1"
+  resolved "https://registry.yarnpkg.com/7zip-min/-/7zip-min-3.0.1.tgz#01f54330ab01c35f33382644d5733b53b794948a"
+  integrity sha512-WB4VCA/KSKzxhj+BAp8fI3ZYMMAftclkXlUTckuiDacsqyubQxxG3lGcpBcgzWWuJqnfQncEq1xrJpPLSxqsxw==
+  dependencies:
+    "7zip-bin" "5.1.1"
+
 "@alloc/quick-lru@^5.2.0":
   version "5.2.0"
   resolved "https://registry.yarnpkg.com/@alloc/quick-lru/-/quick-lru-5.2.0.tgz#7bf68b20c0a350f936915fcae06f58e32007ce30"
