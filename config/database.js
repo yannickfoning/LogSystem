@@ -35,7 +35,7 @@ const dbConfig = {
   queueLimit: parseInt(process.env.DB_QUEUE_LIMIT || '0', 10),
   ssl: process.env.DB_SSL === 'true' ? {
     ca: process.env.DB_SSL_CA_PATH ? fs.readFileSync(process.env.DB_SSL_CA_PATH) : undefined,
-    rejectUnauthorized: process.env.NODE_ENV === 'production' // Enforce SSL certificate validation in production
+    rejectUnauthorized: false // Aiven uses self-signed cert
   } : undefined
 };
 
@@ -57,7 +57,7 @@ export function buildSslOptions() {
   const ca = process.env.DB_SSL_CA_PATH
     ? fs.readFileSync(process.env.DB_SSL_CA_PATH)
     : fs.existsSync('./ca.pem') ? fs.readFileSync('./ca.pem') : undefined;
-  return { ca, rejectUnauthorized: process.env.NODE_ENV === 'production' };
+  return { ca, rejectUnauthorized: false };
 }
 
 export async function testConnection() {
