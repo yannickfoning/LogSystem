@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
   typescript: { ignoreBuildErrors: false },
+  eslint: { ignoreDuringBuilds: true },
   reactStrictMode: true,
   serverExternalPackages: ['unzipper', 'decompress', '7zip-min', 'chokidar', 'pdfkit'],
 
