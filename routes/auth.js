@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import logger from '../config/logger.js';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { Router } from 'express';
 import pool from '../config/database.js';
 import { recordAudit } from '../middleware/audit.js';

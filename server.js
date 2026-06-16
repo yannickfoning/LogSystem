@@ -185,21 +185,27 @@ const nextStaticDir = path.join(__dirname, '.next/static');
 const nextPublicDir = path.join(__dirname, 'public');
 
 if (fs.existsSync(nextStaticDir)) {
-  // Servir les assets statiques Next.js
   app.use('/_next/static', express.static(nextStaticDir, { maxAge: '1y', immutable: true }));
   app.use(express.static(nextPublicDir, { index: false }));
 
-  // Importer le handler Next.js standalone
   const nextServerPath = path.join(__dirname, '.next/standalone/server.js');
   if (fs.existsSync(nextServerPath)) {
     logger.info('[NEXT] Using Next.js standalone server');
-    // Next.js standalone gère ses propres routes
-    const { default: nextHandler } = await import(nextServerPath).catch(() => ({ default: null }));
-    if (nextHandler) {
-      app.all('*', nextHandler);
-    }
+    delete process.env.PORT;
+
+    const NextServer = (await import('next/dist/server/next-server.js')).default;
+    const nextApp = new NextServer({
+      dir: __dirname,
+      dev: false,
+      hostname: 'localhost',
+      port: PORT,
+      customServer: true,
+    });
+
+    const nextHandler = nextApp.getRequestHandler();
+    await nextApp.prepare();
+    app.all('*', (req, res) => nextHandler(req, res));
   } else {
-    // Fallback: servir index.html pour toutes les routes non-API
     app.get('*', (req, res) => {
       const indexPath = path.join(nextPublicDir, 'index.html');
       if (fs.existsSync(indexPath)) {
@@ -223,6 +229,7 @@ if (fs.existsSync(nextStaticDir)) {
 
   app.use((req, res) => { res.status(404).json({ error: 'Route non trouvée' }); });
 }
+
 
 app.use((err, req, res, _next) => {
   logger.error('[ERROR]', err.message);
