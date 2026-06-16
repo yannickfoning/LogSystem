@@ -14,6 +14,7 @@ jobs:
       with:
         node-version: '20.x'
         cache: 'yarn'
+        cache-dependency-path: '**/yarn.lock'
     - name: Install
       run: yarn install --frozen-lockfile
     - name: Cache Next.js build
