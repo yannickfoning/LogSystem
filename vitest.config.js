@@ -1,5 +1,4 @@
 import { defineConfig } from 'vitest/config';
-
 export default defineConfig({
   test: {
     environment: 'node',
@@ -7,4 +6,5 @@ export default defineConfig({
     testTimeout: 10000,
     hookTimeout: 10000,
   },
+  css: false,
 });
