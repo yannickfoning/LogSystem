@@ -190,22 +190,17 @@ if (fs.existsSync(nextStaticDir)) {
 
   const nextServerPath = path.join(__dirname, '.next/standalone/server.js');
   if (fs.existsSync(nextServerPath)) {
-    logger.info('[NEXT] Using Next.js standalone server');
-    delete process.env.PORT;
-
-    const NextServer = (await import('next/dist/server/next-server.js')).default;
-    const nextApp = new NextServer({
-      dir: __dirname,
+    logger.info('[NEXT] Using Next.js request handler');
+    const next = (await import('next')).default;
+    const nextApp = next({
       dev: false,
-      hostname: 'localhost',
-      port: PORT,
-      customServer: true,
+      dir: __dirname,
     });
-
-    const nextHandler = nextApp.getRequestHandler();
     await nextApp.prepare();
+    const nextHandler = nextApp.getRequestHandler();
     app.all('*', (req, res) => nextHandler(req, res));
   } else {
+
     app.get('*', (req, res) => {
       const indexPath = path.join(nextPublicDir, 'index.html');
       if (fs.existsSync(indexPath)) {
