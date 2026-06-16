@@ -28,3 +28,7 @@ jobs:
       run: yarn build
     - name: Test
       run: yarn test
+    - name: Final Build
+      run: yarn build
+      env:
+        SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
