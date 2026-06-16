@@ -13,5 +13,6 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '20.x'
+        cache: 'yarn'
     - name: Install
-      run: npm ci --ignore-scripts
+      run: yarn install --frozen-lockfile --ignore-scripts
