@@ -3,9 +3,12 @@ import { cookies } from 'next/headers';
 import crypto from 'crypto';
 import { db } from './db';
 
-const SESSION_SECRET = process.env.SESSION_SECRET;
-if (!SESSION_SECRET || SESSION_SECRET.length < 32) {
-  throw new Error('[FATAL] SESSION_SECRET must be set and at least 32 characters');
+function getSessionSecret(): string {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error('[FATAL] SESSION_SECRET must be set and at least 32 characters');
+  }
+  return secret;
 }
 
 const SALT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
@@ -22,7 +25,7 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 
 // ── Session token (HMAC-SHA256, cookie-based only — NO localStorage) ─────────
 function hmacSign(payload: string): string {
-  return crypto.createHmac('sha256', SESSION_SECRET!).update(payload).digest('hex');
+  return crypto.createHmac('sha256', getSessionSecret()).update(payload).digest('hex');
 }
 
 export function createSessionToken(userId: string, sessionVersion: number): string {
