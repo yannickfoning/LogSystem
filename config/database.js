@@ -48,7 +48,7 @@ pool.getConnection()
   })
   .catch(err => {
     logger.error({ event: 'db_connection_error', error: err.message }, '[DB] Failed to connect to MySQL database. Exiting.', err);
-    process.exit(1); // Exit if DB connection fails
+    if (process.env.NODE_ENV !== 'test') process.exit(1);
   });
 
 export default pool;
