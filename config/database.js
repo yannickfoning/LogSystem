@@ -52,3 +52,16 @@ pool.getConnection()
   });
 
 export default pool;
+export function buildSslOptions() {
+  if (process.env.DB_SSL === 'false' || !process.env.DB_SSL) return undefined;
+  const ca = process.env.DB_SSL_CA_PATH
+    ? fs.readFileSync(process.env.DB_SSL_CA_PATH)
+    : fs.existsSync('./ca.pem') ? fs.readFileSync('./ca.pem') : undefined;
+  return { ca, rejectUnauthorized: process.env.NODE_ENV === 'production' };
+}
+
+export async function testConnection() {
+  const conn = await pool.getConnection();
+  conn.release();
+  logger.info({ event: 'db_connection_success' }, '[DB] MySQL connection successful');
+}
