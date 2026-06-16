@@ -18,7 +18,7 @@ export interface DashboardSystem {
   disk?: Record<string, number>;
 }
 
-export interface LogEntry { id: string; timestamp: string; createdAt?: string; logLevel: string; level?: string; source?: string; service?: string; message: string; errorType?: string; eventType?: string; clientIp?: string; targetUser?: string; module?: string; fingerprint?: string; metadata?: unknown; importDate?: string; importTimeOnly?: string; createdAtLog?: string; createdTimeLog?: string; importedAt?: string; importedTime?: string; importedByEmail?: string; importIp?: string; responsibleUsername?: string; sourceDirectory?: string; sourceApplication?: string; fileName?: string; parserFormat?: string; }
+export interface LogEntry { id: string; timestamp: string; createdAt?: string; logLevel: string; level?: string; source?: string; service?: string; message: string; errorType?: string; eventType?: string; clientIp?: string; targetUser?: string; module?: string; fingerprint?: string; metadata?: unknown; importDate?: string; importTimeOnly?: string; createdAtLog?: string; createdTimeLog?: string; importedAt?: string; importedTime?: string; importedByEmail?: string; importIp?: string; responsibleUsername?: string; sourceDirectory?: string; sourceApplication?: string; fileName?: string; parserFormat?: string; sourceType?: string; }
 
 export interface LogQueryParams {
   [key: string]: unknown;
