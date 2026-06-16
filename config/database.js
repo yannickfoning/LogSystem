@@ -3,6 +3,27 @@ import dotenv from 'dotenv';
 import logger from './logger.js';
 import fs from 'fs'; // Required for reading CA certificate
 
+dotenv.config();
+
+export function normalizeLevel(level) {
+  const l = String(level || 'INFO').toUpperCase();
+  const valid = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL', 'FATAL', 'SECURITY'];
+  return valid.includes(l) ? l : 'INFO';
+}
+
+export function levelSeverity(level) {
+  const map = {
+    'DEBUG': 1,
+    'INFO': 2,
+    'WARNING': 3,
+    'ERROR': 4,
+    'CRITICAL': 5,
+    'FATAL': 6,
+    'SECURITY': 7
+  };
+  return map[normalizeLevel(level)] || 0;
+}
+
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT || '3306', 10),

@@ -96,6 +96,19 @@ function containsTenantData(obj, target) {
   return false;
 }
 
+/** Vérifie si un objet contient des données métier significatives (Point 3 - v5.9) */
+function isDataPayloadEmpty(obj) {
+  const METADATA_KEYS = ['availableFilters', 'facets', 'columns', 'dates', 'labels'];
+  if (Array.isArray(obj)) return obj.length === 0;
+  if (obj && typeof obj === 'object') {
+    for (const [key, val] of Object.entries(obj)) {
+      if (METADATA_KEYS.includes(key)) continue;
+      if (typeof val === 'object' && !isDataPayloadEmpty(val)) return false;
+    }
+  }
+  return true;
+}
+
 async function runIsolationTests(userA, userB) {
   let testsPassed = true;
   const scenarios = [

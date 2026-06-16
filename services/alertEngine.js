@@ -1,7 +1,6 @@
 import logger from '../config/logger.js';
-import pool from '../config/database.js';
+import pool, { levelSeverity, normalizeLevel } from '../config/database.js';
 import EventEmitter from 'events';
-import { levelSeverity, normalizeLevel } from './logLevelUtils.js'; // Correction du chemin relatif
 
 const ALERT_EVAL_INTERVAL = parseInt(process.env.ALERT_EVAL_INTERVAL || '60000', 10);
 const SAFETY_INTERVAL = parseInt(process.env.SAFETY_INTERVAL || ALERT_EVAL_INTERVAL.toString(), 10); // Fix #3: Use ALERT_EVAL_INTERVAL (60s) instead of 10s to prevent DB saturation
