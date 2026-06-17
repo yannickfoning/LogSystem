@@ -36,6 +36,7 @@ router.put('/alerts/read-all', async (req, res) => {
     );
     res.json({ success: true });
   } catch (e) {
+    logger.error({ event: 'dashboard_route_error', error: e.message }, '[DASHBOARD]');
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -56,6 +57,7 @@ router.put('/alerts/:id/read', async (req, res) => {
     }
     res.json({ success: true });
   } catch (e) {
+    logger.error({ event: 'dashboard_route_error', error: e.message }, '[DASHBOARD]');
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -167,6 +169,7 @@ router.get('/summary', async (req, res) => {
     await setCachedDashboard(userId, data);
     res.json(data);
   } catch (e) {
+    logger.error({ event: 'dashboard_route_error', error: e.message }, '[DASHBOARD]');
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -361,6 +364,7 @@ router.get('/top-errors', async (req, res) => {
     }));
     res.json({ topErrors: normalized, errors: normalized });
   } catch (e) {
+    logger.error({ event: 'dashboard_route_error', error: e.message }, '[DASHBOARD]');
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -424,6 +428,7 @@ router.get('/per-level', async (req, res) => {
     for (const r of rows) result[r.log_level] = r.cnt;
     res.json(result);
   } catch (e) {
+    logger.error({ event: 'dashboard_route_error', error: e.message }, '[DASHBOARD]');
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -442,6 +447,7 @@ router.get('/hourly', async (req, res) => {
     );
     res.json(rows);
   } catch (e) {
+    logger.error({ event: 'dashboard_route_error', error: e.message }, '[DASHBOARD]');
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -530,6 +536,7 @@ router.get('/today', async (req, res) => {
       peak_hour: activityPeaks[0]?.hour ?? null
     });
   } catch (e) {
+    logger.error({ event: 'dashboard_route_error', error: e.message }, '[DASHBOARD]');
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -582,6 +589,7 @@ router.get('/alerts/:id', async (req, res) => {
     if (!rows.length) return res.status(404).json({ error: 'Alerte introuvable' });
     res.json(rows[0]);
   } catch (e) {
+    logger.error({ event: 'dashboard_route_error', error: e.message }, '[DASHBOARD]');
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });

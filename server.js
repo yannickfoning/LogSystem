@@ -84,10 +84,11 @@ app.use(cookieParser());
 app.use((req, res, next) => {
   helmet({
     hsts: process.env.NODE_ENV === 'production' ? { maxAge: 31536000, includeSubDomains: true } : false,
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", `'nonce-${res.locals.cspNonce}'`, "https://cdnjs.cloudflare.com", "https://unpkg.com", "'unsafe-inline'", "'unsafe-eval'"],
+        scriptSrc: ["'self'", `'nonce-${res.locals.cspNonce}'`, "https://cdnjs.cloudflare.com", "https://unpkg.com"],
         styleSrc: ["'self'", `'nonce-${res.locals.cspNonce}'`, "https://cdnjs.cloudflare.com", "'unsafe-inline'"],
         styleSrcAttr: ["'unsafe-inline'"],
         imgSrc: ["'self'", "data:", "https:"],
@@ -96,6 +97,7 @@ app.use((req, res, next) => {
         objectSrc: ["'none'"],
         mediaSrc: ["'self'", "data:"],
         frameSrc: ["'none'"],
+        upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null,
       }
     },
     crossOriginEmbedderPolicy: false
@@ -208,11 +210,13 @@ async function start() {
   if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
 
   const server = app.listen(PORT, () => {
+    logger.info({ event: 'server_started', port: PORT, env: process.env.NODE_ENV || 'development', cache: cacheStarted ? 'redis' : 'disabled' }, `[LogSystem] Running on http://localhost:${PORT}`);
+  });
+
+  // Timeouts définis après listen() mais hors callback (correct)
   server.timeout = 300000;       // 5min - upload timeout
   server.keepAliveTimeout = 310000;
   server.headersTimeout = 320000;
-    logger.info({ event: 'server_started', port: PORT, env: process.env.NODE_ENV || 'development', cache: cacheStarted ? 'redis' : 'disabled' }, `[LogSystem] Running on http://localhost:${PORT}`);
-  });
 
   const shutdown = (signal) => {
     logger.info(`[${signal}] Shutting down gracefully...`);

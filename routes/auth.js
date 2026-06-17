@@ -26,18 +26,31 @@ router.post('/login', validateBody(loginSchema), async (req, res) => {
     
     if (users.length === 0 || !valid) {
       // Constant-time response to prevent timing attacks
-      await new Promise(resolve => setTimeout(resolve, 100)); // Small delay to normalize timing
+      await new Promise(resolve => setTimeout(resolve, 100));
       return res.status(401).json({ error: 'Identifiants invalides' });
     }
 
-    // Premier utilisateur à se connecter → devient admin automatiquement
-    // Cela fonctionne même après une réinitialisation de la plateforme
-    const [allUsers] = await pool.execute('SELECT COUNT(*) as total FROM users WHERE is_active = 1');
-    const isFirstUser = allUsers[0].total === 1;
-    if (isFirstUser && user.role !== 'admin') {
-      await pool.execute('UPDATE users SET role = ? WHERE id = ?', ['admin', user.id]);
-      user.role = 'admin';
-      logger.info({ event: 'first_user_promoted_admin', userId: user.id, email: user.email }, '[AUTH] Premier utilisateur promu admin');
+    // Premier utilisateur actif → devient admin automatiquement (atomique)
+    // Utilise une transaction pour éviter la race condition si deux connexions simultanées
+    if (user.role !== 'admin') {
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        const [[{ total }]] = await conn.execute(
+          'SELECT COUNT(*) as total FROM users WHERE is_active = 1 FOR UPDATE'
+        );
+        if (total === 1) {
+          await conn.execute('UPDATE users SET role = ? WHERE id = ?', ['admin', user.id]);
+          user.role = 'admin';
+          logger.info({ event: 'first_user_promoted_admin', userId: user.id, email: user.email }, '[AUTH] Premier utilisateur promu admin');
+        }
+        await conn.commit();
+      } catch (txErr) {
+        await conn.rollback();
+        logger.error({ event: 'first_user_promotion_failed', error: txErr.message }, '[AUTH]');
+      } finally {
+        conn.release();
+      }
     }
 
     await pool.execute(
@@ -55,6 +68,7 @@ router.post('/login', validateBody(loginSchema), async (req, res) => {
 
     req.session.regenerate((err) => {
       if (err) {
+        logger.error({ event: 'session_regenerate_error', error: err.message }, '[AUTH]');
         return res.status(500).json({ error: 'Erreur de session' });
       }
       req.session.user = {
@@ -67,8 +81,11 @@ router.post('/login', validateBody(loginSchema), async (req, res) => {
 
       setCsrfCookie(res, req, req.sessionID);
 
-      req.session.save((err) => {
-        if (err) return res.status(500).json({ error: 'Erreur de session' });
+      req.session.save((saveErr) => {
+        if (saveErr) {
+          logger.error({ event: 'session_save_error', error: saveErr.message }, '[AUTH]');
+          return res.status(500).json({ error: 'Erreur de session' });
+        }
         res.json({
           id: user.id,
           email: user.email,
@@ -78,6 +95,7 @@ router.post('/login', validateBody(loginSchema), async (req, res) => {
       });
     });
   } catch (e) {
+    logger.error({ event: 'login_error', error: e.message }, '[AUTH]');
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -136,6 +154,7 @@ router.put('/profile', validateBody(profileSchema), async (req, res) => {
     req.session.user.display_name = display_name || null;
     res.json({ success: true, display_name: display_name || null });
   } catch (e) {
+    logger.error({ event: 'profile_update_error', error: e.message }, '[AUTH]');
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -167,6 +186,7 @@ router.put('/password', validateBody(passwordSchema), async (req, res) => {
 
     res.json({ success: true });
   } catch (e) {
+    logger.error({ event: 'change_password_error', error: e.message }, '[AUTH]');
     await recordAudit({
       userId: req.session.user?.id,
       userEmail: req.session.user?.email,

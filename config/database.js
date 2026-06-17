@@ -27,7 +27,7 @@ const dbConfig = {
   queueLimit: parseInt(process.env.DB_QUEUE_LIMIT || '0', 10),
   ssl: process.env.DB_SSL === 'true' ? {
     ca: process.env.DB_SSL_CA_PATH ? fs.readFileSync(process.env.DB_SSL_CA_PATH) : undefined,
-    rejectUnauthorized: false
+    rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false'
   } : undefined
 };
 
@@ -58,5 +58,5 @@ export function buildSslOptions() {
   const ca = process.env.DB_SSL_CA_PATH
     ? fs.readFileSync(process.env.DB_SSL_CA_PATH)
     : fs.existsSync('./ca.pem') ? fs.readFileSync('./ca.pem') : undefined;
-  return { ca, rejectUnauthorized: false };
+  return { ca, rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' };
 }
