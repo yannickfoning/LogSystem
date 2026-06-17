@@ -164,43 +164,14 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
 });
 
-// ── Frontend Next.js ──────────────────────────────────────────────────────────
-const nextStaticDir = path.join(__dirname, '.next/static');
-const nextPublicDir = path.join(__dirname, 'public');
-
-if (fs.existsSync(nextStaticDir)) {
-  app.use('/_next/static', express.static(nextStaticDir, { maxAge: '1y', immutable: true }));
-  app.use(express.static(nextPublicDir, { index: false }));
-
-  const nextServerPath = path.join(__dirname, '.next/standalone/server.js');
-  if (fs.existsSync(nextServerPath)) {
-    logger.info('[NEXT] Using Next.js request handler');
-    const next = (await import('next')).default;
-    const nextApp = next({ dev: false, dir: __dirname });
-    await nextApp.prepare();
-    const nextHandler = nextApp.getRequestHandler();
-    app.all('*', (req, res) => nextHandler(req, res));
-  } else {
-    app.get('*', (req, res) => {
-      const indexPath = path.join(nextPublicDir, 'index.html');
-      if (fs.existsSync(indexPath)) {
-        res.sendFile(indexPath);
-      } else {
-        res.status(404).json({ error: 'Frontend not built' });
-      }
-    });
-  }
-} else {
-  logger.warn('[NEXT] Next.js build not found, serving static HTML frontend');
-  const publicDir = path.join(__dirname, 'public');
-  app.use(createHtmlCspMiddleware(publicDir));
-  app.use(express.static(publicDir, { index: false }));
-  app.get('/', (req, res) => {
-    if (req.session?.user) return res.redirect('/dashboard.html');
-    res.redirect('/login.html');
-  });
-  app.use((req, res) => { res.status(404).json({ error: 'Route non trouvée' }); });
-}
+// Frontend HTML classique
+const publicDir = path.join(__dirname, 'public');
+app.use(createHtmlCspMiddleware(publicDir));
+app.use(express.static(publicDir, { index: false }));
+app.get('/', (req, res) => {
+  if (req.session?.user) return res.redirect('/dashboard.html');
+  res.redirect('/login.html');
+});
 
 app.use((err, req, res, _next) => {
   logger.error({ event: 'express_error', message: err.message, stack: err.stack, path: req.path });
