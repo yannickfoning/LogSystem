@@ -707,12 +707,11 @@
       function loadSystem() {
         api.get('/api/admin/system-stats').then(function(s) {
           document.getElementById('system-stats').innerHTML =
-            '<div class="kpi-card"><span class="kpi-label">Utilisateurs</span><span class="kpi-value blue">'+s.total_users+'</span></div>' +
-            '<div class="kpi-card"><span class="kpi-label">Taille BDD</span><span class="kpi-value green">'+s.db_size_mb+' Mo</span></div>' +
-            '<div class="kpi-card"><span class="kpi-label">Error Groups (open)</span><span class="kpi-value red">'+s.open_error_groups+'</span></div>' +
-            '<div class="kpi-card"><span class="kpi-label">Alertes non lues</span><span class="kpi-value orange">'+s.new_alerts+'</span></div>' +
-            '<div class="kpi-card"><span class="kpi-label">Total logs</span><span class="kpi-value blue">'+Number(s.total_logs).toLocaleString()+'</span></div>';
-        });
+            '<div class="kpi-card"><span class="kpi-label">Utilisateurs</span><span class="kpi-value blue">'+s.totalUsers+'</span></div>' +
+            '<div class="kpi-card"><span class="kpi-label">Taille BDD</span><span class="kpi-value green">'+s.dbSizeMb+' Mo</span></div>' +
+            '<div class="kpi-card"><span class="kpi-label">Error Groups</span><span class="kpi-value red">'+s.openErrorGroups+'</span></div>' +
+            '<div class="kpi-card"><span class="kpi-label">Total logs</span><span class="kpi-value blue">'+Number(s.totalLogs).toLocaleString()+'</span></div>';
+        }).catch(function(e){ if(window.toast) window.toast.error('Erreur système'); });
       }
 
       // Initial loads
