@@ -1,51 +1,18 @@
-# Dependencies
 node_modules/
-.pnp
-.pnp.js
-
-# Build
 .next/
 dist/
 build/
-out/
-
-# Environment
-.env
-.env.local
-.env.*.local
-
-# Logs
-*.log
-logs/
-!logs/.gitkeep
-
-# Uploads
+logs/*.log
+logs/**/*.log
 uploads/
-
-# OS
+*.env
+!.env.example
+.env.local
+ca.pem
+cookies.txt
+tsconfig.tsbuildinfo
+yarn-error.log
+npm-debug.log
 .DS_Store
 Thumbs.db
-
-# IDE
-.vscode/settings.json
-.idea/
-
-# Debug / test artifacts
-cookies.txt
 qa-results*.json
-test-plan.json
-*.ps1
-
-# Yarn
-.yarn/cache
-.yarn/unplugged
-.yarn/build-state.yml
-.yarn/install-state.gz
-.pnp.*
-
-# TypeScript
-*.tsbuildinfo
-tsconfig.tsbuildinfo
-
-# CA cert (ne pas committer en prod)
-ca.pem
