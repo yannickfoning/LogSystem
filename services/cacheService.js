@@ -104,3 +104,13 @@ export async function startCacheService() {
 export function getRedisClient() {
   return isReady() ? redis : null;
 }
+export async function getCacheStatus() {
+  try {
+    const client = getRedisClient();
+    if (!client) return { connected: false };
+    await client.ping();
+    return { connected: true };
+  } catch (e) {
+    return { connected: false };
+  }
+}

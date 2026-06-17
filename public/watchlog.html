@@ -506,28 +506,6 @@
       }, 1000);
     }
 
-    function updateUI() {
-      // Update metrics
-      const elapsedMin = Math.max((Date.now() - STATE.sessionStartTime) / 60000, 0.0167); // min 1s
-      const logsPerMin = Math.round(STATE.metrics.total / elapsedMin) || 0;
-      document.getElementById('metricsLogsPerMin').textContent = logsPerMin;
-      document.getElementById('metricsErrors').textContent = STATE.metrics.errors;
-      document.getElementById('metricsServices').textContent = STATE.metrics.services.size;
-      const errorRate = STATE.metrics.total > 0 ? Math.round((STATE.metrics.errors / STATE.metrics.total) * 100) : 0;
-      document.getElementById('metricsErrorRate').textContent = errorRate + '%';
-
-      // Update stream
-      updateLogStream();
-
-      // Update heatmap
-      updateHeatmap();
-
-      // Update level chart
-      updateLevelChart();
-
-      // Update services
-      updateServiceList();
-    }
 
     const SOURCE_CONFIG = {
       watch:  { color: '#10b981', label: 'WATCH' },
