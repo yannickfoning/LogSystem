@@ -41,7 +41,7 @@ import searchApiRoutes from './routes/api/search.js';
 import { alertWorker } from './workers/alertWorker.js';
 import { startAlertEngine, setAlertWorker, stopAlertEngine } from './services/alertEngine.js';
 import { startRetentionScheduler } from './services/retentionService.js';
-import { startWatcher, stopWatcher } from './services/watcherService.js';
+import { startWatcher, stopWatcher, getWatcherStatus } from './services/watcherService.js';
 import { startCacheService } from './services/cacheService.js';
 import { createHtmlCspMiddleware } from './middleware/htmlCsp.js';
 
@@ -155,6 +155,11 @@ app.use('/api/admin', requireAuth, scopeGuard, adminRoutes);
 app.use('/api/search', requireAuth, scopeGuard, searchApiRoutes);
 
 // SSE Alert Stream
+
+// Watchdogs status
+app.get('/api/watchdogs/status', requireAuth, (req, res) => {
+  res.json(getWatcherStatus());
+});
 app.get('/api/alerts/stream', requireAuth, (req, res) => {
   alertWorker.addClient(res, req);
 });

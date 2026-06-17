@@ -312,7 +312,7 @@ router.get('/analysis/:fingerprint', async (req, res) => {
     const sample = samples[0] || {};
     const [metaRows] = await pool.execute(
       `SELECT status, previous_seen, returned_at, return_reason, return_count
-       FROM error_groups WHERE fingerprint = ?${scope.sql} LIMIT 1`,
+       FROM error_groups WHERE fingerprint = ? ${scope.sql} LIMIT 1`,
       [fingerprint, ...scope.params]
     );
     const meta = metaRows[0] || {};
