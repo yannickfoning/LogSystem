@@ -404,7 +404,7 @@ router.get('/alerts', async (req, res) => {
     }
     sql += ' ORDER BY created_at DESC LIMIT ?';
     params.push(limit);
-    const [rows] = await pool.execute(sql, params);
+    const [rows] = await pool.query(sql, params);
     res.json(rows);
   } catch (e) {
     logger.error({ event: 'alerts_error', error: e.message, sql: e.sql }, '[DASHBOARD ALERTS]');

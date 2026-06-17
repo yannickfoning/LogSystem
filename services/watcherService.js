@@ -487,7 +487,7 @@ export async function getWatchStats(userId) {
 
     // Top errors
     const [topErrors] = await conn.query(
-      `SELECT fingerprint, event_type, COUNT(*) as count, MAX(timestamp) as last_seen
+      `SELECT fingerprint, ANY_VALUE(event_type) as event_type, COUNT(*) as count, MAX(timestamp) as last_seen
        FROM logs
        WHERE user_id = ? AND log_level IN ('ERROR', 'CRITICAL', 'FATAL') AND imported_at >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
        GROUP BY fingerprint
