@@ -744,7 +744,7 @@
         modal = document.createElement('div');
         modal.id = 'modal-alert-detail';
         modal.className = 'modal-backdrop';
-        modal.innerHTML = '<div class="modal-box"><div class="modal-head"><span class="modal-title">🔔 Détail alerte</span><button class="modal-close" onclick="this.closest('.modal-backdrop').classList.remove('show')">&times;</button></div><div class="modal-body" id="modal-alert-body"></div></div>';
+        modal.innerHTML = '<div class="modal-box"><div class="modal-head"><span class="modal-title">Detail alerte</span><button class="modal-close" onclick="document.querySelectorAll(&quot;.modal-backdrop&quot;).forEach(function(m){m.classList.remove(&quot;show&quot;)})" >&times;</button></div><div class="modal-body" id="modal-alert-body"></div></div>';
         document.body.appendChild(modal);
         modal.addEventListener('click', function(e){ if(e.target===modal) modal.classList.remove('show'); });
       }

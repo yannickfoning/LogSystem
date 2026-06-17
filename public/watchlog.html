@@ -609,6 +609,15 @@
       }).join('');
     }
 
+    function updateServiceList() {
+      var list = document.getElementById('serviceList');
+      if (!list) return;
+      var services = Array.from(STATE.metrics.services || []);
+      if (!services.length) { list.innerHTML = '<li style="color:var(--text2);font-size:12px">Aucun service</li>'; return; }
+      list.innerHTML = services.slice(0, 10).map(function(s) {
+        return '<li style="font-size:12px;padding:3px 0;color:var(--text1)">' + esc(s) + '</li>';
+      }).join('');
+    }
     function updateUI() {
       // Update metrics
       const elapsedMin = Math.max((Date.now() - STATE.sessionStartTime) / 60000, 0.0167); // min 1s
