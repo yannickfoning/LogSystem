@@ -94,6 +94,7 @@ app.use((req, res, next) => {
         connectSrc: ["'self'"],
         fontSrc: ["'self'", "https://cdnjs.cloudflare.com", "https://fonts.gstatic.com"],
         objectSrc: ["'none'"],
+        mediaSrc: ["'self'", "data:"],
         frameSrc: ["'none'"],
       }
     },
