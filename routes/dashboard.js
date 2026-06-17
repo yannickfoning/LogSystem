@@ -370,7 +370,7 @@ router.get('/recent-logs', async (req, res) => {
   try {
     const scope = userScope(req);
     const limit = asInt(req.query.limit, 10);
-    const [rows] = await pool.execute(
+    const [rows] = await pool.query(
       'SELECT * FROM logs WHERE 1=1' + scope.sql + ' ORDER BY id DESC LIMIT ?',
       [...scope.params, limit]
     );
