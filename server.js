@@ -208,6 +208,9 @@ async function start() {
   if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
 
   const server = app.listen(PORT, () => {
+  server.timeout = 300000;       // 5min - upload timeout
+  server.keepAliveTimeout = 310000;
+  server.headersTimeout = 320000;
     logger.info({ event: 'server_started', port: PORT, env: process.env.NODE_ENV || 'development', cache: cacheStarted ? 'redis' : 'disabled' }, `[LogSystem] Running on http://localhost:${PORT}`);
   });
 
