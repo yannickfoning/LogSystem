@@ -974,9 +974,11 @@ function showLogDetail(logId){
 
     var btnRefresh = document.getElementById('btn-refresh');
     if (btnRefresh) btnRefresh.addEventListener('click', refreshAll);
-
-    // ── Init ──
-    refreshAll();
+    // -- Init --
+    (window.initApp ? window.initApp() : Promise.resolve()).then(function() {
+      refreshAll();
+      connectSSE();
+    });
     connectSSE();
 
     // ── Mobile hamburger menu ──
