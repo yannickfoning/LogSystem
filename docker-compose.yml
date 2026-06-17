@@ -5,26 +5,74 @@ services:
     build:
       context: .
       target: runner
+      args:
+        SESSION_SECRET: ${SESSION_SECRET}
     container_name: logsystem
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "10000:10000"
     env_file: .env
+    environment:
+      - NODE_ENV=production
+      - PORT=10000
+      - DB_HOST=mysql
+      - DB_PORT=3306
     volumes:
       - uploads:/app/uploads
       - logs:/app/logs
     networks:
       - logsystem
+    depends_on:
+      mysql:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:10000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
 
+  mysql:
+    image: mysql:8.0
+    container_name: logsystem-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME:-logsystem}
+      MYSQL_USER: ${DB_USER:-logsystem}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    networks:
+      - logsystem
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: logsystem-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    volumes:
+      - redis_data:/data
+    networks:
+      - logsystem
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   uploads:
   logs:
+  mysql_data:
+  redis_data:
 
 networks:
   logsystem:

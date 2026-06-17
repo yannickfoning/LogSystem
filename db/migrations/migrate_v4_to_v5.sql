@@ -1,14 +1,14 @@
--- MIGRATION V4 → V5 (Aiven MySQL compatible — no DELIMITER/IF NOT EXISTS on indexes)
+-- MIGRATION V4 → V5 (Aiven MySQL compatible — no IF NOT EXISTS on ALTER/CREATE INDEX)
 
 ALTER TABLE `alerts`
-  ADD COLUMN IF NOT EXISTS `resolved_at` DATETIME NULL DEFAULT NULL AFTER `read_at`;
+  ADD COLUMN `resolved_at` DATETIME NULL DEFAULT NULL AFTER `read_at`;
 
 ALTER TABLE `alerts` ADD INDEX `idx_alerts_resolved` (`resolved_at`);
 
 ALTER TABLE `import_jobs`
-  ADD COLUMN IF NOT EXISTS `skipped_lines`   INT          DEFAULT 0   AFTER `error_message`,
-  ADD COLUMN IF NOT EXISTS `import_source`   VARCHAR(255)             AFTER `skipped_lines`,
-  ADD COLUMN IF NOT EXISTS `import_service`  VARCHAR(255)             AFTER `import_source`;
+  ADD COLUMN `skipped_lines`   INT          DEFAULT 0   AFTER `error_message`,
+  ADD COLUMN `import_source`   VARCHAR(255)             AFTER `skipped_lines`,
+  ADD COLUMN `import_service`  VARCHAR(255)             AFTER `import_source`;
 
 CREATE TABLE IF NOT EXISTS `watch_offsets` (
   `path`       VARCHAR(1024) PRIMARY KEY,

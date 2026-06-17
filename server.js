@@ -9,19 +9,13 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 import crypto from 'crypto';
 import logger from './config/logger.js';
 
-// ── Patch anti-crash global ───────────────────────────────────────────────────
+// ── Anti-crash global ────────────────────────────────────────────────────────
 process.on('uncaughtException', (err) => {
   logger.error({ event: 'uncaughtException', message: err.message, stack: err.stack, timestamp: new Date().toISOString() });
   process.exit(1);
 });
-
 process.on('unhandledRejection', (reason) => {
-  logger.error({
-    event: 'unhandledRejection',
-    message: reason?.message || String(reason),
-    stack: reason?.stack,
-    timestamp: new Date().toISOString()
-  });
+  logger.error({ event: 'unhandledRejection', message: reason?.message || String(reason), stack: reason?.stack, timestamp: new Date().toISOString() });
 });
 
 import express from 'express';
@@ -35,7 +29,7 @@ import fs from 'fs';
 
 import { testConnection, buildSslOptions } from './config/database.js';
 import { runMigrations } from './lib/database/migrationRunner.js';
-import { requireAuth, requireAuthPage, requireAdminPage } from './middleware/auth.js';
+import { requireAuth } from './middleware/auth.js';
 import { scopeGuard } from './middleware/scopeGuard.js';
 import { csrfMiddleware, csrfValidation } from './middleware/csrf.js';
 import authRoutes from './routes/auth.js';
@@ -55,7 +49,7 @@ const app = express();
 app.set('trust proxy', 1);
 const PORT = parseInt(process.env.PORT || '3001', 10);
 
-// Forcer HTTPS en production
+// ── HTTPS redirect en production ─────────────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {
   app.use((req, res, next) => {
     if (req.headers['x-forwarded-proto'] !== 'https') {
@@ -65,6 +59,7 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
+// ── Validation SESSION_SECRET ─────────────────────────────────────────────────
 const sessionSecret = process.env.SESSION_SECRET;
 if (!sessionSecret || sessionSecret.includes('change-me') || sessionSecret.length < 32) {
   logger.fatal('[FATAL] SESSION_SECRET must be at least 32 characters. Exiting.');
@@ -99,7 +94,6 @@ app.use((req, res, next) => {
         connectSrc: ["'self'"],
         fontSrc: ["'self'", "https://cdnjs.cloudflare.com", "https://fonts.gstatic.com"],
         objectSrc: ["'none'"],
-        mediaSrc: ["'self'"],
         frameSrc: ["'none'"],
       }
     },
@@ -151,7 +145,7 @@ app.use((req, res, next) => {
 app.use(csrfMiddleware);
 app.use(csrfValidation);
 
-// ── API Routes (AVANT le frontend Next.js) ──────────────────────────────────
+// ── API Routes ────────────────────────────────────────────────────────────────
 app.use('/api/auth/login', loginLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/logs', requireAuth, scopeGuard, logsRoutes);
@@ -165,22 +159,12 @@ app.get('/api/alerts/stream', requireAuth, (req, res) => {
   alertWorker.addClient(res, req);
 });
 
-// Route d'initialisation des utilisateurs
-app.get('/init-users-7x9k2', async (req, res) => {
-  try {
-    const { default: bcrypt } = await import('bcrypt');
-    const pool = (await import('./config/database.js')).default;
-    const adminHash = await bcrypt.hash('Admin@2026!', 12);
-    const userHash = await bcrypt.hash('User@2026!', 12);
-    await pool.execute(`INSERT INTO users (email,password_hash,display_name,role,is_active,created_at) VALUES (?,?,'Administrateur','admin',1,NOW()) ON DUPLICATE KEY UPDATE password_hash=VALUES(password_hash),is_active=1`, ['admin@logsystem.com', adminHash]);
-    await pool.execute(`INSERT INTO users (email,password_hash,display_name,role,is_active,created_at) VALUES (?,?,'Utilisateur Test','user',1,NOW()) ON DUPLICATE KEY UPDATE password_hash=VALUES(password_hash),is_active=1`, ['user@logsystem.com', userHash]);
-    res.json({ ok: true, users: ['admin@logsystem.com', 'user@logsystem.com'] });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+// Health check Express (avant Next.js)
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
 });
 
-// ── Frontend Next.js (mode standalone) ──────────────────────────────────────
-// Le build Next.js est dans .next/standalone/server.js
-// On sert les fichiers statiques Next.js buildés
+// ── Frontend Next.js ──────────────────────────────────────────────────────────
 const nextStaticDir = path.join(__dirname, '.next/static');
 const nextPublicDir = path.join(__dirname, 'public');
 
@@ -192,15 +176,11 @@ if (fs.existsSync(nextStaticDir)) {
   if (fs.existsSync(nextServerPath)) {
     logger.info('[NEXT] Using Next.js request handler');
     const next = (await import('next')).default;
-    const nextApp = next({
-      dev: false,
-      dir: __dirname,
-    });
+    const nextApp = next({ dev: false, dir: __dirname });
     await nextApp.prepare();
     const nextHandler = nextApp.getRequestHandler();
     app.all('*', (req, res) => nextHandler(req, res));
   } else {
-
     app.get('*', (req, res) => {
       const indexPath = path.join(nextPublicDir, 'index.html');
       if (fs.existsSync(indexPath)) {
@@ -211,27 +191,23 @@ if (fs.existsSync(nextStaticDir)) {
     });
   }
 } else {
-  // Next.js pas encore buildé — servir l'ancien frontend HTML
   logger.warn('[NEXT] Next.js build not found, serving static HTML frontend');
   const publicDir = path.join(__dirname, 'public');
   app.use(createHtmlCspMiddleware(publicDir));
   app.use(express.static(publicDir, { index: false }));
-
   app.get('/', (req, res) => {
     if (req.session?.user) return res.redirect('/dashboard.html');
     res.redirect('/login.html');
   });
-
   app.use((req, res) => { res.status(404).json({ error: 'Route non trouvée' }); });
 }
 
-
 app.use((err, req, res, _next) => {
-  logger.error('[ERROR]', err.message);
+  logger.error({ event: 'express_error', message: err.message, stack: err.stack, path: req.path });
   res.status(500).json({ error: 'Erreur interne du serveur' });
 });
 
-// ── Start ────────────────────────────────────────────────────────────────────
+// ── Startup ───────────────────────────────────────────────────────────────────
 async function start() {
   try {
     await testConnection();
@@ -241,16 +217,10 @@ async function start() {
     process.exit(1);
   }
 
-  logger.info({ event: 'starting_migrations' }, '[MIGRATION]');
-  const migrationsSucceeded = await runMigrations();
-  if (!migrationsSucceeded) {
-    logger.warn({ event: 'migrations_had_errors' }, '[MIGRATION]');
-  }
+  await runMigrations();
 
   const cacheStarted = await startCacheService();
-  if (!cacheStarted) {
-    logger.warn('[CACHE] Redis not available — running without cache (degraded mode)');
-  }
+  if (!cacheStarted) logger.warn('[CACHE] Redis not available — running without cache (degraded mode)');
 
   setAlertWorker(alertWorker);
   try { await startAlertEngine(); } catch (e) { logger.error({ event: 'alertEngineStartFailed', message: e.message }); }
@@ -258,14 +228,10 @@ async function start() {
   try { await startWatcher(); } catch (e) { logger.error({ event: 'watcherStartFailed', message: e.message }); }
 
   const logsDir = (process.env.WATCH_DIRS || './logs').split(',')[0].trim();
-  if (!fs.existsSync(logsDir)) {
-    fs.mkdirSync(logsDir, { recursive: true });
-  }
+  if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
 
   const server = app.listen(PORT, () => {
-    logger.info({ level: 'info', message: `[LogSystem] Running on http://localhost:${PORT}` });
-    logger.info({ level: 'info', message: `[LogSystem] Environment: ${process.env.NODE_ENV || 'development'}` });
-    logger.info({ level: 'info', message: `[LogSystem] Cache: ${cacheStarted ? 'Redis actif' : 'désactivé'}` });
+    logger.info({ event: 'server_started', port: PORT, env: process.env.NODE_ENV || 'development', cache: cacheStarted ? 'redis' : 'disabled' }, `[LogSystem] Running on http://localhost:${PORT}`);
   });
 
   const shutdown = (signal) => {

@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import crypto from 'crypto';
 import { db } from './db';
 
+// ── Lazy SESSION_SECRET (évite le crash au build Next.js) ────────────────────
 function getSessionSecret(): string {
   const secret = process.env.SESSION_SECRET;
   if (!secret || secret.length < 32) {
@@ -23,7 +24,7 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return bcrypt.compare(password, hash);
 }
 
-// ── Session token (HMAC-SHA256, cookie-based only — NO localStorage) ─────────
+// ── Session token (HMAC-SHA256, cookie-based only) ────────────────────────────
 function hmacSign(payload: string): string {
   return crypto.createHmac('sha256', getSessionSecret()).update(payload).digest('hex');
 }
@@ -45,7 +46,9 @@ export function verifySessionToken(token: string): { userId: string; version: nu
     const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf-8'));
     if (!payload.userId || payload.version === undefined) return null;
     return { userId: payload.userId, version: payload.version };
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 // ── Cookie management ─────────────────────────────────────────────────────────
@@ -86,8 +89,12 @@ export async function getAuthUser() {
   if (!user || !user.isActive) return null;
   if (user.sessionVersion !== decoded.version) return null;
   return {
-    id: user.id, email: user.email, displayName: user.displayName,
-    role: user.role, isActive: user.isActive, sessionVersion: user.sessionVersion,
+    id: user.id,
+    email: user.email,
+    displayName: user.displayName,
+    role: user.role,
+    isActive: user.isActive,
+    sessionVersion: user.sessionVersion,
   };
 }
 
