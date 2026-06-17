@@ -1,6 +1,6 @@
 import { Router } from "express";
 import logger from "../config/logger.js";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import pool from "../config/database.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { recordAudit } from "../middleware/audit.js";
