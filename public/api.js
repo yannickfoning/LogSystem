@@ -56,10 +56,23 @@
       return apiFetch(url, { method: 'PATCH', body: JSON.stringify(data !== undefined ? data : {}) });
     },
     upload: function(url, formData) {
-      return apiFetch(url, {
-        method: 'POST',
-        body: formData,
-        headers: {}
+      return new Promise(function(resolve, reject) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', url);
+        xhr.setRequestHeader('X-CSRF-Token', getCSRF());
+        xhr.timeout = 0;
+        xhr.withCredentials = true;
+        xhr.onload = function() {
+          if (xhr.status === 401) { window.location.href = '/login.html'; return; }
+          try { var d = JSON.parse(xhr.responseText);
+            if (xhr.status >= 200 && xhr.status < 300) resolve(d);
+            else reject(d && d.error ? d : { error: xhr.statusText });
+          } catch(e) { reject({ error: xhr.statusText }); }
+        };
+        xhr.onerror = function() { reject({ error: 'Erreur réseau' }); };
+        xhr.send(formData);
+      });
+    }
       });
     }
   };
