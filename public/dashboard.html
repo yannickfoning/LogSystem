@@ -670,7 +670,7 @@
     function loadTopErrors() {
       return api.get('/api/dashboard/top-errors?limit=5').then(function(d){
         var list = document.getElementById('top-errors-list');
-        if (!d || !d.length) { list.innerHTML='<p style="color:var(--text2);font-size:13px;text-align:center;padding:12px 0;">' + t('dashboard.no_error_groups') + '</p>'; return; }
+        d = d && (d.topErrors || d.errors || d); if (!Array.isArray(d) || !d.length) { list.innerHTML='<p style="color:var(--text2);font-size:13px;text-align:center;padding:12px 0;">' + t('dashboard.no_error_groups') + '</p>'; return; }
         list.innerHTML = d.map(function(g){
           var sampleId = g.sample_log_id || g.log_id || g.first_log_id || '';
           var fp = g.fingerprint || '';
@@ -690,7 +690,7 @@
     // ── Alertes ──
     function loadAlerts() {
       return api.get('/api/dashboard/alerts?limit=15&status=new').then(function(d){
-        var alerts = d && d.alerts ? d.alerts : (Array.isArray(d)?d:[]);
+        var alerts = Array.isArray(d) ? d : (d && d.alerts ? d.alerts : []);
         var tbody = document.getElementById('alerts-tbody');
         if (!alerts.length) {
           tbody.innerHTML = '<tr><td colspan="7" style="padding:20px;text-align:center;color:var(--text2);font-size:13px;">' + t('dashboard.no_alerts') + '</td></tr>';
