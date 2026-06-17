@@ -341,7 +341,7 @@ router.get('/top-errors', async (req, res) => {
   try {
     const scope = userScope(req);
     const limit = asInt(req.query.limit, 10);
-    const [rows] = await pool.execute(
+    const [rows] = await pool.query(
       `SELECT id, fingerprint, title, event_type, error_type, severity_max, occurrence_count,
               first_seen, previous_seen, last_seen, returned_at, return_reason, return_count,
               source_server, service, status, sample_log_id, user_id
