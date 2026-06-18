@@ -4,8 +4,8 @@ services:
     env: node
     region: frankfurt
     plan: starter
-    buildCommand: yarn install --frozen-lockfile --production
-    startCommand: node server.js
+    buildCommand: npm install --legacy-peer-deps && npm run build
+    startCommand: npm start
     healthCheckPath: /health
     autoDeploy: true
     envVars:
@@ -24,15 +24,8 @@ services:
         sync: false
       - key: DB_SSL
         value: "true"
-      - key: DB_SSL_CA_PATH
-        sync: false
-      # Mettre à "false" UNIQUEMENT si problème de certificat CA Aiven en transitoire
-      - key: DB_SSL_REJECT_UNAUTHORIZED
-        value: "true"
       # Application Configuration
       - key: SESSION_SECRET
-        generateValue: true
-      - key: CSRF_SECRET
         generateValue: true
       - key: BCRYPT_ROUNDS
         value: "12"
@@ -40,7 +33,3 @@ services:
         value: "3"
       - key: IMPORT_BATCH_SIZE
         value: "500"
-      - key: ALERT_EVAL_INTERVAL
-        value: "60000"
-      - key: UPLOAD_MAX_SIZE
-        value: "52428800"

@@ -18,6 +18,11 @@ import { recordAudit } from "../middleware/audit.js";
 import { validateBody, importUploadSchema } from "../middleware/validation.js";
 import { invalidateDashboard } from "../services/cacheService.js";
 import { extractArchive, isArchive } from "../lib/processing/archiveHandler.js";
+import busboy from 'busboy';
+import os from 'os';
+import fsp from 'fs/promises';
+import { createWriteStream } from 'fs';
+import { createHash } from 'crypto';
 
 const router = Router();
 router.use(requireAuth);
@@ -517,7 +522,18 @@ async function insertBatch(conn, batch, userId) {
 // ── POST /upload ──────────────────────────────────────────────────────────────
 router.post(
   "/upload",
-  upload.single("file"),
+  (req, res, next) => {
+    upload.single("file")(req, res, (err) => {
+      if (err) {
+        logger.warn({ event: "upload_rejected", error: err.message }, "[IMPORT]");
+        if (err instanceof multer.MulterError) {
+          return res.status(400).json({ error: `Erreur upload: ${err.message}` });
+        }
+        return res.status(400).json({ error: err.message });
+      }
+      next();
+    });
+  },
   validateBody(importUploadSchema),
   async (req, res) => {
     try {
@@ -610,7 +626,6 @@ router.get("/jobs", async (req, res) => {
 
     res.json(normalized);
   } catch (e) {
-    logger.error({ event: 'import_route_error', error: e.message }, '[IMPORT]');
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -627,7 +642,6 @@ router.get("/jobs/:id", async (req, res) => {
       return res.status(404).json({ error: "Job non trouvé" });
     res.json(rows[0]);
   } catch (e) {
-    logger.error({ event: 'import_route_error', error: e.message }, '[IMPORT]');
     res.status(500).json({ error: "Erreur serveur" });
   }
 });

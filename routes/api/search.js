@@ -141,13 +141,15 @@ router.get('/', async (req, res) => {
       params
     );
     const totalCount = countResult[0]?.total || 0;
+    
+    const isAdmin = req.session?.user?.role === 'admin';
 
     // Fetch logs avec pagination
     const [logs] = await pool.execute(
       `SELECT 
         id, timestamp, created_time, log_level, source, source_server, service, 
         message, normalized_message, event_type, fingerprint, module, error_type,
-        stack_trace, target_user, parser_format, timestamp_inferred, 
+        ${isAdmin ? 'stack_trace' : 'NULL as stack_trace'}, target_user, parser_format, timestamp_inferred, 
         classification_confidence
        FROM logs 
        WHERE ${whereClause}

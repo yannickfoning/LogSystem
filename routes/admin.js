@@ -30,7 +30,6 @@ router.get("/users", async (req, res) => {
     );
     res.json(rows);
   } catch (e) {
-    logger.error({ event: 'admin_route_error', error: e.message }, '[ADMIN]');
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -65,7 +64,6 @@ router.post("/users", validateBody(createUserSchema), async (req, res) => {
 
     res.json({ success: true, id: result.insertId });
   } catch (e) {
-    logger.error({ event: 'admin_route_error', error: e.message }, '[ADMIN]');
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -124,7 +122,6 @@ router.put("/users/:id", validateBody(updateUserSchema), async (req, res) => {
 
     res.json({ success: true });
   } catch (e) {
-    logger.error({ event: 'admin_route_error', error: e.message }, '[ADMIN]');
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -167,7 +164,6 @@ router.delete("/users/:id", async (req, res) => {
 
     res.json({ success: true });
   } catch (e) {
-    logger.error({ event: 'admin_route_error', error: e.message }, '[ADMIN]');
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -213,7 +209,6 @@ router.get("/alert-rules", async (req, res) => {
     );
     res.json(rows);
   } catch (e) {
-    logger.error({ event: 'admin_route_error', error: e.message }, '[ADMIN]');
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -258,7 +253,6 @@ router.post("/alert-rules", validateBody(alertRuleSchema), async (req, res) => {
 
     res.json({ success: true, id: result.insertId });
   } catch (e) {
-    logger.error({ event: 'admin_route_error', error: e.message }, '[ADMIN]');
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -329,7 +323,6 @@ router.put("/alert-rules/:id", async (req, res) => {
 
     res.json({ success: true });
   } catch (e) {
-    logger.error({ event: 'admin_route_error', error: e.message }, '[ADMIN]');
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -364,7 +357,6 @@ router.delete("/alert-rules/:id", async (req, res) => {
 
     res.json({ success: true });
   } catch (e) {
-    logger.error({ event: 'admin_route_error', error: e.message }, '[ADMIN]');
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -523,7 +515,6 @@ router.get("/retention/stats", async (req, res) => {
     const stats = await getRetentionStats(user.id);
     res.json(stats);
   } catch (e) {
-    logger.error({ event: 'admin_route_error', error: e.message }, '[ADMIN]');
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -542,7 +533,6 @@ router.post("/retention/run", async (req, res) => {
     });
     res.json(result);
   } catch (e) {
-    logger.error({ event: 'admin_route_error', error: e.message }, '[ADMIN]');
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -578,7 +568,6 @@ router.post("/purge", validateBody(purgeSchema), async (req, res) => {
 
     res.json({ deleted: result.affectedRows });
   } catch (e) {
-    logger.error({ event: 'admin_route_error', error: e.message }, '[ADMIN]');
     res.status(500).json({ error: "Erreur serveur" });
   }
 });

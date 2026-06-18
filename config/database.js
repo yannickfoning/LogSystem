@@ -16,6 +16,18 @@ export function levelSeverity(level) {
   return map[normalizeLevel(level)] || 0;
 }
 
+function readCaFile(path) {
+  if (!path) return undefined;
+  try {
+    if (fs.existsSync(path)) {
+      return fs.readFileSync(path);
+    }
+  } catch (err) {
+    logger.warn({ event: 'db_ca_read_error', path, error: err.message }, '[DB] Failed to read CA file.');
+  }
+  return undefined;
+}
+
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT || '3306', 10),
@@ -26,7 +38,7 @@ const dbConfig = {
   connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || '10', 10),
   queueLimit: parseInt(process.env.DB_QUEUE_LIMIT || '0', 10),
   ssl: process.env.DB_SSL === 'true' ? {
-    ca: process.env.DB_SSL_CA_PATH ? fs.readFileSync(process.env.DB_SSL_CA_PATH) : undefined,
+    ca: readCaFile(process.env.DB_SSL_CA_PATH),
     rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false'
   } : undefined
 };
@@ -55,8 +67,8 @@ export async function testConnection() {
 
 export function buildSslOptions() {
   if (process.env.DB_SSL === 'false' || !process.env.DB_SSL) return undefined;
-  const ca = process.env.DB_SSL_CA_PATH
-    ? fs.readFileSync(process.env.DB_SSL_CA_PATH)
-    : fs.existsSync('./ca.pem') ? fs.readFileSync('./ca.pem') : undefined;
+  let ca = readCaFile(process.env.DB_SSL_CA_PATH);
+  if (!ca) ca = readCaFile('./ca.pem');
+  
   return { ca, rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' };
 }
