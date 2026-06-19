@@ -6,74 +6,18 @@
   <title>LogSystem — Tableau de bord</title>
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/dashboard.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-  <style>
-    /* ── Modale générique ───────────────────────────────────────────── */
-    .modal-backdrop {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.65);
-      display: none; align-items: center; justify-content: center;
-      z-index: 10000; padding: 20px; backdrop-filter: blur(2px);
-    }
-    .modal-backdrop.show { display: flex; }
-    .modal-box {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 14px; max-width: 720px; width: 100%;
-      max-height: 85vh; overflow: hidden; display: flex; flex-direction: column;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-    }
-    .modal-box.large { max-width: 1100px; }
-    .modal-head {
-      padding: 14px 18px; border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    .modal-title { font-size: 14px; font-weight: 600; color: var(--text); display:flex; align-items:center; gap:8px; }
-    .modal-close {
-      background: transparent; border: none; color: var(--text2);
-      font-size: 22px; cursor: pointer; line-height: 1; padding: 0 6px;
-    }
-    .modal-close:hover { color: var(--text); }
-    .modal-body { padding: 16px 18px; overflow-y: auto; }
-    .modal-body dl { display:grid; grid-template-columns: 160px 1fr; gap: 8px 14px; font-size: 12.5px; margin: 0; }
-    .modal-body dt { color: var(--text2); font-weight: 500; }
-    .modal-body dd { margin: 0; color: var(--text); word-break: break-word; }
-    .modal-body pre {
-      background: var(--surface2); border: 1px solid var(--border);
-      border-radius: 8px; padding: 10px; font-size: 11.5px; max-height: 240px;
-      overflow: auto; margin: 8px 0 0; white-space: pre-wrap; word-break: break-word;
-    }
-    .modal-body .section-title {
-      font-size: 11px; text-transform: uppercase; letter-spacing: .5px;
-      color: var(--text2); margin: 16px 0 8px;
-    }
-
-    /* Trends header avec navigation date */
-    .trends-nav { display: flex; gap: 8px; align-items: center; }
-    .trends-nav .period-display {
-      font-size: 11.5px; color: var(--text2); padding: 4px 10px;
-      background: var(--surface2); border-radius: 6px; min-width: 200px; text-align:center;
-    }
-    #trends-wrapper { cursor: zoom-in; }
-    #trends-wrapper:hover { opacity: .95; }
-
-    /* Section admin */
-    .admin-only { display: none; }
-    body.is-admin .admin-only { display: block; }
-
-    .err-group { cursor: pointer; }
-    .err-group:hover { background: rgba(255,255,255,0.03); }
-  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" integrity="sha384-xscEkekms/SQq5SFOOIcbfflRgUup5sdW1duER21mIKxWcHi9Xyv37aIOSrCepJf" crossorigin="anonymous"></script>
 </head>
 <body>
 
   <nav class="navbar">
     <div class="brand">
-      <img src="/image/coleps.png" alt="Coleps"
-           style="height:36px;width:auto;object-fit:contain;border-radius:4px;">
+      <img src="/image/coleps.png" alt="Coleps" class="brand-logo-img">
       <span>LogSystem</span>
     </div>
     <button class="hamburger" id="hamburger-btn" aria-label="Menu" aria-expanded="false"><span></span><span></span><span></span></button>
     <ul class="nav-links" id="nav-links">
-      <li><a href="/dashboard.html" class="active" data-i18n="nav.dashboard">Tableau de bord</a></li>
+      <li><a href="/dashboard.html" aria-current="page" data-i18n="nav.dashboard">Tableau de bord</a></li>
       <li><a href="/search.html" data-i18n="nav.search">Recherche</a></li>
       <li><a href="/import.html" data-i18n="nav.import">Import</a></li>
       <li><a href="/watchlog.html" data-i18n="nav.watchlog">Watch Log</a></li>
@@ -86,7 +30,7 @@
     </div>
   </nav>
 
-  <div class="dash-layout">
+  <main class="dash-layout" role="main">
 
     <!-- Header row -->
     <div class="dash-header">
@@ -96,7 +40,7 @@
       </h1>
       <div class="dash-actions">
         <span id="refresh-indicator">⟳ Actualisation…</span>
-        <span id="last-refresh" style="font-size:11px;color:var(--text2);"></span>
+        <span id="last-refresh" class="text-kpi-trend"></span>
         <button class="btn btn-xs btn-secondary" id="btn-refresh">Actualiser</button>
       </div>
     </div>
@@ -142,36 +86,36 @@
     </div>
 
     <!-- KPI row 2 : INFO / WARNING / ERROR / CRITICAL breakdown (point 6) -->
-    <div class="kpi-row" style="margin-top:10px;">
-      <div class="kpi-card-v2" style="border-top:3px solid #6b7280;">
+    <div class="kpi-row kpi-row-gap">
+      <div class="kpi-card-v2 border-debug">
         <div class="kpi-icon">🔵</div>
         <div class="kpi-label-v2">DEBUG</div>
         <div class="kpi-value-v2" id="kpi-debug">—</div>
-        <div class="kpi-trend" id="kpi-debug-pct" style="font-size:11px;color:var(--text2);">— %</div>
+        <div class="kpi-trend text-kpi-trend" id="kpi-debug-pct">— %</div>
       </div>
-      <div class="kpi-card-v2" style="border-top:3px solid #4f8ef7;">
+      <div class="kpi-card-v2 border-info">
         <div class="kpi-icon">ℹ️</div>
         <div class="kpi-label-v2">INFO</div>
         <div class="kpi-value-v2" id="kpi-info">—</div>
-        <div class="kpi-trend" id="kpi-info-pct" style="font-size:11px;color:var(--text2);">— %</div>
+        <div class="kpi-trend text-kpi-trend" id="kpi-info-pct">— %</div>
       </div>
-      <div class="kpi-card-v2" style="border-top:3px solid #f59e0b;">
+      <div class="kpi-card-v2 border-warning">
         <div class="kpi-icon">⚠️</div>
         <div class="kpi-label-v2">WARNING</div>
         <div class="kpi-value-v2" id="kpi-warning">—</div>
-        <div class="kpi-trend" id="kpi-warning-pct" style="font-size:11px;color:var(--text2);">— %</div>
+        <div class="kpi-trend text-kpi-trend" id="kpi-warning-pct">— %</div>
       </div>
-      <div class="kpi-card-v2" style="border-top:3px solid #ef4444;">
+      <div class="kpi-card-v2 border-error">
         <div class="kpi-icon">❌</div>
         <div class="kpi-label-v2">ERROR</div>
         <div class="kpi-value-v2" id="kpi-error">—</div>
-        <div class="kpi-trend" id="kpi-error-pct" style="font-size:11px;color:var(--text2);">— %</div>
+        <div class="kpi-trend text-kpi-trend" id="kpi-error-pct">— %</div>
       </div>
-      <div class="kpi-card-v2" style="border-top:3px solid #8b5cf6;">
+      <div class="kpi-card-v2 border-critical">
         <div class="kpi-icon">🔴</div>
         <div class="kpi-label-v2">CRITICAL</div>
         <div class="kpi-value-v2" id="kpi-critical">—</div>
-        <div class="kpi-trend" id="kpi-critical-pct" style="font-size:11px;color:var(--text2);">— %</div>
+        <div class="kpi-trend text-kpi-trend" id="kpi-critical-pct">— %</div>
       </div>
     </div>
 
@@ -190,16 +134,16 @@
           <button class="btn btn-xs btn-secondary" id="trends-expand" data-i18n-title="dashboard.expand_chart" title="Agrandir le graphique">⛶</button>
         </div>
       </div>
-      <div class="card-v2-body" style="padding-bottom:8px;">
-        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;font-size:11px;">
-          <span><span style="display:inline-block;width:10px;height:10px;background:#4f8ef7;border-radius:2px;margin-right:4px;"></span>INFO</span>
-          <span><span style="display:inline-block;width:10px;height:10px;background:#f59e0b;border-radius:2px;margin-right:4px;"></span>WARNING</span>
-          <span><span style="display:inline-block;width:10px;height:10px;background:#ef4444;border-radius:2px;margin-right:4px;"></span>ERROR</span>
-          <span><span style="display:inline-block;width:10px;height:10px;background:#8b5cf6;border-radius:2px;margin-right:4px;"></span>CRITICAL</span>
-          <span><span style="display:inline-block;width:10px;height:10px;background:#fc5c65;border-radius:2px;margin-right:4px;"></span>FATAL</span>
-          <span><span style="display:inline-block;width:10px;height:10px;background:#6b7280;border-radius:2px;margin-right:4px;"></span>DEBUG</span>
+      <div class="card-v2-body card-v2-body-tight">
+        <div class="chart-legend">
+          <span><span class="legend-dot legend-info"></span>INFO</span>
+          <span><span class="legend-dot legend-warning"></span>WARNING</span>
+          <span><span class="legend-dot legend-error"></span>ERROR</span>
+          <span><span class="legend-dot legend-critical"></span>CRITICAL</span>
+          <span><span class="legend-dot legend-fatal"></span>FATAL</span>
+          <span><span class="legend-dot legend-debug"></span>DEBUG</span>
         </div>
-        <div id="trends-wrapper" style="position:relative;height:240px;" title="Cliquer pour agrandir">
+        <div id="trends-wrapper" title="Cliquer pour agrandir">
           <canvas id="trends-chart" role="img" aria-label="Graphique des tendances de logs">Aucune donnée disponible.</canvas>
         </div>
       </div>
@@ -207,7 +151,7 @@
 
     <!-- Main grid -->
     <div class="main-grid">
-      <div style="display:flex;flex-direction:column;gap:16px;">
+      <div class="col-stack">
         <div class="card-v2">
           <div class="card-v2-header">
             <div class="card-v2-title">
@@ -222,8 +166,8 @@
                 <tr><th>Heure</th><th>Niveau</th><th>Source</th><th>Type</th><th>Empreinte</th><th>Message</th></tr>
               </thead>
               <tbody id="logs-tbody">
-                <tr><td colspan="6"><div class="skeleton" style="height:16px;margin:8px 0;"></div></td></tr>
-                <tr><td colspan="6"><div class="skeleton" style="height:16px;margin:8px 0;width:80%;"></div></td></tr>
+                <tr><td colspan="6"><div class="skeleton skeleton-line"></div></td></tr>
+                <tr><td colspan="6"><div class="skeleton skeleton-line w-80"></div></td></tr>
               </tbody>
             </table>
           </div>
@@ -238,24 +182,24 @@
           </div>
           <div class="card-v2-body">
             <div id="top-errors-list">
-              <div class="skeleton" style="height:48px;margin-bottom:8px;border-radius:8px;"></div>
-              <div class="skeleton" style="height:48px;margin-bottom:8px;border-radius:8px;width:85%;"></div>
+              <div class="skeleton skeleton-block"></div>
+              <div class="skeleton skeleton-block w-85"></div>
             </div>
           </div>
         </div>
       </div>
 
-      <div style="display:flex;flex-direction:column;gap:16px;">
+      <div class="col-stack">
         <div class="card-v2">
           <div class="card-v2-header">
             <div class="card-v2-title">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
               <span data-i18n="dashboard.alerts">Alertes</span>
-              <span id="alert-badge" style="background:var(--accent-red);color:#fff;font-size:10px;padding:1px 5px;border-radius:4px;display:none;">0</span>
+              <span id="alert-badge" class="alert-badge-count is-hidden">0</span>
             </div>
             <button class="btn btn-xs btn-secondary" id="mark-all-read" data-i18n="dashboard.mark_all_read">Tout lire</button>
           </div>
-          <div class="scroll-y" style="max-height:280px;">
+          <div class="scroll-y scroll-y-sm" aria-live="polite">
             <div id="alerts-list">
               <table class="alert-widget-table">
                 <thead>
@@ -269,8 +213,8 @@
                     <th></th>
                   </tr>
                 </thead>
-                <tbody id="alerts-tbody">
-                  <tr><td colspan="7" style="padding:16px;text-align:center;color:var(--text2);">Chargement…</td></tr>
+                <tbody id="alerts-tbody" aria-live="polite">
+                  <tr><td colspan="7" class="cell-loading">Chargement…</td></tr>
                 </tbody>
               </table>
             </div>
@@ -284,8 +228,8 @@
               Répartition par niveau
             </div>
           </div>
-          <div class="card-v2-body" style="padding-bottom:4px;">
-            <div style="position:relative;height:180px;">
+          <div class="card-v2-body card-v2-body-tight">
+            <div class="chart-box-sm">
               <canvas id="level-chart" role="img" aria-label="Répartition des niveaux">Aucune donnée.</canvas>
             </div>
           </div>
@@ -297,9 +241,9 @@
             <div class="card-v2-title">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
               État système & Watchdogs
-              <span style="font-size:10px;color:var(--text2);font-weight:500;">(admin)</span>
+              <span class="admin-hint">(admin)</span>
             </div>
-            <button class="btn btn-xs btn-secondary" id="refresh-watchdogs" title="Rafraîchir">⟳</button>
+            <button class="btn btn-xs btn-secondary" id="refresh-watchdogs" title="Rafraîchir" aria-label="Rafraîchir l'état système">⟳</button>
           </div>
           <div class="card-v2-body">
             <div class="status-row">
@@ -318,17 +262,15 @@
               <span class="status-label"><span class="status-dot ok"></span>Watcher</span>
               <span class="status-val" id="status-watcher">—</span>
             </div>
-            <div class="section-title" style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin:14px 0 6px;">Watchdogs</div>
+            <div class="section-title-sm">Watchdogs</div>
             <div id="watchdogs-list">
-              <div style="font-size:12px;color:var(--text2);padding:6px 0;">Chargement…</div>
+              <div class="status-loading">Chargement…</div>
             </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
-
-  <!-- ── Modales ───────────────────────────────────────────────────── -->
+  </main>
   <div class="modal-backdrop" id="modal-detail">
     <div class="modal-box" id="modal-detail-box">
       <div class="modal-head">
@@ -346,7 +288,7 @@
         <button class="modal-close" data-close="modal-chart">×</button>
       </div>
       <div class="modal-body">
-        <div style="position:relative;height:60vh;">
+        <div class="chart-box-lg">
           <canvas id="trends-chart-large"></canvas>
         </div>
       </div>
@@ -556,7 +498,7 @@
         if (trendsChart) { trendsChart.destroy(); trendsChart = null; }
         if (!hasAny) {
           var w = document.getElementById('trends-wrapper');
-          w.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text2)">' + t('dashboard.no_period_data') + '</div>';
+          w.innerHTML = '<div class="trends-empty">' + t('dashboard.no_period_data') + '</div>';
           setTimeout(function(){ w.innerHTML = '<canvas id="trends-chart" role="img" aria-label="Graphique des tendances de logs">' + t('dashboard.no_data') + '</canvas>'; }, 0);
           return;
         }
@@ -615,7 +557,7 @@
         animateValue('kpi-sources', d.source_count || 0);
 
         var ab = document.getElementById('alert-badge');
-        if (d.unread_alerts>0){ ab.style.display=''; ab.textContent=d.unread_alerts; } else ab.style.display='none';
+        if (d.unread_alerts>0){ ab.classList.remove('is-hidden'); ab.textContent=d.unread_alerts; } else ab.classList.add('is-hidden');
 
         document.getElementById('kpi-total-trend').textContent = t('dashboard.kpi.total_cumulative');
         document.getElementById('kpi-today-trend').textContent = t('dashboard.kpi.today_since_midnight');
@@ -652,7 +594,7 @@
       return api.get('/api/logs?limit=20&sort=timestamp&order=desc').then(function(d){
         var rows = d && d.data ? d.data : [];
         var tbody = document.getElementById('logs-tbody');
-        if (!rows.length) { tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:20px;">' + t('dashboard.no_logs') + '</td></tr>'; return; }
+        if (!rows.length) { tbody.innerHTML='<tr><td colspan="6" class="cell-empty">' + t('dashboard.no_logs') + '</td></tr>'; return; }
         tbody.innerHTML = rows.map(function(r){
           return '<tr class="log-row-link" data-log-id="'+r.id+'">'
             + '<td class="cell-muted cell-nowrap">'+timeAgo(r.timestamp)+'</td>'
@@ -670,16 +612,17 @@
     function loadTopErrors() {
       return api.get('/api/dashboard/top-errors?limit=5').then(function(d){
         var list = document.getElementById('top-errors-list');
-        d = d && (d.topErrors || d.errors || d); if (!Array.isArray(d) || !d.length) { list.innerHTML='<p style="color:var(--text2);font-size:13px;text-align:center;padding:12px 0;">' + t('dashboard.no_error_groups') + '</p>'; return; }
+        d = d && (d.topErrors || d.errors || d);
+        if (!Array.isArray(d) || !d.length) { list.innerHTML='<p class="cell-empty">' + t('dashboard.no_error_groups') + '</p>'; return; }
         list.innerHTML = d.map(function(g){
           var sampleId = g.sample_log_id || g.log_id || g.first_log_id || '';
           var fp = g.fingerprint || '';
-          return '<div class="err-group" data-sample-log-id="'+esc(sampleId)+'" data-fingerprint="'+esc(fp)+'" title="Details du groupe">'
+          return '<div class="err-group" data-sample-log-id="'+escAttr(sampleId)+'" data-fingerprint="'+escAttr(fp)+'" title="Details du groupe">'
             + '<div class="err-count">'+(g.occurrence_count||1)+'</div>'
-            + '<div style="overflow:hidden;flex:1;">'
-            + '<div class="err-title" title="'+esc(g.title)+'">'+esc(g.title||'Erreur inconnue')+'</div>'
+            + '<div class="flex-1 overflow-hidden">'
+            + '<div class="err-title" title="'+escAttr(g.title)+'">'+esc(g.title||'Erreur inconnue')+'</div>'
             + '<div class="err-meta">'+esc(g.event_type||'')+' · '+lvlBadge(g.severity_max)+'</div>'
-            + '<div class="err-meta" style="margin-top:4px;font-size:11px;color:var(--text2);">' +
+            + '<div class="err-meta text-kpi-trend">' +
               '1re: '+esc(fmtDateTime(g.first_seen)||'–')+' · Dernière: '+esc(fmtDateTime(g.last_seen)||'–')+
             '</div>'
             + '</div></div>';
@@ -693,7 +636,7 @@
         var alerts = Array.isArray(d) ? d : (d && d.alerts ? d.alerts : []);
         var tbody = document.getElementById('alerts-tbody');
         if (!alerts.length) {
-          tbody.innerHTML = '<tr><td colspan="7" style="padding:20px;text-align:center;color:var(--text2);font-size:13px;">' + t('dashboard.no_alerts') + '</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="7" class="cell-empty">' + t('dashboard.no_alerts') + '</td></tr>';
           return;
         }
         tbody.innerHTML = alerts.map(function(a){
@@ -706,50 +649,23 @@
           var type = (a.alert_type || a.rule_name || 'Alerte').substring(0,18);
           var sevClass = 'badge-'+(a.severity||'medium');
           var isNew = a.status === 'new';
-          return '<tr class="'+(isNew?'alert-new':'')+'" data-alert-id="'+esc(String(a.id))+'" style="cursor:pointer;" onclick="markAlertRead('+a.id+')">'
-            + '<td class="col-type" title="'+esc(type)+'">'+esc(type.length>16?type.substring(0,16)+'…':type)+'</td>'
+          return '<tr class="'+(isNew?'alert-new':'')+' alert-row-clickable" data-alert-id="'+escAttr(String(a.id))+'">'
+            + '<td class="col-type" title="'+escAttr(type)+'">'+esc(type.length>16?type.substring(0,16)+'…':type)+'</td>'
             + '<td class="col-sev"><span class="'+sevClass+'">'+esc(a.severity||'medium')+'</span></td>'
-            + '<td class="col-occ" style="text-align:center;">'+occ+'</td>'
+            + '<td class="col-occ alert-col-center">'+occ+'</td>'
             + '<td class="col-date">'+dateStr+'</td>'
             + '<td class="col-time">'+timeStr+'</td>'
-            + '<td class="col-dir" title="'+esc(dir)+'">'+esc(dir.length>20?dir.substring(0,20)+'…':dir)+'</td>'
-            + '<td style="text-align:right;"><button class="btn btn-xs" onclick="event.stopPropagation();markAlertRead('+a.id+')" title="Marquer lu" style="padding:2px 6px;font-size:10px;">✓</button></td>'
+            + '<td class="col-dir" title="'+escAttr(dir)+'">'+esc(dir.length>20?dir.substring(0,20)+'…':dir)+'</td>'
+            + '<td class="alert-col-right"><button type="button" class="btn btn-xs btn-mark-read" data-alert-id="'+escAttr(String(a.id))+'" title="Marquer lu" aria-label="Marquer alerte comme lue">✓</button></td>'
             + '</tr>';
         }).join('');
-        // Click to open modal with full alert info
-        tbody.querySelectorAll('tr[data-alert-id]').forEach(function(row){
-          row.addEventListener('click', function(){
-            var id = row.getAttribute('data-alert-id');
-            var alert = alerts.find(function(a){ return String(a.id)===id; });
-            if (alert) showAlertDetail(alert);
+        tbody.querySelectorAll('.btn-mark-read').forEach(function(btn){
+          btn.addEventListener('click', function(e){
+            e.stopPropagation();
+            markAlertRead(btn.getAttribute('data-alert-id'));
           });
         });
       });
-    }
-
-    function showAlertDetail(a) {
-      var meta = a.metadata ? (typeof a.metadata === 'string' ? JSON.parse(a.metadata||'{}') : a.metadata) : {};
-      var dt = a.created_at ? new Date(a.created_at) : null;
-      var html = '<dl style="display:grid;grid-template-columns:120px 1fr;gap:6px 12px;font-size:12.5px;">'
-        + '<dt style="color:var(--text2)">Type</dt><dd>'+(a.alert_type||'—')+'</dd>'
-        + '<dt style="color:var(--text2)">Gravité</dt><dd><span class="badge-'+(a.severity||'medium')+'">'+(a.severity||'medium')+'</span></dd>'
-        + '<dt style="color:var(--text2)">Statut</dt><dd>'+(a.status||'—')+'</dd>'
-        + '<dt style="color:var(--text2)">Date</dt><dd>'+(dt?dt.toLocaleString('fr-FR'):'—')+'</dd>'
-        + '<dt style="color:var(--text2)">Message</dt><dd>'+(a.message||'—')+'</dd>'
-        + (meta.directory?'<dt style="color:var(--text2)">Répertoire</dt><dd>'+esc(meta.directory)+'</dd>':'')
-        + (meta.count?'<dt style="color:var(--text2)">Occurrences</dt><dd>'+meta.count+'</dd>':'')
-        + '</dl>';
-      var modal = document.getElementById('modal-alert-detail');
-      if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'modal-alert-detail';
-        modal.className = 'modal-backdrop';
-        modal.innerHTML = '<div class="modal-box"><div class="modal-head"><span class="modal-title">Detail alerte</span><button class="modal-close" onclick="document.querySelectorAll(&quot;.modal-backdrop&quot;).forEach(function(m){m.classList.remove(&quot;show&quot;)})" >&times;</button></div><div class="modal-body" id="modal-alert-body"></div></div>';
-        document.body.appendChild(modal);
-        modal.addEventListener('click', function(e){ if(e.target===modal) modal.classList.remove('show'); });
-      }
-      document.getElementById('modal-alert-body').innerHTML = html;
-      modal.classList.add('show');
     }
 
     function markAlertRead(id){
@@ -808,7 +724,7 @@ function showErrorGroupDetail(fingerprint, fallbackLogId) {
       '<tr><td style="padding:5px 8px;color:var(--text2)">Utilisateurs touches</td>'                  + '<td style="padding:5px 8px">' + esc(users) + '</td></tr>' +
       '</table>' +
       (d.suggestion ? '<div style="background:rgba(14,165,233,0.08);border-left:3px solid var(--accent-blue);padding:10px 14px;border-radius:6px;font-size:12px;margin-bottom:12px"><strong>Suggestion :</strong><br>' + esc(d.suggestion) + '</div>' : '') +
-      (fallbackLogId ? '<button class="btn btn-sm btn-secondary" onclick="(function(){document.querySelectorAll(\'.modal-backdrop.show\').forEach(function(m){m.classList.remove(\'show\')});showLogDetail(\''+esc(fallbackLogId)+'\')})()">Voir le log exemple</button>' : '') +
+      (fallbackLogId ? '<button type="button" class="btn btn-sm btn-secondary" id="btn-show-sample-log" data-log-id="'+escAttr(String(fallbackLogId))+'">Voir le log exemple</button>' : '') +
       (fingerprint ? ' <a class="btn btn-sm btn-primary" href="/search.html?fingerprint='+encodeURIComponent(fingerprint)+'">Voir dans la recherche</a>' : '');
   }).catch(function(e) {
     if (fallbackLogId) { showLogDetail(fallbackLogId); }
@@ -855,6 +771,12 @@ function showLogDetail(logId){
     });
 
     document.getElementById('top-errors-list').addEventListener('click', function(e){
+      var btn = e.target.closest('#btn-show-sample-log');
+      if (btn) {
+        document.querySelectorAll('.modal-backdrop.show').forEach(function(m){ m.classList.remove('show'); });
+        showLogDetail(btn.getAttribute('data-log-id'));
+        return;
+      }
       var g = e.target.closest('.err-group');
       if (!g) return;
       var sample = g.getAttribute('data-sample-log-id');
@@ -863,8 +785,12 @@ function showLogDetail(logId){
     });
 
     document.getElementById('alerts-list').addEventListener('click', function(e){
-      var item = e.target.closest('[data-alert-id]');
-      if (item) showAlertDetail(item.getAttribute('data-alert-id'));
+      if (e.target.closest('.btn-mark-read')) return;
+      var item = e.target.closest('tr[data-alert-id]');
+      if (item) {
+        var id = item.getAttribute('data-alert-id');
+        showAlertDetail(id);
+      }
     });
 
     document.getElementById('mark-all-read').addEventListener('click', function(){
@@ -885,6 +811,36 @@ function showLogDetail(logId){
     });
 
     // ── Watchdogs + système (admin) ──
+    function loadSystemStatus(){
+      if (!isAdmin()) {
+        document.querySelectorAll('.admin-only').forEach(function(el){ el.style.display = 'none'; });
+        return;
+      }
+      fetch('/api/dashboard/system', { credentials: 'same-origin' })
+        .then(function(r){
+          if (r.status === 403) {
+            document.body.classList.remove('is-admin');
+            document.querySelectorAll('.admin-only').forEach(function(el){ el.style.display = 'none'; });
+            return null;
+          }
+          if (!r.ok) return null;
+          return r.json();
+        })
+        .then(function(d){
+          if (!d) return;
+          var sys = d.system || d;
+          var dbEl = document.getElementById('status-db');
+          if (dbEl) dbEl.textContent = sys.db === 'ok' ? '✅ Connectée' : '❌ ' + (sys.db || '—');
+          var redisEl = document.getElementById('status-redis');
+          var redisDot = document.getElementById('status-redis-dot');
+          if (redisEl) redisEl.textContent = sys.redis === 'ok' ? '✅ Actif' : (sys.redis === 'unavailable' ? '— Indisponible' : '❌ Erreur');
+          if (redisDot) redisDot.className = 'status-dot ' + (sys.redis === 'ok' ? 'ok' : 'warn');
+          var wEl = document.getElementById('status-watcher');
+          if (wEl && sys.watcher) wEl.textContent = sys.watcher.running !== false ? '✅ Actif' : '⏸ Arrêté';
+        })
+        .catch(function(){});
+    }
+
     function loadWatchdogs(){
       if (!isAdmin()) return;
       api.get('/api/watchdogs/status').then(function(d){
@@ -918,7 +874,7 @@ function showLogDetail(logId){
     window.refreshAll = function(){
       setRefreshing(true);
       Promise.all([loadSummary(), loadTrends(), loadRecentLogs(), loadTopErrors(), loadAlerts()])
-        .then(function(){ loadLevelChart(); if (isAdmin()) loadWatchdogs(); updateLastRefresh(); })
+        .then(function(){ loadLevelChart(); if (isAdmin()) { loadWatchdogs(); loadSystemStatus(); } updateLastRefresh(); })
         .catch(function(){})
         .finally(function(){ setRefreshing(false); });
     };

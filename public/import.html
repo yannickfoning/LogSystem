@@ -1,10 +1,11 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title data-i18n="app.title">LogSystem - Import</title>
-        <link rel="stylesheet" href="/styles.css" />
+        <title>LogSystem — Import</title>
+        <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/import.css">
     </head>
     <body>
         <nav class="navbar">
@@ -12,12 +13,7 @@
                 <img
                     src="/image/coleps.png"
                     alt="Coleps"
-                    style="
-                        height: 36px;
-                        width: auto;
-                        object-fit: contain;
-                        border-radius: 4px;
-                    "
+                    class="brand-logo-img"
                 />
                 <span>LogSystem</span>
             </div>
@@ -39,9 +35,12 @@
                     <a href="/search.html" data-i18n="nav.search">Recherche</a>
                 </li>
                 <li>
-                    <a href="/import.html" class="active" data-i18n="nav.import"
+                    <a href="/import.html" aria-current="page" data-i18n="nav.import"
                         >Import</a
                     >
+                </li>
+                <li>
+                    <a href="/watchlog.html" data-i18n="nav.watchlog">Watch Log</a>
                 </li>
                 <li>
                     <a href="/admin.html" id="admin-link" data-i18n="nav.admin"
@@ -62,7 +61,7 @@
             </div>
         </nav>
 
-        <div class="page-container">
+        <main class="page-container import-page" role="main">
             <h1 class="page-title" data-i18n="import.title">Import de logs</h1>
 
             <div class="card mb-24">
@@ -184,9 +183,7 @@
                     </table>
                 </div>
             </div>
-        </div>
-
-        <div class="toast-container"></div>
+        </main>
 
         <div class="toast-container"></div>
 

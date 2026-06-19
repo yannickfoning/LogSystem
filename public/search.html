@@ -3,21 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title data-i18n="app.title">LogSystem - Recherche</title>
+  <title>LogSystem — Recherche</title>
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/search.css">
 </head>
 <body>
   <nav class="navbar">
     <div class="brand">
-      <img src="/image/coleps.png" alt="Coleps"
-           style="height:36px;width:auto;object-fit:contain;border-radius:4px;">
+      <img src="/image/coleps.png" alt="Coleps" class="brand-logo-img">
       <span>LogSystem</span>
     </div>
     <button class="hamburger" id="hamburger-btn" aria-label="Menu" aria-expanded="false"><span></span><span></span><span></span></button>
     <ul class="nav-links" id="nav-links">
       <li><a href="/dashboard.html" data-i18n="nav.dashboard">Tableau de bord</a></li>
-      <li><a href="/search.html" class="active" data-i18n="nav.search">Recherche</a></li>
+      <li><a href="/search.html" aria-current="page" data-i18n="nav.search">Recherche</a></li>
       <li><a href="/import.html" data-i18n="nav.import">Import</a></li>
+      <li><a href="/watchlog.html" data-i18n="nav.watchlog">Watch Log</a></li>
       <li><a href="/admin.html" id="admin-link" data-i18n="nav.admin">Administration</a></li>
     </ul>
     <div class="nav-right">
@@ -27,10 +28,10 @@
     </div>
   </nav>
 
-  <div class="page-container">
+  <main class="page-container" role="main">
     <h1 class="page-title" data-i18n="search.title">Recherche de logs</h1>
 
-    <div class="chips">
+    <div class="chips" role="group" aria-label="Filtres rapides">
       <button class="chip" data-chip="today" data-i18n="search.chip.today">Aujourd'hui</button>
       <button class="chip" data-chip="last-hour" data-i18n="search.chip.last_hour">Dernière heure</button>
       <button class="chip" data-chip="24h" data-i18n="search.chip.24h">24 heures</button>
@@ -40,17 +41,15 @@
     </div>
 
     <!-- Recherche avancée (point 7) — Filtres: Date, Heure, Niveau, Application, Répertoire, Source, Mot-clé -->
-    <div class="card" style="padding:14px;margin-bottom:16px;">
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:10px;">
-        <!-- Mot-clé -->
+    <div class="card search-filters-card">
+      <div class="filter-grid">
         <div class="form-group">
-          <label style="font-size:11px;color:var(--text2);margin-bottom:4px;display:block;">🔍 Mot-clé</label>
-          <input type="text" id="f-search" placeholder="Rechercher..." autocomplete="off" style="width:100%;">
+          <label class="filter-label" for="f-search">Mot-clé</label>
+          <input type="text" id="f-search" placeholder="Rechercher..." autocomplete="off">
         </div>
-        <!-- Niveau -->
         <div class="form-group">
-          <label style="font-size:11px;color:var(--text2);margin-bottom:4px;display:block;">📊 Niveau</label>
-          <select id="f-level" style="width:100%;">
+          <label class="filter-label" for="f-level">Niveau</label>
+          <select id="f-level">
             <option value="">Tous les niveaux</option>
             <option value="DEBUG">DEBUG</option>
             <option value="INFO">INFO</option>
@@ -60,45 +59,38 @@
             <option value="FATAL">FATAL</option>
           </select>
         </div>
-        <!-- Source -->
         <div class="form-group">
-          <label style="font-size:11px;color:var(--text2);margin-bottom:4px;display:block;">📂 Source</label>
-          <input type="text" id="f-source" placeholder="Source / serveur" style="width:100%;">
+          <label class="filter-label" for="f-source">Source</label>
+          <input type="text" id="f-source" placeholder="Source / serveur">
         </div>
-        <!-- Application / Service -->
         <div class="form-group">
-          <label style="font-size:11px;color:var(--text2);margin-bottom:4px;display:block;">📱 Application</label>
-          <input type="text" id="f-service" placeholder="Service / application" style="width:100%;">
+          <label class="filter-label" for="f-service">Application</label>
+          <input type="text" id="f-service" placeholder="Service / application">
         </div>
-        <!-- Répertoire (source_server) -->
         <div class="form-group">
-          <label style="font-size:11px;color:var(--text2);margin-bottom:4px;display:block;">📁 Répertoire</label>
-          <input type="text" id="f-directory" placeholder="Répertoire / serveur" style="width:100%;">
+          <label class="filter-label" for="f-directory">Répertoire</label>
+          <input type="text" id="f-directory" placeholder="Répertoire / serveur">
         </div>
-        <!-- Utilisateur -->
         <div class="form-group">
-          <label style="font-size:11px;color:var(--text2);margin-bottom:4px;display:block;">👤 Utilisateur</label>
-          <input type="text" id="f-target-user" placeholder="Utilisateur cible" autocomplete="off" style="width:100%;">
+          <label class="filter-label" for="f-target-user">Utilisateur</label>
+          <input type="text" id="f-target-user" placeholder="Utilisateur cible" autocomplete="off">
         </div>
-        <!-- Date de -->
         <div class="form-group">
-          <label style="font-size:11px;color:var(--text2);margin-bottom:4px;display:block;">📅 Date / Heure de</label>
-          <input type="datetime-local" id="f-date-from" style="width:100%;">
+          <label class="filter-label" for="f-date-from">Date / Heure de</label>
+          <input type="datetime-local" id="f-date-from">
         </div>
-        <!-- Date à -->
         <div class="form-group">
-          <label style="font-size:11px;color:var(--text2);margin-bottom:4px;display:block;">📅 Date / Heure à</label>
-          <input type="datetime-local" id="f-date-to" style="width:100%;">
+          <label class="filter-label" for="f-date-to">Date / Heure à</label>
+          <input type="datetime-local" id="f-date-to">
         </div>
       </div>
-      <!-- Exemple de recherche combinée -->
-      <div style="font-size:11px;color:var(--text2);margin-bottom:10px;">
-        💡 Recherche combinée ex: <code style="background:var(--surface2);padding:2px 5px;border-radius:4px;">ERROR + nginx + 03/06/2026</code>
+      <div class="search-hint">
+        Recherche combinée ex: <code>ERROR + nginx + 03/06/2026</code>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-        <button class="btn btn-primary" id="search-btn">🔍 Rechercher</button>
-        <button class="btn btn-secondary" id="reset-btn" style="font-size:12px;">✕ Réinitialiser</button>
-        <span id="search-combo-hint" style="font-size:11px;color:var(--text2);margin-left:8px;"></span>
+      <div class="search-actions">
+        <button class="btn btn-primary" id="search-btn">Rechercher</button>
+        <button class="btn btn-secondary" id="reset-btn">Réinitialiser</button>
+        <span id="search-combo-hint" class="search-combo-hint"></span>
       </div>
     </div>
 
@@ -109,14 +101,15 @@
         <button class="btn btn-sm btn-secondary" id="export-pdf" data-i18n="search.export_pdf">Export PDF</button>
       </div>
     </div>
-    <div class="card card-small mb-16" id="group-counts" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+    <div id="facets-bar" class="facets-bar" aria-live="polite"></div>
+    <div class="card card-small mb-16 group-counts-grid" id="group-counts">
       <div class="card-section">
         <div class="section-title">Types d'événements</div>
-        <div id="event-type-counts" class="chip-list" style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px;color:var(--text1);"></div>
+        <div id="event-type-counts" class="chip-list"></div>
       </div>
       <div class="card-section">
         <div class="section-title">Types d'erreur</div>
-        <div id="error-type-counts" class="chip-list" style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px;color:var(--text1);"></div>
+        <div id="error-type-counts" class="chip-list"></div>
       </div>
     </div>
     <div class="text-hint mb-8">
@@ -125,7 +118,7 @@
 
     <div class="card">
       <div class="table-wrapper">
-        <table>
+        <table class="search-table">
           <thead>
             <tr>
               <th data-i18n="common.timestamp">Horodatage</th>
@@ -137,12 +130,12 @@
               <th data-i18n="common.message">Message</th>
             </tr>
           </thead>
-          <tbody id="logs-body"></tbody>
+          <tbody id="logs-body" aria-live="polite"></tbody>
         </table>
       </div>
       <div id="logs-pagination"></div>
     </div>
-  </div>
+  </main>
 
   <div class="modal-overlay" id="detail-modal">
     <div class="modal modal-wide">
@@ -181,37 +174,43 @@
 
       window.loadPage = function(page) {
         currentPage = page;
+        window.scrollTo(0, 0);
         doSearch();
       };
 
+      function renderFacets(facets) {
+        var bar = document.getElementById('facets-bar');
+        if (!bar) return;
+        if (!facets || !Object.keys(facets).length) { bar.innerHTML = ''; return; }
+        bar.innerHTML = Object.keys(facets).map(function(key) {
+          return '<span class="facet-badge">' + esc(key) + ' <strong>' + facets[key] + '</strong></span>';
+        }).join('');
+      }
+
       function doSearch() {
-        var params = getParams();
-        loadGroupCounts(params);
-        api.get('/api/logs?' + buildQuery(params)).then(function(resp) {
-          currentPage = resp.pagination.page || 1;
-          totalPages = resp.pagination.pages || 1;
-          var total = resp.pagination.total != null ? resp.pagination.total : resp.data.length;
-          document.getElementById('results-count').textContent = total + ' résultat(s)';
+        var params = getSearchApiParams();
+        loadGroupCounts(getParams());
+        api.get('/api/search?' + buildQuery(params)).then(function(resp) {
+          var rows = resp.logs || [];
+          var total = resp.total_count != null ? resp.total_count : rows.length;
+          var limit = resp.limit || 100;
+          currentPage = Math.floor((resp.offset || 0) / limit) + 1;
+          totalPages = Math.max(1, Math.ceil(total / limit));
+          document.getElementById('results-count').textContent = total + ' résultat(s) — page ' + currentPage + '/' + totalPages;
+          renderFacets(resp.facets);
           var tb = document.getElementById('logs-body');
-          if (!resp.data.length) {
-            tb.innerHTML = '<tr><td colspan="8" class="no-data" data-i18n="search.no_results">Aucun résultat</td></tr>';
+          if (!rows.length) {
+            tb.innerHTML = '<tr><td colspan="7" class="no-data" data-i18n="search.no_results">Aucun résultat</td></tr>';
             document.getElementById('logs-pagination').innerHTML = '';
             return;
           }
-          tb.innerHTML = resp.data.map(function(r) {
-            // FIX 3a: Timestamp with inferred indicator
+          tb.innerHTML = rows.map(function(r) {
             var tsCell = r.timestamp_inferred
-              ? '<td><span title="Date inférée (non présente dans le log original)" style="color:#f59e0b">'
-                + fmtDT(r.timestamp)
-                + ' <small>~</small></span></td>'
+              ? '<td><span class="ts-inferred" title="Date inférée">' + fmtDT(r.timestamp) + ' <small>~</small></span></td>'
               : '<td>' + fmtDT(r.timestamp) + '</td>';
-            
-            // FIX 3a: User column with badge
             var userCell = r.target_user
-              ? '<td><span style="background:#eff6ff;color:#2563eb;padding:1px 6px;border-radius:4px;font-size:11px">'
-                + esc(r.target_user) + '</span></td>'
-              : '<td><span style="color:#9ca3af;font-size:11px">—</span></td>';
-            
+              ? '<td><span class="user-badge">' + esc(r.target_user) + '</span></td>'
+              : '<td><span class="user-empty">—</span></td>';
             return '<tr data-id="'+r.id+'">'
               + tsCell
               + '<td>'+badge(r.log_level)+'</td>'
@@ -260,6 +259,40 @@
         document.getElementById('f-target-user').value = ''; // FIX 3b
         document.getElementById('f-date-from').value = '';
         document.getElementById('f-date-to').value = '';
+        currentPage = 1;
+        doSearch();
+      });
+
+      function getSearchApiParams() {
+        var p = getParams();
+        var apiParams = {
+          limit: p.limit || 100,
+          offset: ((p.page || 1) - 1) * (p.limit || 100)
+        };
+        if (p.search) apiParams.query = p.search;
+        if (p.log_level) apiParams.level = p.log_level;
+        if (p.source) apiParams.source = p.source;
+        if (p.service) apiParams.service = p.service;
+        if (p.target_user) apiParams.target_user = p.target_user;
+        if (p.source_server) apiParams.source_server = p.source_server;
+        if (p.fingerprint) apiParams.fingerprint = p.fingerprint;
+        if (p.event_type) apiParams.event_type = p.event_type;
+        if (p.error_type) apiParams.error_type = p.error_type;
+        if (p.date_from) apiParams.from_timestamp = p.date_from;
+        if (p.date_to) apiParams.to_timestamp = p.date_to;
+        return apiParams;
+      }
+
+      document.getElementById('reset-btn').addEventListener('click', function() {
+        document.getElementById('f-search').value = '';
+        document.getElementById('f-level').value = '';
+        document.getElementById('f-source').value = '';
+        document.getElementById('f-service').value = '';
+        document.getElementById('f-directory').value = '';
+        document.getElementById('f-target-user').value = '';
+        document.getElementById('f-date-from').value = '';
+        document.getElementById('f-date-to').value = '';
+        window.chipFilter = null;
         currentPage = 1;
         doSearch();
       });

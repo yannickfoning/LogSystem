@@ -48,7 +48,6 @@ async function initRedis() {
   } catch (e) {
     logger.warn({ event: 'redis_not_available', error: e.message }, '[CACHE]');
     redis = null;
-    redisUnavailable = true; // FIX: marquer explicitement indisponible après échec d'init
     return null;
   }
 }

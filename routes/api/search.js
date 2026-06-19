@@ -141,15 +141,13 @@ router.get('/', async (req, res) => {
       params
     );
     const totalCount = countResult[0]?.total || 0;
-    
-    const isAdmin = req.session?.user?.role === 'admin';
 
     // Fetch logs avec pagination
     const [logs] = await pool.execute(
       `SELECT 
         id, timestamp, created_time, log_level, source, source_server, service, 
         message, normalized_message, event_type, fingerprint, module, error_type,
-        ${isAdmin ? 'stack_trace' : 'NULL as stack_trace'}, target_user, parser_format, timestamp_inferred, 
+        stack_trace, target_user, parser_format, timestamp_inferred, 
         classification_confidence
        FROM logs 
        WHERE ${whereClause}
@@ -193,8 +191,12 @@ router.get('/', async (req, res) => {
       if (key) facetMap[key] = count;
     }
 
+    // [FIX-20] Masquer stack_trace pour les utilisateurs non-admins — peut contenir des chemins système internes
+    const isAdmin = req.session?.user?.role === 'admin';
+    const sanitizedLogs = isAdmin ? logs : logs.map(log => ({ ...log, stack_trace: undefined }));
+
     res.json({
-      logs,
+      logs: sanitizedLogs,
       total_count: totalCount,
       limit: limitNum,
       offset: offsetNum,

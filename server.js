@@ -34,7 +34,7 @@ import { scopeGuard } from './middleware/scopeGuard.js';
 import { csrfMiddleware, csrfValidation } from './middleware/csrf.js';
 import authRoutes from './routes/auth.js';
 import logsRoutes from './routes/logs.js';
-import importRoutes from './routes/import.js';
+import importRoutes, { multerErrorHandler } from './routes/import.js';
 import dashboardRoutes from './routes/dashboard.js';
 import adminRoutes from './routes/admin.js';
 import searchApiRoutes from './routes/api/search.js';
@@ -84,7 +84,6 @@ app.use(cookieParser());
 app.use((req, res, next) => {
   helmet({
     hsts: process.env.NODE_ENV === 'production' ? { maxAge: 31536000, includeSubDomains: true } : false,
-    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
@@ -97,7 +96,6 @@ app.use((req, res, next) => {
         objectSrc: ["'none'"],
         mediaSrc: ["'self'", "data:"],
         frameSrc: ["'none'"],
-        upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null,
       }
     },
     crossOriginEmbedderPolicy: false
@@ -181,6 +179,9 @@ app.get('/', (req, res) => {
   res.redirect('/login.html');
 });
 
+// [FIX-12] Multer error handler — before generic 500 handler
+app.use(multerErrorHandler);
+
 app.use((err, req, res, _next) => {
   logger.error({ event: 'express_error', message: err.message, stack: err.stack, path: req.path });
   res.status(500).json({ error: 'Erreur interne du serveur' });
@@ -210,13 +211,11 @@ async function start() {
   if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
 
   const server = app.listen(PORT, () => {
-    logger.info({ event: 'server_started', port: PORT, env: process.env.NODE_ENV || 'development', cache: cacheStarted ? 'redis' : 'disabled' }, `[LogSystem] Running on http://localhost:${PORT}`);
-  });
-
-  // Timeouts définis après listen() mais hors callback (correct)
   server.timeout = 300000;       // 5min - upload timeout
   server.keepAliveTimeout = 310000;
   server.headersTimeout = 320000;
+    logger.info({ event: 'server_started', port: PORT, env: process.env.NODE_ENV || 'development', cache: cacheStarted ? 'redis' : 'disabled' }, `[LogSystem] Running on http://localhost:${PORT}`);
+  });
 
   const shutdown = (signal) => {
     logger.info(`[${signal}] Shutting down gracefully...`);

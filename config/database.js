@@ -16,17 +16,23 @@ export function levelSeverity(level) {
   return map[normalizeLevel(level)] || 0;
 }
 
-function readCaFile(path) {
-  if (!path) return undefined;
+// [FIX-SEC-01] Lecture sécurisée du CA — ne crashe pas si le fichier est absent
+function readCaFile() {
+  const caPath = process.env.DB_SSL_CA_PATH;
+  if (!caPath) return undefined;
   try {
-    if (fs.existsSync(path)) {
-      return fs.readFileSync(path);
-    }
+    return fs.readFileSync(caPath);
   } catch (err) {
-    logger.warn({ event: 'db_ca_read_error', path, error: err.message }, '[DB] Failed to read CA file.');
+    // logger may not be initialized yet at module load — use console as fallback
+    const msg = `[DB] Cannot read SSL CA file (${caPath}): ${err.message}`;
+    try { logger.warn({ event: 'ssl_ca_read_error', path: caPath, error: err.message }, msg); }
+    catch { console.warn(msg); }
+    return undefined;
   }
-  return undefined;
 }
+
+// [FIX-SEC-01] rejectUnauthorized: true par défaut — mettre DB_SSL_REJECT_UNAUTHORIZED=false uniquement si CA Aiven pose problème
+const rejectUnauthorized = process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false';
 
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
@@ -38,8 +44,8 @@ const dbConfig = {
   connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || '10', 10),
   queueLimit: parseInt(process.env.DB_QUEUE_LIMIT || '0', 10),
   ssl: process.env.DB_SSL === 'true' ? {
-    ca: readCaFile(process.env.DB_SSL_CA_PATH),
-    rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false'
+    ca: readCaFile(),
+    rejectUnauthorized
   } : undefined
 };
 
@@ -67,8 +73,8 @@ export async function testConnection() {
 
 export function buildSslOptions() {
   if (process.env.DB_SSL === 'false' || !process.env.DB_SSL) return undefined;
-  let ca = readCaFile(process.env.DB_SSL_CA_PATH);
-  if (!ca) ca = readCaFile('./ca.pem');
-  
-  return { ca, rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' };
+  return {
+    ca: readCaFile(),
+    rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false'
+  };
 }

@@ -18,11 +18,6 @@ import { recordAudit } from "../middleware/audit.js";
 import { validateBody, importUploadSchema } from "../middleware/validation.js";
 import { invalidateDashboard } from "../services/cacheService.js";
 import { extractArchive, isArchive } from "../lib/processing/archiveHandler.js";
-import busboy from 'busboy';
-import os from 'os';
-import fsp from 'fs/promises';
-import { createWriteStream } from 'fs';
-import { createHash } from 'crypto';
 
 const router = Router();
 router.use(requireAuth);
@@ -522,18 +517,7 @@ async function insertBatch(conn, batch, userId) {
 // ── POST /upload ──────────────────────────────────────────────────────────────
 router.post(
   "/upload",
-  (req, res, next) => {
-    upload.single("file")(req, res, (err) => {
-      if (err) {
-        logger.warn({ event: "upload_rejected", error: err.message }, "[IMPORT]");
-        if (err instanceof multer.MulterError) {
-          return res.status(400).json({ error: `Erreur upload: ${err.message}` });
-        }
-        return res.status(400).json({ error: err.message });
-      }
-      next();
-    });
-  },
+  upload.single("file"),
   validateBody(importUploadSchema),
   async (req, res) => {
     try {
@@ -714,3 +698,20 @@ router.get("/jobs/:id/summary", async (req, res) => {
 });
 
 export default router;
+
+// [FIX-12] Gestionnaire d'erreur Multer — doit être APRÈS export default et les routes
+// pour être capturé par Express comme middleware d'erreur (4 paramètres)
+export function multerErrorHandler(err, req, res, next) {
+  if (err && err.code && err.code.startsWith('LIMIT_')) {
+    // MulterError : fichier trop grand, trop de fichiers, champ inconnu...
+    const messages = {
+      LIMIT_FILE_SIZE: 'Fichier trop volumineux',
+      LIMIT_FILE_COUNT: 'Trop de fichiers',
+      LIMIT_UNEXPECTED_FILE: 'Champ de fichier inattendu',
+    };
+    const message = messages[err.code] || 'Erreur de téléversement';
+    logger.warn({ event: 'multer_error', code: err.code, field: err.field }, `[IMPORT] ${message}`);
+    return res.status(400).json({ error: message });
+  }
+  next(err);
+}

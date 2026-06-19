@@ -3,16 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Watch Log - LogSystem</title>
+  <title>LogSystem — Watch Log</title>
   <link rel="stylesheet" href="/styles.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/watchlog.css">
 </head>
 <body>
   <nav class="navbar">
     <div class="brand">
-      <img src="/image/coleps.png" alt="Coleps"
-           style="height:36px;width:auto;object-fit:contain;border-radius:4px;">
+      <img src="/image/coleps.png" alt="Coleps" class="brand-logo-img">
       <span>LogSystem</span>
     </div>
     <button class="hamburger" id="hamburger-btn" aria-label="Menu" aria-expanded="false"><span></span><span></span><span></span></button>
@@ -20,7 +18,7 @@
       <li><a href="/dashboard.html" data-i18n="nav.dashboard">Tableau de bord</a></li>
       <li><a href="/search.html" data-i18n="nav.search">Recherche</a></li>
       <li><a href="/import.html" data-i18n="nav.import">Import</a></li>
-      <li><a href="/watchlog.html" class="active" data-i18n="nav.watchlog">Watch Log</a></li>
+      <li><a href="/watchlog.html" aria-current="page" data-i18n="nav.watchlog">Watch Log</a></li>
       <li><a href="/admin.html" id="admin-link" data-i18n="nav.admin">Administration</a></li>
     </ul>
     <div class="nav-right">
@@ -29,26 +27,25 @@
       <a href="#" id="logout-btn" class="btn btn-xs btn-secondary">Déconnexion</a>
     </div>
   </nav>
-  <div class="watch-container">
-    <!-- Header -->
+  <main class="watch-container" role="main">
     <div class="watch-header">
       <div class="header-title">
-        <i class="fas fa-eye"></i>
+        <span class="icon-inline" id="icon-eye" aria-hidden="true"></span>
         <span data-i18n="watchlog.title">Watch Log — Monitoring Temps Réel</span>
-        <div class="status-indicator"></div>
+        <div class="status-indicator" aria-label="Statut connexion live"></div>
       </div>
       <div class="controls">
-        <button class="btn-small btn-primary" id="btnPause" data-i18n="watchlog.pause">
-          <i class="fas fa-pause"></i> Pause
+        <button class="btn-small btn-primary" id="btnPause" data-i18n="watchlog.pause" aria-label="Pause ou reprendre le flux">
+          <span class="icon-inline" id="icon-pause" aria-hidden="true"></span> Pause
         </button>
-        <button class="btn-small btn-secondary" id="btnClear" data-i18n="watchlog.clear">
-          <i class="fas fa-trash"></i> Effacer
+        <button class="btn-small btn-secondary" id="btnClear" data-i18n="watchlog.clear" aria-label="Effacer le flux">
+          <span class="icon-inline" id="icon-trash" aria-hidden="true"></span> Effacer
         </button>
-        <button class="btn-small btn-secondary" id="btnExport" data-i18n="watchlog.export">
-          <i class="fas fa-download"></i> Exporter
+        <button class="btn-small btn-secondary" id="btnExport" data-i18n="watchlog.export" aria-label="Exporter les logs">
+          <span class="icon-inline" id="icon-download" aria-hidden="true"></span> Exporter
         </button>
-        <button class="btn-small btn-danger" id="btnDisconnect" data-i18n="watchlog.disconnect">
-          <i class="fas fa-times"></i> Déconnecter
+        <button class="btn-small btn-danger" id="btnDisconnect" data-i18n="watchlog.disconnect" aria-label="Déconnecter le flux">
+          <span class="icon-inline" id="icon-times" aria-hidden="true"></span> Déconnecter
         </button>
       </div>
     </div>
@@ -78,8 +75,8 @@
       <!-- Left: Log Stream -->
       <div class="log-stream">
         <div class="stream-header">
-          <div class="stream-title" data-i18n="watchlog.stream.title">
-            <i class="fas fa-stream"></i> Flux en direct
+          <div class="stream-title panel-header-flex" data-i18n="watchlog.stream.title">
+            <span class="icon-inline" id="icon-stream" aria-hidden="true"></span> Flux en direct
           </div>
           <div class="stream-controls">
             <select class="stream-filter" id="filterLevel" aria-label="Filtrer par niveau" title="Filtrer par niveau">
@@ -96,29 +93,28 @@
             </select>
           </div>
         </div>
-        <div class="log-entries" id="logEntries"></div>
+        <div class="log-entries" id="logEntries" aria-live="polite" aria-label="Flux de logs en direct"></div>
       </div>
 
       <!-- Right Panel -->
       <div class="right-panel">
         <!-- AMÉLIORATION 4: Anomalies Alert Panel -->
-        <div class="panel-card" id="anomalyPanel" style="display: none; border-color: #ef4444;">
-          <div class="panel-header" style="background: rgba(239, 68, 68, 0.2); color: #ef4444;">
-            <i class="fas fa-exclamation-triangle"></i> Anomalies Détectées
-            <span class="badge" style="background: #ef4444; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px;">⚠️</span>
+        <div class="panel-card anomaly-panel" id="anomalyPanel">
+          <div class="panel-header anomaly-header panel-header-flex">
+            <span class="icon-inline" id="icon-warning" aria-hidden="true"></span> Anomalies Détectées
+            <span class="wl-alert-badge">⚠️</span>
           </div>
-          <div class="panel-body">
-            <div id="anomalyDetails" style="font-size: 12px; line-height: 1.6;">
-              <p id="anomalyText" style="color: #ef4444; margin: 0;"></p>
-              <p id="anomalyStats" style="color: #9ca3af; margin: 8px 0 0; font-size: 11px;"></p>
+          <div class="panel-body anomaly-body">
+            <div id="anomalyDetails">
+              <p id="anomalyText" class="anomaly-text"></p>
+              <p id="anomalyStats" class="anomaly-stats"></p>
             </div>
           </div>
         </div>
 
-        <!-- Heatmap -->
         <div class="panel-card">
-          <div class="panel-header" data-i18n="watchlog.panel.heatmap">
-            <i class="fas fa-fire"></i> Heatmap 24h (erreurs par heure)
+          <div class="panel-header panel-header-flex" data-i18n="watchlog.panel.heatmap">
+            <span class="icon-inline" id="icon-fire" aria-hidden="true"></span> Heatmap 24h (erreurs par heure)
           </div>
           <div class="panel-body">
             <div class="heatmap" id="heatmap"></div>
@@ -134,8 +130,8 @@
 
         <!-- Error Distribution -->
         <div class="panel-card">
-          <div class="panel-header" data-i18n="watchlog.panel.distribution">
-            <i class="fas fa-chart-bar"></i> Répartition par niveau
+          <div class="panel-header panel-header-flex" data-i18n="watchlog.panel.distribution">
+            <span class="icon-inline" id="icon-chart-bar" aria-hidden="true"></span> Répartition par niveau
           </div>
           <div class="panel-body">
             <div class="level-chart" id="levelChart"></div>
@@ -144,8 +140,8 @@
 
         <!-- Top Services -->
         <div class="panel-card">
-          <div class="panel-header" data-i18n="watchlog.panel.top_services">
-            <i class="fas fa-cogs"></i> Top Services
+          <div class="panel-header panel-header-flex" data-i18n="watchlog.panel.top_services">
+            <span class="icon-inline" id="icon-cogs" aria-hidden="true"></span> Top Services
           </div>
           <div class="panel-body">
             <ul class="service-list" id="serviceList"></ul>
@@ -154,40 +150,37 @@
 
         <!-- FIX BUG-TRENDS-01: Tableau de tendances temps reel similaire au dashboard -->
         <div class="panel-card">
-          <div class="panel-header" data-i18n="watchlog.panel.trends">
-            <i class="fas fa-chart-line"></i> Tendances par heure (24h)
-            <span id="trends-update-time" style="font-size:10px;color:var(--text2);margin-left:auto"></span>
+          <div class="panel-header panel-header-flex" data-i18n="watchlog.panel.trends">
+            <span class="icon-inline" id="icon-chart-line" aria-hidden="true"></span> Tendances par heure (24h)
+            <span id="trends-update-time" class="wl-trends-time"></span>
           </div>
-          <div class="panel-body" style="padding:8px 0">
-            <div id="hourly-trends-table" style="font-size:11px">
-              <div style="text-align:center;color:var(--text2);padding:12px">Chargement...</div>
+          <div class="panel-body wl-trends-body">
+            <div id="hourly-trends-table" class="wl-trends-table">
+              <div class="trends-loading">Chargement...</div>
             </div>
           </div>
         </div>
 
-        <!-- Alertes recentes -->
         <div class="panel-card">
-          <div class="panel-header" data-i18n="watchlog.panel.alerts">
-            <i class="fas fa-bell"></i> Alertes recentes
-            <span id="alert-badge" style="background:var(--accent-red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:6px;display:none">0</span>
+          <div class="panel-header panel-header-flex" data-i18n="watchlog.panel.alerts">
+            <span class="icon-inline" id="icon-bell" aria-hidden="true"></span> Alertes recentes
+            <span id="alert-badge" class="wl-alert-badge is-hidden">0</span>
           </div>
           <div class="panel-body">
-            <ul class="service-list" id="alertsList" style="max-height:180px;overflow-y:auto"></ul>
+            <ul class="service-list wl-alerts-scroll" id="alertsList"></ul>
           </div>
         </div>
       </div>
     </div>
-  </div>
+  </main>
 
-
-  <!-- FIX BUG-WATCH-04: Modal detail log pour watchlog -->
-  <div class="modal-backdrop" id="wl-modal-detail" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center">
-    <div class="modal-box" style="background:var(--surface1,#1e2433);border-radius:12px;padding:24px;max-width:700px;width:95%;max-height:85vh;overflow-y:auto;position:relative">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-        <div class="modal-title" id="wl-modal-title" style="font-size:15px;font-weight:700;color:var(--text1,#f1f5f9)">Detail du log</div>
-        <button onclick="document.getElementById('wl-modal-detail').style.display='none'" style="background:none;border:none;color:var(--text2,#94a3b8);font-size:20px;cursor:pointer;padding:4px 8px">&times;</button>
+  <div class="wl-modal-backdrop" id="wl-modal-detail">
+    <div class="wl-modal-box">
+      <div class="wl-modal-head">
+        <div class="wl-modal-title" id="wl-modal-title">Detail du log</div>
+        <button type="button" class="wl-modal-close" id="wl-modal-close" aria-label="Fermer">&times;</button>
       </div>
-      <div id="wl-modal-body" style="color:var(--text1,#f1f5f9)">Chargement...</div>
+      <div id="wl-modal-body" class="wl-modal-body">Chargement...</div>
     </div>
   </div>
 
@@ -231,8 +224,23 @@
     let eventSource = null;       // pour les logs en direct → /api/alerts/stream
     let statsSource = null;       // pour les stats/anomalies → /api/logs/watch/stream
     let liveRefreshTimer = null;
-    let reconnectAttempts = 0;
-    const MAX_RECONNECT_ATTEMPTS = 5;
+    let reconnectDelay = 1000;
+    let statsReconnectDelay = 1000;
+    const MAX_RECONNECT_ATTEMPTS = 50;
+
+    function mountIcons() {
+      if (!window.icons) return;
+      var map = {
+        'icon-eye': 'eye', 'icon-pause': 'pause', 'icon-trash': 'trash',
+        'icon-download': 'download', 'icon-times': 'times', 'icon-stream': 'stream',
+        'icon-warning': 'exclamationTriangle', 'icon-fire': 'fire',
+        'icon-chart-bar': 'chartBar', 'icon-cogs': 'cogs', 'icon-chart-line': 'chartLine', 'icon-bell': 'bell'
+      };
+      Object.keys(map).forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.innerHTML = window.icons[map[id]];
+      });
+    }
     const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
     // ─── Connexion SSE #1 : flux de logs et alertes en direct ──────────────
@@ -242,7 +250,7 @@
 
       eventSource.addEventListener('connected', function() {
         document.querySelector('.status-indicator').style.background = '#22c55e';
-        reconnectAttempts = 0;
+        reconnectDelay = 1000;
       });
 
       eventSource.addEventListener('alert', function(e) {
@@ -292,10 +300,8 @@
       eventSource.onerror = function() {
         document.querySelector('.status-indicator').style.background = '#ef4444';
         if (eventSource) eventSource.close();
-        if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-          reconnectAttempts++;
-          setTimeout(initSSE, 2000 * reconnectAttempts);
-        }
+        setTimeout(initSSE, reconnectDelay);
+        reconnectDelay = Math.min(reconnectDelay * 2, 30000);
       };
     }
 
@@ -304,7 +310,7 @@
       statsSource = new EventSource('/api/logs/watch/stream');
 
       statsSource.addEventListener('connected', function() {
-        // Stats stream connected
+        statsReconnectDelay = 1000;
       });
 
       statsSource.addEventListener('stats_update', function(e) {
@@ -323,9 +329,9 @@
       });
 
       statsSource.onerror = function() {
-        // Reconnexion silencieuse pour les stats
         if (statsSource) statsSource.close();
-        setTimeout(initStatsSSE, 10000);
+        setTimeout(initStatsSSE, statsReconnectDelay);
+        statsReconnectDelay = Math.min(statsReconnectDelay * 2, 30000);
       };
     }
 
@@ -391,7 +397,7 @@
       const text = document.getElementById('anomalyText');
       const stats = document.getElementById('anomalyStats');
       
-      panel.style.display = 'block';
+      panel.classList.add('is-visible');
       text.textContent = `⚠️ Anomalie détectée: Taux d'erreur ${anomaly.current_rate?.toFixed(2)}% (normal: ${anomaly.baseline_rate?.toFixed(2)}%)`;
       stats.innerHTML = `
         <strong>Augmentation:</strong> ${anomaly.rate_increase_percent}% | 
@@ -403,7 +409,7 @@
     // AMÉLIORATION 4: Hide anomaly alert
     function hideAnomalyAlert() {
       const panel = document.getElementById('anomalyPanel');
-      panel.style.display = 'none';
+      panel.classList.remove('is-visible');
     }
 
     function resetMetrics() {
@@ -617,7 +623,7 @@
     document.getElementById('btnPause').addEventListener('click', () => {
       STATE.paused = !STATE.paused;
       var label = STATE.paused ? (window.i18n ? window.i18n.t('watchlog.resume') : 'Reprendre') : (window.i18n ? window.i18n.t('watchlog.pause') : 'Pause');
-      document.getElementById('btnPause').innerHTML = '<i class="fas ' + (STATE.paused ? 'fa-play' : 'fa-pause') + '"></i> ' + label;
+      document.getElementById('btnPause').innerHTML = '<span class="icon-inline" aria-hidden="true">' + window.icons[STATE.paused ? 'play' : 'pause'] + '</span> ' + label;
     });
 
     document.getElementById('btnClear').addEventListener('click', () => {
@@ -681,8 +687,9 @@
 
 
     // Close watchlog modal on backdrop click
-    document.getElementById('wl-modal-detail').addEventListener('click', function(e){ if(e.target===this) this.style.display='none'; });
-    document.addEventListener('keydown', function(e){ if(e.key==='Escape') { var m=document.getElementById('wl-modal-detail'); if(m) m.style.display='none'; } });
+    document.getElementById('wl-modal-close').addEventListener('click', function(){ document.getElementById('wl-modal-detail').classList.remove('is-open'); });
+    document.getElementById('wl-modal-detail').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('is-open'); });
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape') { var m=document.getElementById('wl-modal-detail'); if(m) m.classList.remove('is-open'); } });
 
     // FIX BUG-WATCH-03: Click sur entree de log pour voir details complets
     document.getElementById('logEntries').addEventListener('click', function(e) {
@@ -719,7 +726,7 @@
           var b=modal.querySelector('#wl-modal-body');
           if(t) t.textContent='Log #'+l.id;
           if(b) b.innerHTML=html;
-          modal.style.display='flex';
+          modal.classList.add('is-open');
         }
       }).catch(function(){});
     });
@@ -791,7 +798,8 @@
     setInterval(loadRecentAlerts, 15000);
 
     window.addEventListener('load', () => {
-      initSSE();        // flux de logs en direct via /api/alerts/stream
+      mountIcons();
+      initSSE();
       initStatsSSE();   // stats + anomalies via /api/logs/watch/stream
       loadRecentLogs();
       loadHourlyTrends();

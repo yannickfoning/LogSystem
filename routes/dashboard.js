@@ -1,11 +1,10 @@
 import { Router } from 'express';
 import logger from '../config/logger.js';
 import pool from '../config/database.js';
-import { userScope, requireAuth } from '../middleware/auth.js';
+import { userScope, requireAuth, requireAdmin } from '../middleware/auth.js';
 import { getCachedDashboard, setCachedDashboard, invalidateDashboard } from '../services/cacheService.js';
 import { getWatcherStatus } from '../services/watcherService.js';
 import { getRedisClient } from '../services/cacheService.js';
-import { requireAdmin } from '../middleware/auth.js';
 
 // Helper function to safely parse integers from query parameters
 function asInt(v, def = 10) {
@@ -535,7 +534,7 @@ router.get('/today', async (req, res) => {
   }
 });
 
-// GET /system — état du système (db, redis, watcher)
+// GET /system — état du système (db, redis, watcher) — [FIX-19] admin seulement
 router.get('/system', requireAdmin, async (req, res) => {
   const status = { db: 'unknown', redis: 'unknown', watcher: {} };
   try {

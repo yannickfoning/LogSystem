@@ -73,8 +73,6 @@
         xhr.send(formData);
       });
     }
-      });
-    }
   };
 
   function fmtDT(iso) {

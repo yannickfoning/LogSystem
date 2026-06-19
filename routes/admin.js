@@ -71,7 +71,7 @@ router.post("/users", validateBody(createUserSchema), async (req, res) => {
 router.put("/users/:id", validateBody(updateUserSchema), async (req, res) => {
   try {
     const { display_name, role, is_active } = req.body;
-    const userId = parseInt(req.params.id, 10);
+    const userId = parseInt(req.params.id);
 
     if (role && req.session.user.id === userId) {
       return res
@@ -128,7 +128,7 @@ router.put("/users/:id", validateBody(updateUserSchema), async (req, res) => {
 
 router.delete("/users/:id", async (req, res) => {
   try {
-    const userId = parseInt(req.params.id, 10);
+    const userId = parseInt(req.params.id);
     if (req.session.user.id === userId) {
       return res
         .status(403)

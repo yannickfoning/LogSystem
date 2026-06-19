@@ -11,11 +11,10 @@ export const profileSchema = z.object({
 });
 
 export const passwordSchema = z.object({
-  current_password: z.string().min(1, "Mot de passe actuel requis").max(128),
+  current_password: z.string().min(1, "Mot de passe actuel requis"),
   new_password: z
     .string()
     .min(12, "Le mot de passe doit faire au moins 12 caractères")
-    .max(128, "Le mot de passe est trop long")
     .regex(/[A-Z]/, "Le mot de passe doit contenir au moins une majuscule")
     .regex(/[a-z]/, "Le mot de passe doit contenir au moins une minuscule")
     .regex(/\d/, "Le mot de passe doit contenir au moins un chiffre"),
@@ -28,15 +27,14 @@ export const importUploadSchema = z.object({
 });
 
 export const createUserSchema = z.object({
-  email: z.string().email("Email invalide").max(255, "Email trop long"),
+  email: z.string().email("Email invalide"),
   password: z
     .string()
     .min(12, "Le mot de passe doit faire au moins 12 caractères")
-    .max(128, "Le mot de passe est trop long")
     .regex(/[A-Z]/, "Le mot de passe doit contenir au moins une majuscule")
     .regex(/[a-z]/, "Le mot de passe doit contenir au moins une minuscule")
     .regex(/\d/, "Le mot de passe doit contenir au moins un chiffre"),
-  display_name: z.string().max(100).optional().nullable(),
+  display_name: z.string().max(255).optional().nullable(),
   role: z.enum(["user", "analyst", "admin"]).optional(),
 });
 

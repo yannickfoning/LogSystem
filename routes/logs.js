@@ -46,13 +46,13 @@ function buildFilters(query, userScopeFilter, useImportedAtForDateRange = false)
   if (imported_to && ISO_RE.test(imported_to)) { sql += ' AND imported_at <= ?'; params.push(imported_to.replace('T',' ')); }
 
   if (search) {
-    const safeSearch = search.replace(/[<>()~@]/g, '').trim().substring(0, 200); // FIX: limite 200 chars anti-DoS
+    // [FIX-PERF-01] FULLTEXT MATCH/AGAINST au lieu de LIKE '%...%' — utilise l'index ft_message
+    const safeSearch = search.replace(/[<>()~*@"]/g, '').trim().substring(0, 200);
     if (safeSearch.length > 0) {
-      // FULLTEXT on message/normalized_message (fast), LIKE on metadata fields
+      // Tente d'abord FULLTEXT sur message/normalized_message, complète avec LIKE sur les autres colonnes
       sql += ' AND (MATCH(message, normalized_message) AGAINST(? IN BOOLEAN MODE) OR source LIKE ? OR source_server LIKE ? OR service LIKE ? OR target_user LIKE ? OR error_type LIKE ?)';
       const like = '%' + safeSearch + '%';
-      const ftSearch = safeSearch.split(/\s+/).filter(w => w.length >= 2).map(w => '+' + w + '*').join(' ') || safeSearch;
-      params.push(ftSearch, like, like, like, like, like);
+      params.push(safeSearch + '*', like, like, like, like, like);
     }
   }
   return { sql, params };
@@ -491,7 +491,6 @@ router.get('/:id', async (req, res) => {
     if (!rows.length) return res.status(404).json({ error: 'Log non trouvé' });
     res.json(rows[0]);
   } catch (e) {
-    logger.error({ event: 'logs_route_error', error: e.message }, '[LOGS]');
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -574,7 +573,7 @@ function generateSuggestion(errorType, message, stackTrace) {
 }
 router.delete('/:id', async (req, res) => {
   try {
-    const logId = parseInt(req.params.id, 10);
+    const logId = parseInt(req.params.id);
     if (isNaN(logId)) return res.status(400).json({ error: 'ID invalide' });
 
     const user = req.session?.user;
@@ -594,7 +593,6 @@ router.delete('/:id', async (req, res) => {
     await recordAudit({ userId: user.id, userEmail: user.email, action: 'delete_log', resourceType: 'log', resourceId: String(logId), details: `User deleted own log ${logId}`, ipAddress: req.ip });
     res.json({ success: true });
   } catch (e) {
-    logger.error({ event: 'logs_route_error', error: e.message }, '[LOGS]');
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
