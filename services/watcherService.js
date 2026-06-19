@@ -9,6 +9,7 @@ import { normalizeLevel } from '../config/database.js';
 import pool from '../config/database.js';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { alertEngineBus } from './alertEngine.js'; // FIX #5: Import du bus event-driven
 import { alertWorker } from '../workers/alertWorker.js';
 
@@ -86,6 +87,10 @@ async function parseDirOwners() {
 
 let dirOwners = null;
 
+function watchPathHash(filePath) {
+  return crypto.createHash('sha256').update(String(filePath)).digest('hex');
+}
+
 function findOwnerForPath(filePath) {
   const resolvedPath = path.resolve(filePath);
   let matchedUserId = null;
@@ -107,7 +112,7 @@ function findOwnerForPath(filePath) {
 // W-02: Load persisted offsets from database on startup
 async function loadPersistedOffsets() {
   try {
-    const [rows] = await pool.execute('SELECT path, offset FROM watch_offsets');
+    const [rows] = await pool.execute('SELECT path, `offset` FROM watch_offsets');
     for (const row of rows) {
       fileOffsets.set(row.path, row.offset);
     }
@@ -121,8 +126,8 @@ async function loadPersistedOffsets() {
 async function persistOffset(filePath, offset) {
   try {
     await pool.execute(
-      'INSERT INTO watch_offsets (path, offset, updated_at) VALUES (?, ?, NOW()) ON DUPLICATE KEY UPDATE offset = ?, updated_at = NOW()',
-      [filePath, offset, offset]
+      'INSERT INTO watch_offsets (path_hash, path, `offset`, updated_at) VALUES (?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE path = VALUES(path), `offset` = VALUES(`offset`), updated_at = NOW()',
+      [watchPathHash(filePath), filePath, offset]
     );
   } catch (e) {
     logger.warn({ event: 'could_not_persist_offset', filePath, error: e.message }, '[WATCHER]');

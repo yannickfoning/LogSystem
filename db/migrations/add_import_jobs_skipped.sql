@@ -7,7 +7,8 @@ ALTER TABLE `import_jobs`
 
 -- Migration: Add watch_offsets table if not exists (required by watcherService)
 CREATE TABLE IF NOT EXISTS `watch_offsets` (
-  `path` VARCHAR(1024) PRIMARY KEY,
+  `path_hash` CHAR(64) PRIMARY KEY,
+  `path` TEXT NOT NULL,
   `offset` BIGINT DEFAULT 0,
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

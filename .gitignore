@@ -1,5 +1,4 @@
 node_modules/
-.next/
 dist/
 build/
 logs/*.log
@@ -11,7 +10,6 @@ uploads/
 ca.pem
 cookies.txt
 tsconfig.tsbuildinfo
-yarn-error.log
 npm-debug.log
 .DS_Store
 Thumbs.db

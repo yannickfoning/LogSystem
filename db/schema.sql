@@ -158,11 +158,12 @@ CREATE TABLE `audit_log` (
   INDEX `idx_audit_created` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- FIX: "offset" est un mot réservé MySQL — renommé en "file_offset"
+-- Watcher file offsets use a stable path hash as primary key to avoid indexing long paths.
 DROP TABLE IF EXISTS `watch_offsets`;
 CREATE TABLE `watch_offsets` (
-  `path` VARCHAR(1024) PRIMARY KEY,
-  `file_offset` BIGINT DEFAULT 0,
+  `path_hash` CHAR(64) PRIMARY KEY,
+  `path` TEXT NOT NULL,
+  `offset` BIGINT DEFAULT 0,
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX `idx_watch_offsets_updated` (`updated_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

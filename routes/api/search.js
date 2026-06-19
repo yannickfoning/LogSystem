@@ -14,7 +14,6 @@ router.use(searchLimiter);
  * Recherche enrichie avec filtres avancés :
  * - query: texte libre (FULLTEXT search)
  * - level: DEBUG|INFO|WARNING|ERROR|CRITICAL|FATAL
- * - error_type: type d'erreur (NullPointerException, ECONNREFUSED, etc.)
  * - service: filtre par service
  * - module: filtre par module
  * - source_server: filtre par serveur source
@@ -33,7 +32,6 @@ router.get('/', async (req, res) => {
     const {
       query = '',
       level = null,
-      error_type = null,
       service = null,
       module = null,
       source_server = null,
@@ -86,11 +84,6 @@ router.get('/', async (req, res) => {
     if (level) {
       whereConditions.push('log_level = ?');
       params.push(level.toUpperCase());
-    }
-
-    if (error_type) {
-      whereConditions.push('error_type = ?');
-      params.push(error_type);
     }
 
     if (service) {
@@ -181,11 +174,6 @@ router.get('/', async (req, res) => {
        WHERE ${whereClause}
        GROUP BY log_level
        UNION ALL
-       SELECT CONCAT('error_type:', COALESCE(error_type, 'unknown')), COUNT(*) 
-       FROM logs 
-       WHERE ${whereClause} AND error_type IS NOT NULL
-       GROUP BY error_type
-       UNION ALL
        SELECT CONCAT('service:', service), COUNT(*) 
        FROM logs 
        WHERE ${whereClause} AND service IS NOT NULL
@@ -202,8 +190,7 @@ router.get('/', async (req, res) => {
     // Format facets
     const facetMap = {};
     for (const row of facets) {
-      const key = row.log_level || row['CONCAT(\'error_type:\', COALESCE(error_type, \'unknown\'))'] ||
-                  row['CONCAT(\'service:\', service)'] || row['CONCAT(\'module:\', module)'];
+      const key = row.log_level || row['CONCAT(\'service:\', service)'] || row['CONCAT(\'module:\', module)'];
       const count = row.count || row['COUNT(*)'];
       if (key) facetMap[key] = count;
     }
@@ -411,7 +398,7 @@ router.get('/trends', async (req, res) => {
  * GET /api/search/metadata
  * 
  * Récupère les vocabulaires uniques pour les filtres (autocomplete)
- * - services, modules, sources, error_types, utilisateurs
+ * - services, modules, sources, utilisateurs
  */
 router.get('/metadata', async (req, res) => {
   try {
@@ -432,11 +419,6 @@ router.get('/metadata', async (req, res) => {
       scope.params || []
     );
 
-    const [errorTypes] = await pool.execute(
-      `SELECT DISTINCT error_type FROM logs WHERE error_type IS NOT NULL ${scope.sql || ''} LIMIT 100`,
-      scope.params || []
-    );
-
     const [users] = await pool.execute(
       `SELECT DISTINCT target_user FROM logs WHERE target_user IS NOT NULL ${scope.sql || ''} LIMIT 100`,
       scope.params || []
@@ -446,7 +428,6 @@ router.get('/metadata', async (req, res) => {
       services: services.map(r => r.service).filter(Boolean),
       modules: modules.map(r => r.module).filter(Boolean),
       sources: sources.map(r => r.source_server).filter(Boolean),
-      error_types: errorTypes.map(r => r.error_type).filter(Boolean),
       target_users: users.map(r => r.target_user).filter(Boolean)
     });
   } catch (e) {

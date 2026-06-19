@@ -142,7 +142,8 @@ ALTER TABLE alerts ADD INDEX IF NOT EXISTS idx_alerts_status (status, created_at
 -- ========================================================================================
 
 CREATE TABLE IF NOT EXISTS watch_offsets (
-  path VARCHAR(1024) PRIMARY KEY,
+  path_hash CHAR(64) PRIMARY KEY,
+  path TEXT NOT NULL,
   offset BIGINT DEFAULT 0,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_updated (updated_at)

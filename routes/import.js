@@ -1,5 +1,10 @@
 import { Router } from "express";
 import multer from "multer";
+import fs from "fs/promises";
+import { createReadStream } from "fs";
+import os from "os";
+import path from "path";
+import { createHash } from "crypto";
 import logger from "../config/logger.js";
 import { v4 as uuidv4 } from "uuid";
 import pool from "../config/database.js";
@@ -24,8 +29,23 @@ const router = Router();
 router.use(requireAuth);
 const RETURN_GAP_DAYS = parseInt(process.env.ERROR_RETURN_GAP_DAYS || "7", 10);
 
+const uploadDir = path.join(os.tmpdir(), "logsystem-uploads");
+
 const upload = multer({
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+    async destination(_req, _file, cb) {
+      try {
+        await fs.mkdir(uploadDir, { recursive: true });
+        cb(null, uploadDir);
+      } catch (e) {
+        cb(e);
+      }
+    },
+    filename(_req, file, cb) {
+      const ext = path.extname(file.originalname || "");
+      cb(null, `${uuidv4()}${ext}`);
+    },
+  }),
   limits: {
     fileSize: parseInt(process.env.UPLOAD_MAX_SIZE || process.env.IMPORT_MAX_SIZE || "524288000", 10),
     files: parseInt(process.env.UPLOAD_MAX_FILES || "10", 10),
@@ -95,6 +115,23 @@ const upload = multer({
     cb(null, true);
   },
 });
+
+function hashFile(filePath) {
+  return new Promise((resolve, reject) => {
+    const hash = createHash("sha256");
+    const stream = createReadStream(filePath);
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("error", reject);
+    stream.on("end", () => resolve(hash.digest("hex")));
+  });
+}
+
+function formatBytes(bytes) {
+  const value = Number(bytes || 0);
+  if (value >= 1024 * 1024 * 1024) return `${(value / 1024 / 1024 / 1024).toFixed(1)} GB`;
+  if (value >= 1024 * 1024) return `${Math.round(value / 1024 / 1024)} MB`;
+  return `${Math.round(value / 1024)} KB`;
+}
 
 // Ordre de sévérité pour error_groups
 const SEV_ORDER = {
@@ -548,18 +585,23 @@ router.post(
   upload.single("file"),
   validateBody(importUploadSchema),
   async (req, res) => {
+    let importAccepted = false;
     const importTimeout = setTimeout(() => {
       logger.warn({ event: "import_upload_timeout" }, "[IMPORT] Timeout after 10 minutes");
     }, 10 * 60 * 1000);
 
     try {
-      if (!req.file)
+      if (!req.file) {
+        clearTimeout(importTimeout);
         return res.status(400).json({ error: "Aucun fichier fourni" });
+      }
 
       const maxSize = parseInt(process.env.UPLOAD_MAX_SIZE || process.env.IMPORT_MAX_SIZE || "524288000", 10);
       if (req.file.size > maxSize) {
+        clearTimeout(importTimeout);
+        fs.rm(req.file.path, { force: true }).catch(() => {});
         return res.status(413).json({
-          error: "Fichier trop gros (500 MB max). Divisez en plusieurs archives.",
+          error: `Fichier trop gros (${formatBytes(req.file.size)} reçu, limite ${formatBytes(maxSize)}). Divisez en plusieurs archives.`,
         });
       }
 
@@ -569,9 +611,7 @@ router.post(
       const service = req.body.service || null;
       const locale = req.body.locale || null;
 
-      const fileHash = await import("crypto").then(({ createHash }) =>
-        createHash("sha256").update(req.file.buffer).digest("hex"),
-      );
+      const fileHash = await hashFile(req.file.path);
 
       await pool.execute(
         "INSERT INTO import_jobs (id, filename, file_size, file_hash, import_ip_address, user_id, import_source, import_service, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')",
@@ -587,15 +627,19 @@ router.post(
         ],
       );
 
-      processImport(
-        jobId,
-        req.file.buffer,
-        req.file.originalname,
-        userId,
-        source,
-        service,
-        locale,
-      ).catch((e) => {
+      importAccepted = true;
+      Promise.resolve().then(async () => {
+        const buffer = await fs.readFile(req.file.path);
+        return processImport(
+          jobId,
+          buffer,
+          req.file.originalname,
+          userId,
+          source,
+          service,
+          locale,
+        );
+      }).catch((e) => {
         const mapped = e instanceof ArchiveError ? e : mapArchiveError(e);
         pool.execute(
           "UPDATE import_jobs SET status = ?, error_message = ?, completed_at = NOW() WHERE id = ?",
@@ -605,7 +649,10 @@ router.post(
           { event: "import_fatal", jobId, error: mapped.message, code: mapped.code },
           "[IMPORT]",
         );
-      }).finally(() => clearTimeout(importTimeout));
+      }).finally(() => {
+        clearTimeout(importTimeout);
+        fs.rm(req.file.path, { force: true }).catch(() => {});
+      });
 
       await recordAudit({
         userId,
@@ -624,6 +671,9 @@ router.post(
       res.json({ job_id: jobId, filename: req.file.originalname });
     } catch (e) {
       clearTimeout(importTimeout);
+      if (!importAccepted && req.file?.path) {
+        fs.rm(req.file.path, { force: true }).catch(() => {});
+      }
       logger.error({ event: "upload_error", error: e.message }, "[IMPORT]");
       if (e instanceof ArchiveError) {
         return res.status(e.status).json({ error: e.message });
@@ -753,7 +803,7 @@ export function multerErrorHandler(err, req, res, next) {
   if (err && err.code && err.code.startsWith('LIMIT_')) {
     // MulterError : fichier trop grand, trop de fichiers, champ inconnu...
     const messages = {
-      LIMIT_FILE_SIZE: 'Fichier trop gros (500 MB max). Divisez en plusieurs archives.',
+      LIMIT_FILE_SIZE: `Fichier trop gros (limite ${formatBytes(parseInt(process.env.UPLOAD_MAX_SIZE || process.env.IMPORT_MAX_SIZE || "524288000", 10))}). Divisez en plusieurs archives.`,
       LIMIT_FILE_COUNT: 'Trop de fichiers',
       LIMIT_UNEXPECTED_FILE: 'Champ de fichier inattendu',
     };

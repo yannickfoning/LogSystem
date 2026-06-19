@@ -3,7 +3,7 @@
   "version": "6.0.0",
   "description": "LogSystem - Plateforme de gestion et monitoring de logs",
   "type": "module",
-  "packageManager": "yarn@1.22.22",
+  "packageManager": "npm@10.0.0",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -15,7 +15,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@rolldown/binding-linux-x64-gnu": "^1.1.2",
     "7zip-min": "^3.0.1",
     "bcryptjs": "^3.0.3",
     "chokidar": "^3.6.0",
