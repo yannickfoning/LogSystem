@@ -1,6 +1,7 @@
 import logger from '../config/logger.js';
 import pool, { levelSeverity, normalizeLevel } from '../config/database.js';
 import EventEmitter from 'events';
+import { detectVolumeAnomalies } from './anomaliesService.js';
 
 const ALERT_EVAL_INTERVAL = parseInt(process.env.ALERT_EVAL_INTERVAL || '60000', 10);
 const SAFETY_INTERVAL = parseInt(process.env.SAFETY_INTERVAL || ALERT_EVAL_INTERVAL.toString(), 10); // Fix #3: Use ALERT_EVAL_INTERVAL (60s) instead of 10s to prevent DB saturation
@@ -149,6 +150,54 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
         msg || `Level ${conditionValue} detected in last ${rule.time_window_minutes}min`,
         targetUserId
       );
+    }
+  } else if (conditionType === 'error_rate') {
+    const [rows] = await pool.execute(
+      `SELECT
+         COUNT(*) as total,
+         SUM(CASE WHEN log_level IN ('ERROR','CRITICAL','FATAL') THEN 1 ELSE 0 END) as errors
+       FROM logs WHERE timestamp >= ? ${userFilter}`,
+      [windowStart, ...scopedParams]
+    );
+    const total = rows[0]?.total || 0;
+    const errors = rows[0]?.errors || 0;
+    const rate = total > 0 ? Math.min(100, (errors / total) * 100) : 0;
+    const threshold = parseFloat(conditionValue) || rule.threshold_value || 10;
+    if (total > 0 && rate > threshold) {
+      return createAlert(rule, `Taux d'erreur ${rate.toFixed(1)}% (> ${threshold}%) sur ${rule.time_window_minutes} min`, targetUserId);
+    }
+  } else if (conditionType === 'level_count') {
+    const levels = String(conditionValue || '').split('|').map(normalizeLevel);
+    const placeholders = levels.map(() => '?').join(',');
+    const [rows] = await pool.execute(
+      `SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ? AND log_level IN (${placeholders}) ${userFilter}`,
+      [windowStart, ...levels, ...scopedParams]
+    );
+    if (rows[0].cnt >= (rule.threshold_value ?? 1)) {
+      return createAlert(rule, `${rows[0].cnt} log(s) ${conditionValue} détecté(s)`, targetUserId);
+    }
+  } else if (conditionType === 'import_status') {
+    const scopeUser = targetUserId ? 'AND user_id = ?' : '';
+    const [rows] = await pool.execute(
+      `SELECT COUNT(*) as cnt FROM import_jobs WHERE status = 'failed' AND completed_at >= ? ${scopeUser}`,
+      [windowStart, ...(targetUserId ? [targetUserId] : [])]
+    );
+    if (rows[0].cnt >= (rule.threshold_value ?? 1)) {
+      return createAlert(rule, `${rows[0].cnt} import(s) échoué(s) récemment`, targetUserId);
+    }
+  } else if (conditionType === 'log_inactivity') {
+    const minutes = parseInt(conditionValue, 10) || rule.time_window_minutes || 60;
+    const since = new Date(now.getTime() - minutes * 60000);
+    const [rows] = await pool.execute(
+      'SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ? ' + userFilter,
+      [since, ...scopedParams]
+    );
+    if (rows[0].cnt === 0) {
+      return createAlert(rule, `Aucun log reçu depuis ${minutes} minutes`, targetUserId);
+    }
+  } else if (conditionType === 'anomaly') {
+    if (targetUserId) {
+      await detectVolumeAnomalies(targetUserId);
     }
   }
   return null;
@@ -354,7 +403,17 @@ async function evalSmartAlertsForUser(userId) {
 
 async function evalAllForUser(userId = null) {
   if (!userId) return 0;
-  const [rules] = await pool.execute('SELECT * FROM alert_rules WHERE is_active = 1');
+  const [rules] = await pool.execute(
+    `SELECT * FROM alert_rules WHERE is_active = 1 AND (
+      (is_global = 1 AND (
+        applicable_to_users IS NULL
+        OR applicable_to_users = '[]'
+        OR JSON_CONTAINS(applicable_to_users, CAST(? AS CHAR), '$')
+      ))
+      OR (COALESCE(is_global, 0) = 0 AND created_by = ?)
+    )`,
+    [String(userId), userId]
+  );
   let alertCount = 0;
   const startTime = Date.now();
   

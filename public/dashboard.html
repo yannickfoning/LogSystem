@@ -2,9 +2,10 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>LogSystem — Tableau de bord</title>
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/css/responsive.css">
   <link rel="stylesheet" href="/dashboard.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" integrity="sha384-xscEkekms/SQq5SFOOIcbfflRgUup5sdW1duER21mIKxWcHi9Xyv37aIOSrCepJf" crossorigin="anonymous"></script>
 </head>
@@ -163,7 +164,7 @@
           <div class="scroll-y">
             <table class="log-table">
               <thead>
-                <tr><th>Heure</th><th>Niveau</th><th>Source</th><th>Type</th><th>Empreinte</th><th>Message</th></tr>
+                <tr><th>Heure</th><th>Niveau</th><th>Source</th><th class="col-hide-mobile">User</th><th class="col-hide-mobile">Import</th><th>Message</th></tr>
               </thead>
               <tbody id="logs-tbody">
                 <tr><td colspan="6"><div class="skeleton skeleton-line"></div></td></tr>
@@ -599,9 +600,9 @@
           return '<tr class="log-row-link" data-log-id="'+r.id+'">'
             + '<td class="cell-muted cell-nowrap">'+timeAgo(r.timestamp)+'</td>'
             + '<td>'+lvlBadge(r.log_level)+'</td>'
-            + '<td class="cell-muted cell-ellipsis-sm" title="'+esc(r.source)+'">'+esc(r.source||'—')+'</td>'
-            + '<td class="cell-muted cell-ellipsis-sm" title="'+esc(r.event_type)+'">'+esc(r.event_type||'—')+'</td>'
-            + '<td class="cell-muted cell-ellipsis-sm" title="'+esc(r.fingerprint)+'">'+esc(r.fingerprint||'—')+'</td>'
+            + '<td class="cell-muted cell-ellipsis-sm" title="'+esc(r.log_source||r.source)+'">'+esc(r.log_source||r.source||'—')+'</td>'
+            + '<td class="col-hide-mobile cell-muted">'+esc(r.log_user||r.target_user||'—')+'</td>'
+            + '<td class="col-hide-mobile cell-muted">'+esc(r.imported_at ? timeAgo(r.imported_at) : '—')+'</td>'
             + '<td class="cell-ellipsis-lg" title="'+esc(r.message)+'">'+esc(r.message||'—')+'</td>'
             + '</tr>';
         }).join('');
@@ -934,36 +935,15 @@ function showLogDetail(logId){
     refreshAll();
     connectSSE();
 
-    // ── Mobile hamburger menu ──
-    (function(){
-      var btn = document.getElementById('hamburger-btn');
-      var nav = document.getElementById('nav-links');
-      if (!btn || !nav) return;
-      btn.addEventListener('click', function(){
-        var open = nav.classList.toggle('open');
-        btn.classList.toggle('open', open);
-        btn.setAttribute('aria-expanded', open);
-      });
-      // Close on outside click
-      document.addEventListener('click', function(e){
-        if (!btn.contains(e.target) && !nav.contains(e.target)) {
-          nav.classList.remove('open');
-          btn.classList.remove('open');
-          btn.setAttribute('aria-expanded', 'false');
-        }
-      });
-      // Close on nav link click
-      nav.querySelectorAll('a').forEach(function(a){
-        a.addEventListener('click', function(){
-          nav.classList.remove('open');
-          btn.classList.remove('open');
-          btn.setAttribute('aria-expanded', 'false');
-        });
-      });
-    })();
     startAutoRefresh();
+
+    window.addEventListener('resize', function() {
+      if (levelChart) levelChart.resize();
+      if (window.trendChart) window.trendChart.resize();
+    });
 
   })();
   </script>
+  <script src="/js/mobile-nav.js" defer></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 {
   "name": "logsystem",
-  "version": "4.0.0",
+  "version": "6.0.0",
   "description": "LogSystem - Plateforme de gestion et monitoring de logs",
   "type": "module",
   "packageManager": "yarn@1.22.22",
@@ -21,6 +21,7 @@
     "chokidar": "^3.6.0",
     "compression": "^1.7.4",
     "cookie-parser": "^1.4.6",
+    "csv-parser": "^3.2.0",
     "decompress": "^4.2.1",
     "dotenv": "^16.4.5",
     "express": "^4.21.0",

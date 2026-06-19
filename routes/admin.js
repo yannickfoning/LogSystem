@@ -638,4 +638,65 @@ router.get("/system-stats", async (req, res) => {
   }
 });
 
+router.get("/system-status", async (req, res) => {
+  try {
+    const status = {
+      version: process.env.APP_VERSION || '6.0.0',
+      uptimeDays: Math.floor(process.uptime() / 86400),
+      uptime: Math.floor(process.uptime() / 86400) + ' days',
+    };
+
+    try {
+      await pool.execute('SELECT 1');
+      status.database = { connected: true, provider: 'Aiven MySQL' };
+    } catch (err) {
+      status.database = { connected: false, error: err.message };
+    }
+
+    try {
+      const { getCacheStatus } = await import('../services/cacheService.js');
+      const cache = await getCacheStatus();
+      status.redis = {
+        connected: Boolean(cache.connected),
+        memoryUsedMb: cache.memoryUsedMb || null,
+      };
+    } catch (err) {
+      status.redis = { connected: false, error: 'Cache disabled' };
+    }
+
+    try {
+      const os = await import('os');
+      const totalMem = os.totalmem();
+      const freeMem = os.freemem();
+      const usedPct = Math.round(((totalMem - freeMem) / totalMem) * 100);
+      status.disk = {
+        usage: usedPct + '%',
+        freeGb: (freeMem / 1024 / 1024 / 1024).toFixed(1),
+        totalGb: (totalMem / 1024 / 1024 / 1024).toFixed(1),
+        warning: usedPct > 90,
+      };
+    } catch (err) {
+      status.disk = { usage: 'N/A' };
+    }
+
+    const startMs = Date.now();
+    await pool.execute('SELECT 1');
+    status.apiResponseMs = { avg: Date.now() - startMs, p95: Date.now() - startMs };
+
+    const { getWatcherStatus } = await import('../services/watcherService.js');
+    const { getRetentionStats } = await import('../services/retentionService.js');
+    status.watcher = getWatcherStatus();
+    try {
+      status.retention = await getRetentionStats();
+    } catch (_) {
+      status.retention = null;
+    }
+
+    res.json(status);
+  } catch (e) {
+    logger.error({ event: 'system_status_error', error: e.message }, '[ADMIN]');
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 export default router;

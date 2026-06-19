@@ -2,9 +2,10 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LogSystem ? Administration</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>LogSystem — Administration</title>
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/css/responsive.css">
   <link rel="stylesheet" href="/admin.css">
 </head>
 <body>
@@ -305,6 +306,7 @@
   <script src="/api.js"></script>
   <script src="/i18n.js"></script>
   <script src="/app-common.js"></script>
+  <script src="/js/mobile-nav.js" defer></script>
   <script>
     (function() {
       if (!window.api) return;
@@ -718,44 +720,30 @@
 
       // ??? SYSTEM ???????????????????????????????????
       function loadSystem() {
-        api.get('/api/admin/system-stats').then(function(s) {
+        Promise.all([
+          api.get('/api/admin/system-stats'),
+          api.get('/api/admin/system-status')
+        ]).then(function(results) {
+          var s = results[0];
+          var st = results[1];
+          var dbOk = st.database && st.database.connected;
+          var redisOk = st.redis && st.redis.connected;
           document.getElementById('system-stats').innerHTML =
+            '<div class="kpi-card"><span class="kpi-label">Database</span><span class="kpi-value '+(dbOk?'green':'red')+'">'+(dbOk?'✓ Connected':'✗ Disconnected')+'</span></div>' +
+            '<div class="kpi-card"><span class="kpi-label">Redis Cache</span><span class="kpi-value '+(redisOk?'green':'amber')+'">'+(redisOk?'✓ Connected':'Cache disabled')+'</span></div>' +
+            '<div class="kpi-card"><span class="kpi-label">Disk / Memory</span><span class="kpi-value">'+(st.disk && st.disk.usage ? st.disk.usage : 'N/A')+'</span></div>' +
+            '<div class="kpi-card"><span class="kpi-label">Uptime</span><span class="kpi-value blue">'+(st.uptime||'—')+'</span></div>' +
+            '<div class="kpi-card"><span class="kpi-label">Version</span><span class="kpi-value">'+(st.version||'6.0.0')+'</span></div>' +
             '<div class="kpi-card"><span class="kpi-label">Utilisateurs</span><span class="kpi-value blue">'+s.totalUsers+'</span></div>' +
             '<div class="kpi-card"><span class="kpi-label">Taille BDD</span><span class="kpi-value green">'+s.dbSizeMb+' Mo</span></div>' +
-            '<div class="kpi-card"><span class="kpi-label">Error Groups</span><span class="kpi-value red">'+s.openErrorGroups+'</span></div>' +
             '<div class="kpi-card"><span class="kpi-label">Total logs</span><span class="kpi-value blue">'+Number(s.totalLogs).toLocaleString()+'</span></div>';
-        }).catch(function(e){ if(window.toast) window.toast.error('Erreur syst?me'); });
+        }).catch(function(){ if(window.toast) window.toast.error('Erreur système'); });
       }
 
       // Initial loads
       loadUsers();
       loadRules();
     })();
-  </script>
-
-  <script>
-  (function(){
-    var btn = document.getElementById('hamburger-btn');
-    var nav = document.getElementById('nav-links');
-    if (!btn || !nav) return;
-    btn.addEventListener('click', function(){
-      var open = nav.classList.toggle('open');
-      btn.classList.toggle('open', open);
-      btn.setAttribute('aria-expanded', open);
-    });
-    document.addEventListener('click', function(e){
-      if (!btn.contains(e.target) && !nav.contains(e.target)) {
-        nav.classList.remove('open');
-        btn.classList.remove('open');
-      }
-    });
-    nav.querySelectorAll('a').forEach(function(a){
-      a.addEventListener('click', function(){
-        nav.classList.remove('open');
-        btn.classList.remove('open');
-      });
-    });
-  })();
   </script>
 </body>
 </html>

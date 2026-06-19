@@ -2,9 +2,11 @@ import { Router } from 'express';
 import pool from '../../config/database.js';
 import { requireAuth, userScope } from '../../middleware/auth.js';
 import logger from '../../config/logger.js';
+import { searchLimiter } from '../../lib/rateLimiter.js';
 
 const router = Router();
 router.use(requireAuth);
+router.use(searchLimiter);
 
 /**
  * GET /api/search
@@ -47,6 +49,14 @@ router.get('/', async (req, res) => {
 
     const limitNum = Math.min(parseInt(limit) || 50, 1000);
     const offsetNum = Math.max(parseInt(offset) || 0, 0);
+
+    if (query && query.length > 500) {
+      return res.status(400).json({ error: 'Longueur mot-clé: 1-500 caractères' });
+    }
+
+    if (from_timestamp && to_timestamp && new Date(from_timestamp) > new Date(to_timestamp)) {
+      return res.status(400).json({ error: 'Date de fin doit être après date de début' });
+    }
 
     let whereConditions = ['1=1'];
     let params = [];
@@ -142,13 +152,20 @@ router.get('/', async (req, res) => {
     );
     const totalCount = countResult[0]?.total || 0;
 
+    if (totalCount > 10000) {
+      return res.status(422).json({
+        error: 'Trop de résultats (10K max). Affinez votre recherche.',
+        count: totalCount,
+      });
+    }
+
     // Fetch logs avec pagination
     const [logs] = await pool.execute(
       `SELECT 
-        id, timestamp, created_time, log_level, source, source_server, service, 
+        id, timestamp, created_time, imported_at, log_level, source, source_server, service, 
         message, normalized_message, event_type, fingerprint, module, error_type,
-        stack_trace, target_user, parser_format, timestamp_inferred, 
-        classification_confidence
+        stack_trace, target_user, log_user, log_source, file_name, import_job_id,
+        parser_format, timestamp_inferred, classification_confidence
        FROM logs 
        WHERE ${whereClause}
        ORDER BY timestamp DESC

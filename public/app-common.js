@@ -70,6 +70,7 @@
         window.i18n.mountToggle('lang-toggle');
       }
       markActiveNav();
+      document.dispatchEvent(new CustomEvent('app:ready', { detail: u }));
       return u;
     }).catch(function () {
       window.location.href = '/login.html';

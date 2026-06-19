@@ -4,14 +4,14 @@ import pool from '../config/database.js';
 import { requireAuth, requireAdmin, userScope } from '../middleware/auth.js';
 import { startWatcher, stopWatcher, getWatcherStatus, detectAnomalies, getWatchStats } from '../services/watcherService.js';
 import { recordAudit } from '../middleware/audit.js';
-import PDFDocument from 'pdfkit';
+import { generateLogPdf } from '../lib/pdfExport.js';
 
 const router = Router();
 router.use(requireAuth);
 
 const MAX_LIMIT = 500;
 const DEFAULT_LIMIT = 50;
-const LOG_COLUMNS = 'id, timestamp, created_time, imported_at, log_level, source, source_server, service, message, normalized_message, event_type, error_type, fingerprint, user_id, target_user, module, parser_format, timestamp_inferred, created_at';
+const LOG_COLUMNS = 'id, timestamp, created_time, imported_at, log_level, source, source_server, service, message, normalized_message, event_type, error_type, fingerprint, user_id, target_user, module, parser_format, timestamp_inferred, created_at, file_name, file_created_at, import_job_id, imported_by_user_id, log_source, log_user';
 
 // ── Helper : filtres SQL partagés ─────────────────────────────────────────────
 function buildFilters(query, userScopeFilter, useImportedAtForDateRange = false) {
@@ -80,14 +80,18 @@ router.get('/export/csv', async (req, res) => {
     const userScopeFilter = userScope(req);
     const { sql: filters, params } = buildFilters(req.query, userScopeFilter);
     const [rows] = await pool.execute(
-      `SELECT id, timestamp, imported_at, log_level, source, source_server, service, event_type, error_type, fingerprint, target_user, message FROM logs WHERE 1=1 ${filters} ORDER BY timestamp DESC LIMIT 10000`,
+      `SELECT id, timestamp, imported_at, log_level, source, source_server, service, event_type, error_type, fingerprint, target_user, log_user, log_source, file_name, message FROM logs WHERE 1=1 ${filters} ORDER BY timestamp DESC LIMIT 10000`,
       params
     );
+    if (rows.length >= 10000) {
+      return res.status(422).json({ error: 'Trop de résultats (10K max). Affinez votre recherche.' });
+    }
     const escape = v => `"${String(v ?? '').replace(/"/g, '""').replace(/[\n\r]/g, ' ')}"`;
-    const header = ['ID', 'Date', 'Heure', 'Niveau', 'Source', 'Service', 'Type événement', 'Message'].map(escape).join(',');
+    const header = ['ID', 'Date', 'Heure', 'Niveau', 'Source', 'Service', 'Utilisateur', 'Message', 'Importé le', 'Fichier', 'Source log'].map(escape).join(',');
     const body = rows.map(r => [
       r.id, String(r.timestamp ?? '').slice(0, 10), String(r.timestamp ?? '').slice(11, 19),
-      r.log_level ?? '', r.source ?? '', r.service ?? '', r.event_type ?? '', r.message ?? ''
+      r.log_level ?? '', r.source ?? '', r.service ?? '', (r.log_user || r.target_user || ''), r.message ?? '',
+      r.imported_at ?? '', r.file_name ?? '', r.log_source ?? ''
     ].map(escape).join(',')).join('\n');
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="logs_export_${new Date().toISOString().slice(0,10)}.csv"`);
@@ -104,58 +108,34 @@ router.get('/export/pdf', async (req, res) => {
   try {
     const userScopeFilter = userScope(req);
     const { sql: filters, params } = buildFilters(req.query, userScopeFilter);
-    const MAX_PDF_ROWS = 1000;
+    const MAX_PDF_ROWS = 10000;
+    const [countRows] = await pool.execute(
+      `SELECT COUNT(*) as cnt FROM logs WHERE 1=1 ${filters}`,
+      params
+    );
+    if (countRows[0].cnt > MAX_PDF_ROWS) {
+      return res.status(422).json({ error: 'Trop de résultats pour PDF. Max 10K. Affinez votre recherche.' });
+    }
     const [rows] = await pool.execute(
-      `SELECT id, timestamp, imported_at, log_level, source, source_server, service, event_type, error_type, fingerprint, target_user, message FROM logs WHERE 1=1 ${filters} ORDER BY timestamp DESC LIMIT ${MAX_PDF_ROWS}`,
+      `SELECT id, timestamp, imported_at, log_level, source, source_server, service, event_type, error_type, fingerprint, target_user, log_user, log_source, file_name, file_created_at, message FROM logs WHERE 1=1 ${filters} ORDER BY timestamp DESC LIMIT ${MAX_PDF_ROWS}`,
       params
     );
 
-    const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 30 });
+    const filterDesc = [
+      req.query.log_level && `Niveau: ${req.query.log_level}`,
+      req.query.source && `Source: ${req.query.source}`,
+      req.query.date_from && `Depuis: ${req.query.date_from}`,
+    ].filter(Boolean).join(', ');
+
+    const pdfBuffer = await generateLogPdf(rows, {
+      username: req.session.user.display_name || req.session.user.email,
+      filters: filterDesc,
+      orientation: req.query.orientation || 'portrait',
+    });
+
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="logs_export_${new Date().toISOString().slice(0,10)}.pdf"`);
-    doc.pipe(res);
-
-    const PAGE_W = 841.89, MARGIN = 30, TABLE_W = PAGE_W - MARGIN * 2;
-    const ROW_H = 20, HEAD_H = 24, PAGE_H = 595.28, FOOT_Y = PAGE_H - 30; // FIX PDF: taille ligne augmentee
-    const COL_W = [35, 75, 55, 55, 70, 70, 90, 332];
-    const COL_X = []; let cx = MARGIN;
-    COL_W.forEach(w => { COL_X.push(cx); cx += w; });
-    const HEADERS = ['#', 'Date', 'Heure', 'Niveau', 'Source', 'Service', 'Type', 'Message'];
-    const LEVEL_COLORS = { DEBUG: '#888888', INFO: '#2E75B6', WARNING: '#ED7D31', ERROR: '#C00000', CRITICAL: '#7030A0', FATAL: '#000000' };
-    let yPos = MARGIN, page = 1, rowNum = 0;
-
-    const drawHeader = () => {
-      doc.font('Helvetica-Bold').fontSize(13).fillColor('#1F4E79').text('LogSystem — Export des logs', MARGIN, yPos, { width: TABLE_W, align: 'center' });
-      yPos += 18;
-      doc.font('Helvetica').fontSize(8).fillColor('#595959').text(`Exporté le ${new Date().toLocaleString('fr-FR')}  |  ${rows.length} log(s)`, MARGIN, yPos, { width: TABLE_W, align: 'center' });
-      yPos += 14;
-      pdfTableRow(doc, HEADERS, yPos, HEAD_H, COL_X, COL_W, true);
-      yPos += HEAD_H;
-    };
-    const drawFooter = () => {
-      doc.font('Helvetica').fontSize(7).fillColor('#888888').text(`Page ${page}`, MARGIN, FOOT_Y, { width: TABLE_W, align: 'right' });
-    };
-    drawHeader();
-
-    for (const row of rows) {
-      if (yPos + ROW_H > FOOT_Y - 10) { drawFooter(); doc.addPage(); yPos = MARGIN; page++; pdfTableRow(doc, HEADERS, yPos, HEAD_H, COL_X, COL_W, true); yPos += HEAD_H; }
-      rowNum++;
-      const bgColor = rowNum % 2 === 0 ? '#F2F4F7' : '#FFFFFF';
-      doc.rect(COL_X[0], yPos, TABLE_W, ROW_H).fill(bgColor);
-      // FIX BUG-PDF-01: Eviter double rendu colonne Niveau (fond puis texte colore)
-      const rowCols = [rowNum, String(row.timestamp ?? '').slice(0, 10), String(row.timestamp ?? '').slice(11, 19),
-        '', // niveau rendu manuellement ci-dessous avec couleur
-        row.source ?? '', row.service ?? '', row.event_type ?? '', row.message ?? ''];
-      pdfTableRow(doc, rowCols, yPos, ROW_H, COL_X, COL_W, false);
-      // Rendu colonne Niveau avec couleur specifique
-      doc.rect(COL_X[3], yPos, COL_W[3], ROW_H).fill(bgColor).stroke('#CCCCCC');
-      const lvlColor = LEVEL_COLORS[row.log_level] || '#333333';
-      doc.roundedRect(COL_X[3]+3, yPos+3, COL_W[3]-6, ROW_H-6, 2).fill(lvlColor + '22');
-      doc.font('Helvetica-Bold').fontSize(6.5).fillColor(lvlColor)
-         .text(row.log_level ?? '', COL_X[3]+3, yPos+5, { width: COL_W[3]-6, align: 'center', lineBreak: false });
-      yPos += ROW_H;
-    }
-    drawFooter(); doc.end();
+    res.send(pdfBuffer);
   } catch (e) {
     logger.error({ event: 'export_pdf_failed', error: e.message }, '[EXPORT PDF]');
     if (!res.headersSent) res.status(500).json({ error: 'Erreur export PDF' });
@@ -486,7 +466,7 @@ router.get('/directory', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const scope = userScope(req);
-    const cols = 'id, timestamp, created_time, imported_at, timezone, log_level, source, source_server, service, message, normalized_message, event_type, fingerprint, user_id, client_ip, module, error_type, stack_trace, target_user, raw_log, parser_format, timestamp_inferred, classification_confidence, created_at';
+    const cols = 'id, timestamp, created_time, imported_at, timezone, log_level, source, source_server, service, message, normalized_message, event_type, fingerprint, user_id, client_ip, module, error_type, stack_trace, target_user, raw_log, parser_format, timestamp_inferred, classification_confidence, created_at, file_name, file_created_at, import_job_id, imported_by_user_id, log_source, log_user';
     const [rows] = await pool.execute(`SELECT ${cols} FROM logs WHERE id = ?` + scope.sql, [req.params.id, ...scope.params]);
     if (!rows.length) return res.status(404).json({ error: 'Log non trouvé' });
     res.json(rows[0]);

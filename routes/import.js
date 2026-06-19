@@ -17,7 +17,8 @@ import { alertWorker } from "../workers/alertWorker.js";
 import { recordAudit } from "../middleware/audit.js";
 import { validateBody, importUploadSchema } from "../middleware/validation.js";
 import { invalidateDashboard } from "../services/cacheService.js";
-import { extractArchive, isArchive } from "../lib/processing/archiveHandler.js";
+import { extractArchive, isArchive, filterLogFiles, mapArchiveError, ArchiveError } from "../lib/processing/archiveHandler.js";
+import { importLimiter } from "../lib/rateLimiter.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -26,7 +27,7 @@ const RETURN_GAP_DAYS = parseInt(process.env.ERROR_RETURN_GAP_DAYS || "7", 10);
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: parseInt(process.env.UPLOAD_MAX_SIZE || "52428800", 10),
+    fileSize: parseInt(process.env.UPLOAD_MAX_SIZE || process.env.IMPORT_MAX_SIZE || "524288000", 10),
     files: parseInt(process.env.UPLOAD_MAX_FILES || "10", 10),
   },
   fileFilter: (req, file, cb) => {
@@ -119,9 +120,10 @@ async function processImport(
   const importService = service ?? null;
   const dateLocale = locale || process.env.LOG_DATE_LOCALE || "fr"; // FIX 2a
   const batchSize = Math.min(
-    parseInt(process.env.IMPORT_BATCH_SIZE || "2000", 10),
-    5000,
+    parseInt(process.env.IMPORT_BATCH_SIZE || "500", 10),
+    500,
   );
+  const importTimestamp = new Date().toISOString().slice(0, 19).replace("T", " ");
 
   let filesToProcess = [];
 
@@ -129,17 +131,24 @@ async function processImport(
     logger.info({ event: "archive_detected", file: filename }, "[IMPORT]");
     try {
       const extracted = await extractArchive(buffer, filename);
-      filesToProcess = extracted;
+      filesToProcess = filterLogFiles(extracted);
+      if (filesToProcess.length === 0) {
+        throw new ArchiveError(
+          "NO_LOG_FILES",
+          422,
+          "Aucun fichier log (.log,.txt,.json,.csv) trouvé dans l'archive.",
+        );
+      }
       logger.info(
         { event: "archive_extracted", count: filesToProcess.length },
         "[IMPORT]",
       );
     } catch (e) {
       logger.error(
-        { event: "archive_extraction_error", error: e.message },
+        { event: "archive_extraction_error", error: e.message, code: e.code },
         "[IMPORT]",
       );
-      throw e;
+      throw e instanceof ArchiveError ? e : mapArchiveError(e);
     }
   } else {
     filesToProcess = [{ filename, content: buffer }];
@@ -168,7 +177,14 @@ async function processImport(
       );
       parsedLogs = [];
     }
-    allParsedLogs = allParsedLogs.concat(parsedLogs);
+    allParsedLogs = allParsedLogs.concat(
+      parsedLogs.map((log) => ({
+        ...log,
+        file_name: file.filename,
+        file_created_at: file.file_created_at || null,
+        file_modified_at: file.file_modified_at || null,
+      })),
+    );
   }
 
   const parsedLogs = allParsedLogs;
@@ -297,7 +313,12 @@ async function processImport(
           ingested_realtime: 0,
           file_created_at: logEntry.file_created_at || null,
           file_modified_at: logEntry.file_modified_at || null,
-          // FIX: host, log_format, status_code, duration_ms supprimés (colonnes inexistantes)
+          file_name: (logEntry.file_name || filename || "").slice(0, 255),
+          import_job_id: jobId,
+          imported_by_user_id: userId,
+          imported_at: importTimestamp,
+          log_source: logEntry.source || logEntry.source_server || importSource || null,
+          log_user: logEntry.target_user || logEntry.log_user || null,
         };
 
         normalized.normalized_message = normalizeMessage(normalized.message);
@@ -347,12 +368,13 @@ async function processImport(
 
     // FIX 2c: Store import_summary for later retrieval
     await conn.execute(
-      "UPDATE import_jobs SET status = ?, processed_lines = ?, error_count = ?, skipped_lines = ?, import_summary = ?, completed_at = NOW() WHERE id = ?",
+      "UPDATE import_jobs SET status = ?, processed_lines = ?, error_count = ?, skipped_lines = ?, successful_lines = ?, import_summary = ?, completed_at = NOW() WHERE id = ?",
       [
         "completed",
         processed,
         errors,
         importSummary.skipped || 0,
+        importSummary.inserted || processed,
         JSON.stringify(importSummary),
         jobId,
       ],
@@ -390,7 +412,6 @@ async function processImport(
 async function insertBatch(conn, batch, userId) {
   await conn.beginTransaction();
   try {
-    // FIX: colonnes alignées exactement sur le schéma SQL de la table logs
     const logValues = batch.map((entry) => [
       entry.raw_log,
       entry.timestamp,
@@ -405,9 +426,9 @@ async function insertBatch(conn, batch, userId) {
       entry.event_type,
       entry.fingerprint,
       userId || null,
-          entry.source_type,
+      entry.source_type,
       entry.ingested_realtime,
-      entry.client_ip, // FIX: était ip_address
+      entry.client_ip,
       entry.module,
       entry.error_type,
       entry.stack_trace,
@@ -417,6 +438,12 @@ async function insertBatch(conn, batch, userId) {
       entry.classification_confidence,
       entry.file_created_at || null,
       entry.file_modified_at || null,
+      entry.file_name || null,
+      entry.import_job_id || null,
+      entry.imported_by_user_id || userId || null,
+      entry.imported_at || null,
+      entry.log_source || null,
+      entry.log_user || null,
     ]);
 
     await conn.query(
@@ -424,7 +451,7 @@ async function insertBatch(conn, batch, userId) {
         raw_log, timestamp, created_time, timezone, log_level, source, source_server, service, message, normalized_message,
         event_type, fingerprint, user_id, source_type, ingested_realtime, client_ip, module, error_type,
         stack_trace, target_user, parser_format, timestamp_inferred, classification_confidence,
-        file_created_at, file_modified_at
+        file_created_at, file_modified_at, file_name, import_job_id, imported_by_user_id, imported_at, log_source, log_user
       ) VALUES ?`,
       [logValues],
     );
@@ -517,25 +544,37 @@ async function insertBatch(conn, batch, userId) {
 // ── POST /upload ──────────────────────────────────────────────────────────────
 router.post(
   "/upload",
+  importLimiter,
   upload.single("file"),
   validateBody(importUploadSchema),
   async (req, res) => {
+    const importTimeout = setTimeout(() => {
+      logger.warn({ event: "import_upload_timeout" }, "[IMPORT] Timeout after 10 minutes");
+    }, 10 * 60 * 1000);
+
     try {
       if (!req.file)
         return res.status(400).json({ error: "Aucun fichier fourni" });
+
+      const maxSize = parseInt(process.env.UPLOAD_MAX_SIZE || process.env.IMPORT_MAX_SIZE || "524288000", 10);
+      if (req.file.size > maxSize) {
+        return res.status(413).json({
+          error: "Fichier trop gros (500 MB max). Divisez en plusieurs archives.",
+        });
+      }
 
       const jobId = uuidv4();
       const userId = req.session.user.id;
       const source = req.body.source || null;
       const service = req.body.service || null;
-      const locale = req.body.locale || null; // FIX 2a
+      const locale = req.body.locale || null;
 
       const fileHash = await import("crypto").then(({ createHash }) =>
         createHash("sha256").update(req.file.buffer).digest("hex"),
       );
 
       await pool.execute(
-        "INSERT INTO import_jobs (id, filename, file_size, file_hash, import_ip_address, user_id, import_source, import_service) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO import_jobs (id, filename, file_size, file_hash, import_ip_address, user_id, import_source, import_service, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')",
         [
           jobId,
           req.file.originalname,
@@ -556,12 +595,17 @@ router.post(
         source,
         service,
         locale,
-      ).catch((e) =>
+      ).catch((e) => {
+        const mapped = e instanceof ArchiveError ? e : mapArchiveError(e);
+        pool.execute(
+          "UPDATE import_jobs SET status = ?, error_message = ?, completed_at = NOW() WHERE id = ?",
+          ["failed", mapped.message.substring(0, 1000), jobId],
+        ).catch(() => {});
         logger.error(
-          { event: "import_fatal", jobId, error: e.message },
+          { event: "import_fatal", jobId, error: mapped.message, code: mapped.code },
           "[IMPORT]",
-        ),
-      );
+        );
+      }).finally(() => clearTimeout(importTimeout));
 
       await recordAudit({
         userId,
@@ -579,7 +623,11 @@ router.post(
 
       res.json({ job_id: jobId, filename: req.file.originalname });
     } catch (e) {
+      clearTimeout(importTimeout);
       logger.error({ event: "upload_error", error: e.message }, "[IMPORT]");
+      if (e instanceof ArchiveError) {
+        return res.status(e.status).json({ error: e.message });
+      }
       res.status(500).json({ error: e.message || "Erreur lors de l'upload" });
     }
   },
@@ -705,13 +753,14 @@ export function multerErrorHandler(err, req, res, next) {
   if (err && err.code && err.code.startsWith('LIMIT_')) {
     // MulterError : fichier trop grand, trop de fichiers, champ inconnu...
     const messages = {
-      LIMIT_FILE_SIZE: 'Fichier trop volumineux',
+      LIMIT_FILE_SIZE: 'Fichier trop gros (500 MB max). Divisez en plusieurs archives.',
       LIMIT_FILE_COUNT: 'Trop de fichiers',
       LIMIT_UNEXPECTED_FILE: 'Champ de fichier inattendu',
     };
     const message = messages[err.code] || 'Erreur de téléversement';
     logger.warn({ event: 'multer_error', code: err.code, field: err.field }, `[IMPORT] ${message}`);
-    return res.status(400).json({ error: message });
+    const status = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+    return res.status(status).json({ error: message });
   }
   next(err);
 }
