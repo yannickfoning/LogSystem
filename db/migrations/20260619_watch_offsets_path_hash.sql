@@ -6,13 +6,10 @@ UPDATE watch_offsets
   WHERE path_hash IS NULL;
 
 ALTER TABLE watch_offsets
-  DROP PRIMARY KEY;
-
-ALTER TABLE watch_offsets
   MODIFY path TEXT NOT NULL;
 
 ALTER TABLE watch_offsets
   MODIFY path_hash CHAR(64) NOT NULL;
 
 ALTER TABLE watch_offsets
-  ADD PRIMARY KEY (path_hash);
+  ADD UNIQUE INDEX idx_watch_offsets_path_hash (path_hash);

@@ -90,7 +90,7 @@ CREATE TABLE `alert_rules` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `name` VARCHAR(255) NOT NULL,
   `description` TEXT,
-  `condition_type` ENUM('level','count','fingerprint','threshold','silence') NOT NULL,
+  `condition_type` ENUM('level','count','fingerprint','threshold','silence','error_rate','level_count','import_status','log_inactivity','anomaly') NOT NULL,
   `condition_value` TEXT NOT NULL,
   `threshold_value` INT,
   `time_window_minutes` INT DEFAULT 60,

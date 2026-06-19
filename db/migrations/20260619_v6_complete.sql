@@ -8,6 +8,7 @@ ALTER TABLE `logs` ADD COLUMN `log_user` VARCHAR(255) NULL;
 
 ALTER TABLE `alert_rules` ADD COLUMN `is_global` TINYINT(1) NOT NULL DEFAULT 0;
 ALTER TABLE `alert_rules` ADD COLUMN `applicable_to_users` JSON NULL;
+ALTER TABLE `alert_rules` MODIFY COLUMN `condition_type` ENUM('level','count','fingerprint','threshold','silence','error_rate','level_count','import_status','log_inactivity','anomaly') NOT NULL;
 
 ALTER TABLE `import_jobs` ADD COLUMN `successful_lines` INT DEFAULT 0;
 ALTER TABLE `import_jobs` ADD COLUMN `failed_lines` INT DEFAULT 0;
