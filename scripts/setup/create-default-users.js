@@ -1,8 +1,7 @@
-import dotenv from 'dotenv';
-dotenv.config();
+import '../../config/loadEnv.js';
 
 import bcrypt from 'bcryptjs';
-import pool from '../config/database.js';
+import pool from '../../config/database.js';
 
 const rounds = parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
 

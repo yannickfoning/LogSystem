@@ -1,11 +1,9 @@
-import 'dotenv/config';
-import dotenv from 'dotenv';
+import './config/loadEnv.js';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.join(__dirname, '.env') });
 
 import crypto from 'crypto';
 import logger from './config/logger.js';
@@ -170,7 +168,7 @@ app.get('/api/alerts/stream', requireAuth, (req, res) => {
   alertWorker.addClient(res, req);
 });
 
-// Health check Express (avant Next.js)
+// Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
 });

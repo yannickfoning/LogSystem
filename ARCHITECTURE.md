@@ -57,6 +57,27 @@ Le responsive commun vit dans `public/css/responsive.css` et doit etre inclus pa
 ## Securite
 
 Les secrets obligatoires sont `SESSION_SECRET` et `CSRF_SECRET`.
-`server.js` importe `dotenv/config` comme premier import afin que les modules qui lisent `process.env` au chargement voient les variables locales.
+`config/loadEnv.js` est importe en premier dans `server.js` et les scripts de setup afin que les modules ESM qui lisent `process.env` au chargement (ex. `middleware/csrf.js`) voient les variables du fichier `.env` local.
 
 Les donnees sont scopees par utilisateur via `userScope` et `scopeGuard`. Les actions sensibles doivent appeler `recordAudit()`.
+
+## Deploiement — Option A (hybride, recommandee)
+
+Decision retenue : **Vercel pour le frontend et les API rapides** ; **service always-on (Render/Railway) pour les composants stateful**.
+
+| Composant | Vercel | Always-on |
+|---|---|---|
+| Pages HTML statiques + login/search/dashboard | Oui | Oui |
+| Watch Log SSE (`/api/logs/watch/stream`) | Non | Oui |
+| Alert push SSE (`/api/alerts/stream`) | Non | Oui |
+| File watcher (`services/watcherService.js`) | Non | Oui |
+| Alert engine + retention (`setInterval`) | Non | Oui |
+| Import RAR volumineux (> 4,5 Mo) | Non | Oui |
+
+Sur Vercel, `START_BACKGROUND_JOBS=false` est force via `vercel.json`. Le handler serverless exporte `server.js` sans `.listen()`.
+
+Redis : utiliser Upstash (compatible Vercel) plutot que Render Key Value (reseau prive Render).
+
+Pool MySQL serverless : `DB_CONNECTION_LIMIT=2` recommande sur Vercel.
+
+Voir `DEV_PROD_SETUP.md` et `vercel.json` pour la configuration detaillee.

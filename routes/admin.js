@@ -28,7 +28,7 @@ router.get("/users", async (req, res) => {
       "SELECT id, email, display_name, role, is_active, last_login, created_at FROM users ORDER BY created_at DESC",
     );
     res.json(rows);
-  } catch (e) {
+  } catch (_e) {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -62,7 +62,7 @@ router.post("/users", validateBody(createUserSchema), async (req, res) => {
     });
 
     res.json({ success: true, id: result.insertId });
-  } catch (e) {
+  } catch (_e) {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -120,7 +120,7 @@ router.put("/users/:id", validateBody(updateUserSchema), async (req, res) => {
     });
 
     res.json({ success: true });
-  } catch (e) {
+  } catch (_e) {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -162,7 +162,7 @@ router.delete("/users/:id", async (req, res) => {
     });
 
     res.json({ success: true });
-  } catch (e) {
+  } catch (_e) {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -192,11 +192,11 @@ router.post(
       });
 
       res.json({ success: true });
-    } catch (e) {
+    } catch (_e) {
       res.status(500).json({ error: "Erreur serveur" });
     }
   },
-);
+)
 
 // ─── ALERT RULES CRUD ──────────────────────────────────
 
@@ -207,7 +207,7 @@ router.get("/alert-rules", async (req, res) => {
       [req.session.user.id],
     );
     res.json(rows);
-  } catch (e) {
+  } catch (_e) {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -251,7 +251,7 @@ router.post("/alert-rules", validateBody(alertRuleSchema), async (req, res) => {
     });
 
     res.json({ success: true, id: result.insertId });
-  } catch (e) {
+  } catch (_e) {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -355,7 +355,7 @@ router.delete("/alert-rules/:id", async (req, res) => {
     });
 
     res.json({ success: true });
-  } catch (e) {
+  } catch (_e) {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -419,9 +419,9 @@ router.patch("/alerts/:id", async (req, res) => {
     }
 
     res.json({ success: true, id: alertId, status });
-  } catch (e) {
+  } catch (_e) {
     logger.error(
-      { event: "alert_status_error", error: e.message },
+      { event: "alert_status_error", error: _e.message },
       "[ALERT STATUS]",
     );
     res.status(500).json({ error: "Erreur serveur" });
@@ -513,7 +513,7 @@ router.get("/retention/stats", async (req, res) => {
     const user = req.session.user;
     const stats = await getRetentionStats(user.id);
     res.json(stats);
-  } catch (e) {
+  } catch (_e) {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -531,7 +531,7 @@ router.post("/retention/run", async (req, res) => {
       ipAddress: req.ip,
     });
     res.json(result);
-  } catch (e) {
+  } catch (_e) {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -566,7 +566,7 @@ router.post("/purge", validateBody(purgeSchema), async (req, res) => {
     });
 
     res.json({ deleted: result.affectedRows });
-  } catch (e) {
+  } catch (_e) {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -631,8 +631,8 @@ router.get("/system-stats", async (req, res) => {
       inflightProcesses: watcherStatus.inflight
       // watcherErrors24h: 0, // Placeholder for future implementation
     });
-  } catch (e) {
-    logger.error({ event: 'system_stats_error', error: e.message }, '[ADMIN]');
+  } catch (_e) {
+    logger.error({ event: 'system_stats_error', error: _e.message }, '[ADMIN]');
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -648,8 +648,8 @@ router.get("/system-status", async (req, res) => {
     try {
       await pool.execute('SELECT 1');
       status.database = { connected: true, provider: 'Aiven MySQL' };
-    } catch (err) {
-      status.database = { connected: false, error: err.message };
+    } catch (_err) {
+      status.database = { connected: false, error: _err.message };
     }
 
     try {
@@ -659,7 +659,7 @@ router.get("/system-status", async (req, res) => {
         connected: Boolean(cache.connected),
         memoryUsedMb: cache.memoryUsedMb || null,
       };
-    } catch (err) {
+    } catch (_err) {
       status.redis = { connected: false, error: 'Cache disabled' };
     }
 
@@ -687,7 +687,7 @@ router.get("/system-status", async (req, res) => {
     status.watcher = getWatcherStatus();
     try {
       status.retention = await getRetentionStats();
-    } catch (_) {
+    } catch (__) {
       status.retention = null;
     }
 

@@ -117,7 +117,7 @@ export async function getCacheStatus() {
     if (!client) return { connected: false };
     await client.ping();
     return { connected: true };
-  } catch (e) {
+  } catch (_e) {
     return { connected: false };
   }
 }

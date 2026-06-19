@@ -1,9 +1,7 @@
+import './loadEnv.js';
 import mysql from 'mysql2/promise';
-import dotenv from 'dotenv';
 import logger from './logger.js';
 import fs from 'fs';
-
-dotenv.config();
 
 export function normalizeLevel(level) {
   const l = String(level || 'INFO').toUpperCase();

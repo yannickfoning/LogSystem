@@ -1,8 +1,7 @@
-import dotenv from 'dotenv';
-dotenv.config();
+import '../../config/loadEnv.js';
 
 import bcrypt from 'bcryptjs';
-import pool from '../config/database.js';
+import pool from '../../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 
 async function main() {

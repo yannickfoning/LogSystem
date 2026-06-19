@@ -1,92 +1,115 @@
 # Guide de Configuration DEV / PROD
 
-Ce document explique comment configurer les environnements de développement local et de production pour LogSystem, en assurant une séparation claire et sécurisée des bases de données et des services.
+Ce document explique comment configurer les environnements de développement local et de production pour LogSystem.
 
 ## Objectifs
 
-- **Développement Local** : Utiliser une base de données MySQL locale (`localhost:3306`, base `log`), sans SSL.
-- **Production** : Utiliser la base de données Aiven MySQL existante, avec SSL activé, telle que configurée sur Render.
+- **Développement local** : MySQL local (`localhost:3306`), sans SSL.
+- **Production always-on** (Render/Railway) : MySQL Aiven avec SSL, workers temps réel (SSE, watcher, alert engine).
+- **Vercel (Option A — hybride)** : frontend + API légères uniquement ; workers et imports lourds restent sur le service always-on.
 
-## 1. Variables d'Environnement
+## 1. Variables d'environnement
 
-LogSystem utilise les variables d'environnement pour toutes ses configurations sensibles.
+Copiez `.env.example` vers `.env` à la racine du projet.
 
-### Fichier `.env.example`
+### Secrets obligatoires
 
-Un fichier `.env.example` est fourni à la racine du projet. Il contient les variables minimales requises pour un environnement de développement local.
+Générez des secrets aléatoires (64 caractères recommandés) :
+
+```bash
+npm run secret
+# ou
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+```
+
+Remplacez dans `.env` :
+
+- `SESSION_SECRET` — minimum 32 caractères, **ne doit pas contenir** `change-me`
+- `CSRF_SECRET` — minimum 32 caractères
+
+### Base de données locale
 
 ```dotenv
-NODE_ENV=development
-PORT=3001
-
 DB_HOST=localhost
 DB_PORT=3306
 DB_USER=root
-DB_PASSWORD=
-DB_NAME=log
-DB_SSL=false # Pour le développement local, pas de SSL. En production, toujours 'true'.
-DB_CONNECTION_LIMIT=10 # Nombre maximum de connexions dans le pool. Ajustez selon la charge.
-
-SESSION_SECRET=CHANGE_ME_WITH_A_LONG_SECRET
-
-# ... (autres variables optionnelles comme UPLOAD_MAX_SIZE, WATCH_DIRS, etc.)
+DB_PASSWORD=votre_mot_de_passe
+DB_NAME=logsystem
+DB_SSL=false
 ```
 
-### Configuration Locale (`.env`)
+Créez la base si nécessaire :
 
-1. **Copiez** le fichier `.env.example` et renommez-le en `.env` à la racine de votre projet.
-2. **Modifiez** les valeurs :
-    - `DB_PASSWORD` : Le mot de passe de votre utilisateur `root` MySQL local.
-    - `SESSION_SECRET` : **Générez une clé secrète longue et aléatoire** (minimum 32 caractères, idéalement 64). Vous pouvez utiliser `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"` pour en générer une.
-    - Assurez-vous que `DB_SSL=false`.
+```sql
+CREATE DATABASE IF NOT EXISTS logsystem CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
 
-    **Note de Sécurité**: L'utilisation de `root` pour le développement local est courante mais fortement déconseillée en production. En production, utilisez un utilisateur avec des privilèges minimaux.
+## 2. Démarrage local (sans étape manuelle SQL)
 
-### Configuration de Production (Render)
+```bash
+npm install
+cp .env.example .env   # puis éditez les secrets et DB_PASSWORD
+node server.js
+```
 
-Les variables d'environnement pour la production doivent être configurées directement sur la plateforme de déploiement (Render dans ce cas).
+Au premier démarrage sur une base **vide** :
 
-**Ne modifiez JAMAIS ces variables directement dans le code ou dans un `.env` qui serait versionné et déployé.**
+1. Le runner applique `db/schema.sql` puis `db/migrations/*.sql`.
+2. Les tables critiques sont vérifiées — le serveur refuse de démarrer si une table manque.
+3. Créez les comptes par défaut : `npm run create-admin`
 
-Les variables Aiven existantes (DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, DB_SSL=true, DB_SSL_CA_PATH ou DB_SSL_CA) doivent être configurées dans les "Environment Variables" de votre service Render.
+Comptes créés par `create-admin` (à changer après la première connexion) :
 
-## 2. Démarrage de l'Application
+| Rôle | Email | Mot de passe |
+|---|---|---|
+| admin | admin@logsystem.local | Admin@1234 |
+| user | user@logsystem.local | User@1234 |
 
-### Démarrage Local
+## 3. Migrations
 
-1. Assurez-vous que votre serveur MySQL local est en cours d'exécution et que la base de données `log` existe (ou créez-la).
-2. Exécutez `npm install` pour installer les dépendances.
-3. Démarrez l'application : `npm run dev` ou `node server.js`.
-4. Au démarrage, vous verrez un log similaire à : `[DB] MySQL connection successful { event: 'db_connected', env: 'development', database: 'root@localhost/log' }`.
+**Aucune exécution manuelle de SQL n'est requise.** Le `migrationRunner.js` s'exécute automatiquement au démarrage (`RUN_MIGRATIONS_ON_START=true` par défaut).
 
-### Déploiement en Production
+Voir `MIGRATION_SQL.md` pour la liste des fichiers SQL et le comportement du runner.
 
-Le déploiement sur Render utilisera automatiquement les variables d'environnement configurées sur la plateforme. Le log de démarrage affichera : `[DB] MySQL connection successful { event: 'db_connected', env: 'production', database: 'avnadmin@mysql-xxx.aivencloud.com/defaultdb' }`.
+## 4. Production
 
-## 3. Migrations de Base de Données
+### Service always-on (Render / Railway) — recommandé
 
-Les scripts de migration SQL (`db/migrations/*.sql`) sont conçus pour être agnostiques à l'environnement. Le `migrationRunner.js` (exécuté au démarrage de `server.js`) utilisera la connexion à la base de données configurée via les variables d'environnement.
+Héberge l'application complète :
 
-- **Local** : Les migrations s'appliqueront à votre base `localhost/log`.
-- **Production** : Les migrations s'appliqueront à votre base Aiven.
+- Watch Log SSE (`/api/logs/watch/stream`)
+- Alert worker (`/api/alerts/stream`)
+- File watcher (`WATCH_DIRS`)
+- Alert engine + retention scheduler
+- Import de gros fichiers RAR
 
-## 4. Risques et Vérifications
+Variables identiques à `.env.example`, avec `DB_SSL=true` et les credentials Aiven.
 
-### Risques
+### Vercel (Option A — API légère uniquement)
 
-- **Oubli de `.env` local** : Si le fichier `.env` n'est pas créé ou est mal configuré, l'application pourrait tenter de se connecter à des valeurs par défaut ou échouer.
-- **`SESSION_SECRET` non valide** : Un `SESSION_SECRET` trop court ou contenant "change-me" empêchera l'application de démarrer (vérification en place dans `server.js`).
-- **Conflit de port** : Si `PORT=3001` est déjà utilisé localement, l'application ne démarrera pas.
+`vercel.json` désactive automatiquement les background jobs (`START_BACKGROUND_JOBS=false`).
 
-- **Fuite de Connexions / Saturation DB**: Une mauvaise gestion des connexions (ouverture/fermeture à chaque requête) peut saturer la base de données. L'utilisation d'un pool de connexions est essentielle.
+**Limites Vercel :**
 
-### Vérifications Essentielles
+- Pas de SSE persistant (Watch Log / alertes push)
+- Upload limité à ~4,5 Mo par requête
+- Pas de file watcher
 
-- **Log de démarrage** : Toujours vérifier le log `[DB] MySQL connection successful` pour confirmer l'environnement et la base de données ciblée.
-- **Fonctionnalités clés** : Tester la connexion utilisateur, la recherche de logs, l'importation et les dashboards dans l'environnement local.
-- **Migrations** : S'assurer que les migrations s'exécutent sans erreur dans les deux environnements.
-- **Sessions** : Vérifier que la connexion et la déconnexion fonctionnent correctement, et que la session est persistante.
+Configurez les variables dans le dashboard Vercel (voir section VERCEL dans `.env.example`).
 
----
+## 5. Vérifications essentielles
 
-Cette configuration assure une séparation propre et efficace entre vos environnements de développement et de production, vous permettant de travailler localement sans affecter la production et de déployer en toute confiance.
+- [ ] Log `[DB]` au démarrage sans erreur `[FATAL]`
+- [ ] Aucune erreur `[MIGRATION]` non ignorée (sauf doublons bénins)
+- [ ] `npm run create-admin` fonctionne
+- [ ] Connexion admin et user testées
+- [ ] CSRF actif sur les requêtes POST/PUT/DELETE
+
+## 6. Dépannage
+
+| Symptôme | Cause probable | Solution |
+|---|---|---|
+| `CSRF_SECRET must be set` | `.env` absent ou secret trop court | Vérifier `.env`, régénérer les secrets |
+| `SESSION_SECRET must be at least 32 characters` | Secret manquant ou contient `change-me` | Régénérer et mettre à jour `.env` |
+| `Tables manquantes après migrations` | MySQL inaccessible ou migrations en échec | Vérifier credentials, logs `[MIGRATION]` |
+| `create-admin` échoue | Migrations non appliquées | Démarrer `node server.js` une fois d'abord |
