@@ -10,6 +10,13 @@ let redis = null;
 let redisUnavailable = false; // FIX: flag séparé pour distinguer "pas encore connecté" vs "échec permanent"
 
 async function initRedis() {
+  // FIX: ne tenter la connexion que si Redis est explicitement configuré.
+  // Sans REDIS_URL/REDIS_HOST, on évite des tentatives répétées vers
+  // localhost:6379 (absent en production sur Render) qui polluent les logs.
+  if (!process.env.REDIS_URL && !process.env.REDIS_HOST) {
+    logger.info({ event: 'redis_not_configured' }, '[CACHE] Redis non configuré — mode dégradé (cache désactivé)');
+    return null;
+  }
   try {
     const { createClient } = await import('redis');
     const url = process.env.REDIS_URL || `redis://${process.env.REDIS_HOST || 'localhost'}:${process.env.REDIS_PORT || 6379}`;

@@ -43,3 +43,18 @@ services:
         value: "60000"
       - key: UPLOAD_MAX_SIZE
         value: "52428800"
+      # Redis (Render Key Value) — cache du dashboard
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: logsystem-cache
+          property: connectionString
+
+  # Render Key Value instance (Redis-compatible) — cache uniquement,
+  # pas de données critiques : le plan free suffit (25 Mo, pas de persistance disque).
+  - type: keyvalue
+    name: logsystem-cache
+    region: frankfurt
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []   # connexions internes uniquement, via le réseau privé Render
