@@ -9,6 +9,10 @@ ALTER TABLE watch_offsets
   DROP PRIMARY KEY;
 
 ALTER TABLE watch_offsets
-  MODIFY path TEXT NOT NULL,
-  MODIFY path_hash CHAR(64) NOT NULL,
+  MODIFY path TEXT NOT NULL;
+
+ALTER TABLE watch_offsets
+  MODIFY path_hash CHAR(64) NOT NULL;
+
+ALTER TABLE watch_offsets
   ADD PRIMARY KEY (path_hash);
