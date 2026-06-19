@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "server.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "server.js"
+    }
+  ],
+  "functions": {
+    "server.js": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  },
+  "env": {
+    "NODE_ENV": "production",
+    "START_BACKGROUND_JOBS": "false",
+    "RUN_MIGRATIONS_ON_START": "true",
+    "UPLOAD_MAX_SIZE": "4500000",
+    "IMPORT_BATCH_SIZE": "500"
+  }
+}

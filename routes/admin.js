@@ -11,7 +11,6 @@ import {
 import {
   validateBody,
   alertRuleSchema,
-  alertUpdateSchema,
   createUserSchema,
   updateUserSchema,
   resetPasswordSchema,

@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import dotenv from 'dotenv';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -49,6 +49,10 @@ import { createHtmlCspMiddleware } from './middleware/htmlCsp.js';
 const app = express();
 app.set('trust proxy', 1);
 const PORT = parseInt(process.env.PORT || '3001', 10);
+const IS_VERCEL = process.env.VERCEL === '1';
+const START_BACKGROUND_JOBS = process.env.START_BACKGROUND_JOBS !== 'false' && !IS_VERCEL;
+let initialized = false;
+let initializationPromise = null;
 
 // ── HTTPS redirect en production ─────────────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {
@@ -189,27 +193,47 @@ app.use((err, req, res, _next) => {
 });
 
 // ── Startup ───────────────────────────────────────────────────────────────────
-async function start() {
+export async function initializeApp() {
+  if (initialized) return { app, cacheStarted: false };
+  if (initializationPromise) return initializationPromise;
+
+  initializationPromise = (async () => {
   try {
     await testConnection();
     logger.info({ event: 'db_connection_success', env: process.env.NODE_ENV }, '[DB]');
   } catch (e) {
     logger.error({ event: 'db_connection_failed', error: e.message }, '[FATAL]');
-    process.exit(1);
+    throw e;
   }
 
-  await runMigrations();
+  if (process.env.RUN_MIGRATIONS_ON_START !== 'false') {
+    await runMigrations();
+  }
 
   const cacheStarted = await startCacheService();
   if (!cacheStarted) logger.warn('[CACHE] Redis not available — running without cache (degraded mode)');
 
   setAlertWorker(alertWorker);
-  try { await startAlertEngine(); } catch (e) { logger.error({ event: 'alertEngineStartFailed', message: e.message }); }
-  try { startRetentionScheduler(); } catch (e) { logger.error({ event: 'retentionStartFailed', message: e.message }); }
-  try { await startWatcher(); } catch (e) { logger.error({ event: 'watcherStartFailed', message: e.message }); }
+  if (START_BACKGROUND_JOBS) {
+    try { await startAlertEngine(); } catch (e) { logger.error({ event: 'alertEngineStartFailed', message: e.message }); }
+    try { startRetentionScheduler(); } catch (e) { logger.error({ event: 'retentionStartFailed', message: e.message }); }
+    try { await startWatcher(); } catch (e) { logger.error({ event: 'watcherStartFailed', message: e.message }); }
+  } else {
+    logger.info({ event: 'background_jobs_disabled', platform: IS_VERCEL ? 'vercel' : 'default' }, '[STARTUP]');
+  }
 
   const logsDir = (process.env.WATCH_DIRS || './logs').split(',')[0].trim();
-  if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+  if (START_BACKGROUND_JOBS && !fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+
+  initialized = true;
+  return { app, cacheStarted };
+  })();
+
+  return initializationPromise;
+}
+
+async function start() {
+  const { cacheStarted } = await initializeApp();
 
   const server = app.listen(PORT, () => {
   server.timeout = 300000;       // 5min - upload timeout
@@ -237,7 +261,17 @@ async function start() {
   process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
-start().catch((err) => {
-  logger.fatal({ event: 'startupFailed', message: err.message, stack: err.stack });
-  process.exit(1);
-});
+export default async function handler(req, res) {
+  await initializeApp();
+  return app(req, res);
+}
+
+export { app };
+
+const isDirectRun = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isDirectRun) {
+  start().catch((err) => {
+    logger.fatal({ event: 'startupFailed', message: err.message, stack: err.stack });
+    process.exit(1);
+  });
+}

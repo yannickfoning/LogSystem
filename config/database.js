@@ -51,18 +51,6 @@ const dbConfig = {
 
 const pool = mysql.createPool(dbConfig);
 
-// Test connexion au démarrage — ne bloque pas les tests
-pool.getConnection()
-  .then(connection => {
-    logger.info({ event: 'db_connected', env: process.env.NODE_ENV, database: `${dbConfig.user}@${dbConfig.host}/${dbConfig.database}` }, '[DB] MySQL connection pool initialized successfully.');
-    connection.release();
-  })
-  .catch(err => {
-    logger.error({ event: 'db_connection_error', error: err.message }, '[DB] Failed to connect to MySQL database.', err);
-    // Ne pas appeler process.exit() ici — laisser le code appelant décider
-    if (process.env.NODE_ENV !== 'test') process.exit(1);
-  });
-
 export default pool;
 
 export async function testConnection() {

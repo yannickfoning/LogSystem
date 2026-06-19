@@ -137,7 +137,7 @@ export async function detectRecurringPatterns(userId, windowHours = 24) {
  */
 export function suggestFix(errorType, message, stackTrace) {
   const msg = String(message || '').toLowerCase();
-  const stack = String(stackTrace || '').toLowerCase();
+  const _stack = String(stackTrace || '').toLowerCase();
   const err = String(errorType || '').toUpperCase();
   
   // AMÉLIORATION 6: Comprehensive error handling suggestions

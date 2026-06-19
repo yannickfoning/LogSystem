@@ -52,8 +52,8 @@ async function initRedis() {
 
     await redis.connect();
     return redis;
-  } catch (e) {
-    logger.warn({ event: 'redis_not_available', error: e.message }, '[CACHE]');
+  } catch (_e) {
+    logger.warn({ event: 'redis_not_available', error: _e.message }, '[CACHE]');
     redis = null;
     return null;
   }
@@ -64,7 +64,7 @@ function isReady() {
 }
 
 const CACHE_TTL_STATS = 300; // 5 minutes for stats
-const CACHE_TTL_COUNTERS = 60; // 1 minute for counters
+const _CACHE_TTL_COUNTERS = 60; // 1 minute for counters (reserved for future use)
 
 export async function getCachedDashboard(userId) {
   if (!isReady()) return null;
