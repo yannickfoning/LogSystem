@@ -321,7 +321,7 @@ router.put("/alert-rules/:id", async (req, res) => {
       return res.status(404).json({ error: "RÃ¨gle non trouvÃ©e" });
 
     res.json({ success: true });
-  } catch (e) {
+  } catch (_e) {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -674,7 +674,7 @@ router.get("/system-status", async (req, res) => {
         totalGb: (totalMem / 1024 / 1024 / 1024).toFixed(1),
         warning: usedPct > 90,
       };
-    } catch (err) {
+    } catch (_err) {
       status.disk = { usage: 'N/A' };
     }
 

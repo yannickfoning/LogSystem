@@ -30,7 +30,11 @@ export default [
     },
     rules: {
       'no-console': 'off',
-      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      'no-unused-vars': ['warn', { 
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_'
+      }],
       'no-empty': ['warn', { allowEmptyCatch: true }],
       'no-case-declarations': 'warn',
       'no-useless-escape': 'warn',
