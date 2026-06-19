@@ -9,6 +9,7 @@
 ## 📋 Vérifications Pré-Déploiement
 
 ### ✅ Code
+
 - [x] Build validation passed (59 JS files)
 - [x] Syntax errors: 0
 - [x] Import errors: 0
@@ -17,12 +18,14 @@
 - [x] vercel.json configured
 
 ### ✅ Base de Données
+
 - [x] MySQL/Aiven connecté
 - [x] Migrations prêtes
 - [x] Schema actuel validé
 - [x] SSL/TLS configuré
 
 ### ✅ Sécurité
+
 - [x] SESSION_SECRET configuré (64 chars)
 - [x] CSRF_SECRET configuré (64 chars)
 - [x] Helmet middleware activé
@@ -30,6 +33,7 @@
 - [x] Rate limiting configuré
 
 ### ✅ Performance
+
 - [x] Compression gzip activée
 - [x] Cache Redis configuré (optionnel)
 - [x] Connection pooling MySQL
@@ -100,7 +104,7 @@ git push origin main
 #### Option A: Via le Dashboard Vercel
 
 1. **Connecter le repo GitHub**
-   - Accéder à https://vercel.com/dashboard
+   - Accéder à <https://vercel.com/dashboard>
    - Cliquer sur "Add New" → "Project"
    - Importer le repository `yannickfoning/LogSystem`
 
@@ -115,7 +119,7 @@ git push origin main
 
 Ajouter dans Vercel Dashboard → Project Settings → Environment Variables:
 
-```
+```env
 # ─ NODE & APPLICATION
 NODE_ENV=production
 PORT=3000
@@ -145,7 +149,7 @@ ALERT_EVAL_INTERVAL=60000
 RETENTION_CRON_HOUR=3
 ```
 
-4. **Valider & Déployer**
+1. **Valider & Déployer**
    - Cliquer sur "Deploy"
    - Attendre ~2-3 minutes
    - Vercel affichera l'URL de production
@@ -181,6 +185,7 @@ node -e "console.log('CSRF_SECRET=' + require('crypto').randomBytes(64).toString
 ```
 
 **Ajouter ces valeurs dans:**
+
 1. Vercel Dashboard (Project Settings → Environment Variables)
 2. ~~.env local~~ (déjà dans .gitignore)
 
@@ -219,7 +224,7 @@ vercel logs --prod
 #### ✅ Tests manuels
 
 1. **Page de login**
-   - Accéder à https://<url>/login.html
+   - Accéder à `https://<url>/login.html`
    - Doit charger sans erreur
 
 2. **Connexion**
@@ -266,16 +271,19 @@ vercel rollback
 ## ⚠️ Limitations Vercel à Connaître
 
 ### Fichiers volumineux
+
 - **Limite request body:** ~4.5 MB
 - **Solution:** Utiliser `UPLOAD_MAX_SIZE=4500000`
 - **Pour gros fichiers:** Implémenter multipart upload côté client
 
 ### Timeouts
+
 - **maxDuration:** 60 secondes par défaut (configuré dans `vercel.json`)
 - **Attention:** Les imports très volumineux peuvent timeout
 - **Solution:** Limiter IMPORT_BATCH_SIZE ou implémenter job queue
 
 ### Background Jobs
+
 - ❌ **Alertes automatiques:** Désactivées (`START_BACKGROUND_JOBS=false`)
 - ❌ **Watcher temps réel:** Désactivé
 - ❌ **Retention scheduler:** Désactivé
@@ -284,6 +292,7 @@ vercel rollback
 **Alternative:** Utiliser Vercel Cron Jobs (fonctionnalité Pro)
 
 ### Redis
+
 - ✅ Supporté via Aiven ou third-party services
 - Configuration: Variable `REDIS_URL` en prod
 
@@ -310,6 +319,7 @@ vercel logs --prod --level=error
 ### Alertes (Vercel Pro)
 
 Configuration recommandée:
+
 - Alert si error rate > 1%
 - Alert si response time > 3s
 - Alert si deployment fails
@@ -334,11 +344,13 @@ Configuration recommandée:
 ### Secrets Management
 
 ⚠️ Ne JAMAIS:
+
 - Commiter les secrets dans `.env`
 - Exposer les secrets en logs
 - Utiliser des secrets hardcodés
 
 ✅ Toujours:
+
 - Utiliser Vercel Environment Variables (vault chiffré)
 - Générer avec cryptographie sécurisée
 - Rotater régulièrement
@@ -348,11 +360,11 @@ Configuration recommandée:
 
 ## 📱 URLs de Référence
 
-- **Repository:** https://github.com/yannickfoning/LogSystem
-- **Vercel Project:** https://vercel.com/dashboard/projects/logsystem
-- **Aiven Console:** https://console.aiven.io
-- **Logs:** https://vercel.com/dashboard/projects/logsystem/logs
-- **Deployments:** https://vercel.com/dashboard/projects/logsystem/deployments
+- **Repository:** <https://github.com/yannickfoning/LogSystem>
+- **Vercel Project:** <https://vercel.com/dashboard/projects/logsystem>
+- **Aiven Console:** <https://console.aiven.io>
+- **Logs:** <https://vercel.com/dashboard/projects/logsystem/logs>
+- **Deployments:** <https://vercel.com/dashboard/projects/logsystem/deployments>
 
 ---
 
@@ -360,11 +372,12 @@ Configuration recommandée:
 
 ### Erreur: "Cannot find module"
 
-```
+```bash
 Error: Cannot find module 'express'
 ```
 
 **Solution:**
+
 ```bash
 npm install  # ou npm ci
 git add package-lock.json
@@ -377,7 +390,8 @@ git push origin main
 
 ### Erreur: "Timeout after 60 seconds"
 
-**Solution:** 
+**Solution:**
+
 - Réduire IMPORT_BATCH_SIZE
 - Réduire UPLOAD_MAX_SIZE
 - Augmenter maxDuration dans vercel.json (si Pro)
@@ -393,9 +407,9 @@ git push origin main
 En cas de problème:
 
 1. Vérifier les logs Vercel: `vercel logs --prod`
-2. Consulter la documentation Vercel: https://vercel.com/docs
-3. Consulter la documentation Aiven: https://aiven.io/docs
-4. Créer une issue GitHub: https://github.com/yannickfoning/LogSystem/issues
+2. Consulter la documentation Vercel: <https://vercel.com/docs>
+3. Consulter la documentation Aiven: <https://aiven.io/docs>
+4. Créer une issue GitHub: <https://github.com/yannickfoning/LogSystem/issues>
 
 ---
 
