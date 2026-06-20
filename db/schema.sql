@@ -151,11 +151,13 @@ CREATE TABLE `audit_log` (
   `resource_id` VARCHAR(100),
   `details` TEXT,
   `ip_address` VARCHAR(45),
+  `status` VARCHAR(20) DEFAULT 'success',
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   INDEX `idx_audit_user` (`user_id`),
   INDEX `idx_audit_action` (`action`),
   INDEX `idx_audit_resource` (`resource_type`),
-  INDEX `idx_audit_created` (`created_at`)
+  INDEX `idx_audit_created` (`created_at`),
+  INDEX `idx_audit_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Watcher file offsets use a stable path hash as primary key to avoid indexing long paths.

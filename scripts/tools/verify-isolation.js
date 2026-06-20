@@ -1,5 +1,4 @@
 import pool from '../../config/database.js';
-import logger from '../../config/logger.js';
 
 /**
  * RAPPORT DE CERTIFICATION D'ISOLATION A/B

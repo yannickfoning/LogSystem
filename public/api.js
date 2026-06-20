@@ -67,7 +67,7 @@
           try { var d = JSON.parse(xhr.responseText);
             if (xhr.status >= 200 && xhr.status < 300) resolve(d);
             else reject(d && d.error ? d : { error: xhr.statusText });
-          } catch(e) { reject({ error: xhr.statusText }); }
+          } catch(_e) { reject({ error: xhr.statusText }); }
         };
         xhr.onerror = function() { reject({ error: 'Erreur réseau' }); };
         xhr.send(formData);
@@ -85,7 +85,7 @@
         day: '2-digit', month: '2-digit', year: 'numeric',
         hour: '2-digit', minute: '2-digit', second: '2-digit'
       });
-    } catch (e) {
+    } catch (_e) {
       return d.toLocaleString('fr-FR');
     }
   }
@@ -158,7 +158,7 @@
   toast.prototype.warning = function(msg) { this._add(msg, 'warning'); };
   toast.prototype.info = function(msg) { this._add(msg, 'info'); };
 
-  function paginationHtml(current, total, cb) {
+  function paginationHtml(current, total) {
     if (total <= 1) return '';
     var pages = [];
     var start = Math.max(1, current - 2);

@@ -3,7 +3,7 @@
  * Couvre tous les correctifs critiques appliqués lors de l'audit
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import path from 'path';
 
 // ── CORRECTIF 1 : SSL rejectUnauthorized ────────────────────────────────────

@@ -145,6 +145,7 @@
       if (!window.api) return;
       var currentPage = 1;
       var totalPages = 1;
+      var esc = window.escapeHtml;
 
       document.getElementById('logout-btn').addEventListener('click', function(e) {
         e.preventDefault();

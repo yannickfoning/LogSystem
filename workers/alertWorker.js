@@ -109,7 +109,7 @@ class AlertWorker {
       try {
         client.res.write(msg);
         client.lastActivity = Date.now();
-      } catch (e) {
+      } catch (_e) {
         clients.delete(client);
       }
     }
@@ -150,7 +150,7 @@ class AlertWorker {
           client.lastActivity = Date.now();
           sentCount++;
         }
-      } catch (e) {
+      } catch (_e) {
         clients.delete(client);
       }
     }
@@ -196,7 +196,7 @@ class AlertWorker {
           client.lastActivity = Date.now();
           sentCount++;
         }
-      } catch (e) {
+      } catch (_e) {
         clients.delete(client);
       }
     }

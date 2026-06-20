@@ -312,6 +312,7 @@
       if (!window.api) return;
       var myUserId = null;
       var auditPage = 1;
+      var esc = window.escapeHtml;
 
       window.initApp().then(function(u) { myUserId = u.id; });
 

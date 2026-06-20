@@ -17,8 +17,8 @@ export async function recordAudit({ userId, userEmail, action, resourceType, res
 
     await pool.execute(
       `INSERT INTO audit_log
-         (user_id, user_email, action, resource_type, resource_id, details, ip_address)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+         (user_id, user_email, action, resource_type, resource_id, details, ip_address, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         userId   || null,
         userEmail || null,
@@ -26,7 +26,8 @@ export async function recordAudit({ userId, userEmail, action, resourceType, res
         resourceType || null,
         resourceId !== undefined ? String(resourceId) : null,
         detailStr ? detailStr.substring(0, 2000) : null,
-        ipAddress || null
+        ipAddress || null,
+        status || 'success'
       ]
     );
   } catch (e) {
@@ -51,7 +52,8 @@ export function auditMiddleware(action, resourceType) {
         resourceType,
         resourceId: req.params?.id || body?.id || null,
         details: { status, method: req.method, path: req.path },
-        ipAddress: req.ip
+        ipAddress: req.ip,
+        status
       }).catch(() => {});
       return origJson(body);
     };

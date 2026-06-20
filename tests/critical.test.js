@@ -14,6 +14,12 @@ import { detectEncoding, convertToUtf8 } from '../lib/processing/encodingDetecto
 import { isArchive, detectArchiveType } from '../lib/processing/archiveHandler.js';
 
 describe('Log Processing', () => {
+  afterAll(async () => {
+    // Close the MySQL pool so `npm test` exits cleanly instead of hanging
+    // on an open connection once the suite finishes.
+    await pool.end().catch(() => {});
+  });
+
   describe('normalizeMessage', () => {
     it('should remove UUIDs', () => {
       const msg = 'User 550e8400-e29b-41d4-a716-446655440000 logged in';
@@ -219,7 +225,7 @@ describe('Database Constraints', () => {
     // Test database connection
     try {
       await pool.execute('SELECT 1');
-    } catch (e) {
+    } catch (_e) {
       console.warn('[TEST] Database not available, skipping DB tests');
     }
   });

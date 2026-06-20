@@ -86,7 +86,7 @@
       }
 
       window.location.href = data.role === 'admin' ? '/admin.html' : '/dashboard.html';
-    } catch (err) {
+    } catch (_err) {
       errorDiv.textContent = window.i18n ? window.i18n.t('login.error.network') : 'Erreur réseau. Vérifiez votre connexion.';
       errorDiv.style.display = 'block';
     } finally {

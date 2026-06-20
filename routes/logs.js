@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import logger from '../config/logger.js';
 import pool from '../config/database.js';
-import { requireAuth, requireAdmin, userScope } from '../middleware/auth.js';
-import { startWatcher, stopWatcher, getWatcherStatus, detectAnomalies, getWatchStats } from '../services/watcherService.js';
+import { requireAuth, userScope } from '../middleware/auth.js';
+import { detectAnomalies, getWatchStats } from '../services/watcherService.js';
 import { recordAudit } from '../middleware/audit.js';
+import { invalidateDashboard } from '../services/cacheService.js';
 import { generateLogPdf } from '../lib/pdfExport.js';
 
 const router = Router();
@@ -14,7 +15,7 @@ const DEFAULT_LIMIT = 50;
 const LOG_COLUMNS = 'id, timestamp, created_time, imported_at, log_level, source, source_server, service, message, normalized_message, event_type, error_type, fingerprint, user_id, target_user, module, parser_format, timestamp_inferred, created_at, file_name, file_created_at, import_job_id, imported_by_user_id, log_source, log_user';
 
 // ── Helper : filtres SQL partagés ─────────────────────────────────────────────
-function buildFilters(query, userScopeFilter, useImportedAtForDateRange = false) {
+function buildFilters(query, userScopeFilter) {
   const { log_level, source, source_server, service, event_type, error_type, fingerprint, date_from, date_to, imported_from, imported_to, search, from_timestamp, to_timestamp, realtime } = query;
   let sql = userScopeFilter.sql;
   const params = [...userScopeFilter.params];
@@ -56,22 +57,6 @@ function buildFilters(query, userScopeFilter, useImportedAtForDateRange = false)
     }
   }
   return { sql, params };
-}
-
-// ── Helper PDF row ────────────────────────────────────────────────────────────
-function pdfTableRow(doc, cols, y, rowH, colX, colW, isHeader = false) {
-  doc.save();
-  if (isHeader) {
-    doc.rect(colX[0], y, colX[cols.length - 1] + colW[cols.length - 1] - colX[0], rowH).fill('#2E75B6');
-  }
-  doc.restore();
-  cols.forEach((text, i) => {
-    doc.rect(colX[i], y, colW[i], rowH).stroke('#CCCCCC');
-    doc.font(isHeader ? 'Helvetica-Bold' : 'Helvetica')
-       .fontSize(isHeader ? 7 : 6.5)
-       .fillColor(isHeader ? '#FFFFFF' : '#111111')
-       .text(String(text).substring(0, 60), colX[i] + 3, y + 3, { width: colW[i] - 6, height: rowH - 4, ellipsis: true, lineBreak: false });
-  });
 }
 
 // ── GET /export/csv ───────────────────────────────────────────────────────────
@@ -199,8 +184,7 @@ router.get('/counts', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const userScopeFilter = userScope(req);
-    const { limit = 50, sort = 'timestamp', order = 'desc', last_id,
-            log_level, source, service, event_type, fingerprint, search, date_from, date_to } = req.query;
+    const { limit = 50, sort = 'timestamp', order = 'desc', last_id } = req.query;
 
     const limitVal = Math.min(Math.max(parseInt(limit) || DEFAULT_LIMIT, 1), MAX_LIMIT);
     const pageVal = parseInt(req.query.page, 10);
@@ -471,6 +455,7 @@ router.get('/:id', async (req, res) => {
     if (!rows.length) return res.status(404).json({ error: 'Log non trouvé' });
     res.json(rows[0]);
   } catch (e) {
+    logger.error({ event: 'log_detail_error', error: e.message }, '[LOGS GET ONE]');
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -515,7 +500,8 @@ function generateSuggestion(errorType, message, stackTrace) {
   const msg = String(message || '').toLowerCase();
   const stack = String(stackTrace || '').toLowerCase();
   const err = String(errorType || '').toUpperCase();
-  
+  const haystack = `${msg} ${stack}`;
+
   const suggestions = {
     'ECONNREFUSED': 'Vérifiez que le service cible est démarré et accessible sur le port indiqué.',
     'ETIMEDOUT': 'Augmentez le timeout ou vérifiez la latence réseau vers l\'hôte distant.',
@@ -528,23 +514,24 @@ function generateSuggestion(errorType, message, stackTrace) {
   // Check error type first
   if (suggestions[err]) return suggestions[err];
   
-  // Check message patterns
-  if (msg.includes('401') || msg.includes('unauthorized')) {
+  // Check message + stack trace patterns (stack often carries the clue the
+  // top-level message doesn't, e.g. a DB driver error wrapped by app code)
+  if (haystack.includes('401') || haystack.includes('unauthorized')) {
     return 'Erreur d\'authentification. Vérifiez les tokens et les identifiants.';
   }
-  if (msg.includes('403') || msg.includes('forbidden')) {
+  if (haystack.includes('403') || haystack.includes('forbidden')) {
     return 'Erreur d\'autorisation. Vérifiez les droits d\'accès et les permissions.';
   }
-  if (msg.includes('500') || msg.includes('internal server')) {
+  if (haystack.includes('500') || haystack.includes('internal server')) {
     return 'Erreur serveur interne. Consultez les logs du serveur pour plus de détails.';
   }
-  if (msg.includes('cannot read') || msg.includes('cannot set')) {
+  if (haystack.includes('cannot read') || haystack.includes('cannot set')) {
     return 'Une propriété est accédée sur une valeur null/undefined. Ajoutez une vérification null.';
   }
-  if (msg.includes('out of memory') || msg.includes('heap')) {
+  if (haystack.includes('out of memory') || haystack.includes('heap')) {
     return 'Mémoire insuffisante. Vérifiez les fuites mémoire ou augmentez --max-old-space-size.';
   }
-  if (msg.includes('deadlock')) {
+  if (haystack.includes('deadlock')) {
     return 'Deadlock détecté en base de données. Revisitez la logique de transation.';
   }
   
@@ -563,6 +550,7 @@ router.delete('/:id', async (req, res) => {
       const [result] = await pool.execute('DELETE FROM logs WHERE id = ?', [logId]);
       if (!result.affectedRows) return res.status(404).json({ error: 'Log non trouvé' });
       await recordAudit({ userId: user.id, userEmail: user.email, action: 'delete_log', resourceType: 'log', resourceId: String(logId), details: `Admin deleted log ${logId}`, ipAddress: req.ip });
+      await invalidateDashboard(user.id);
       return res.json({ success: true });
     }
 
@@ -571,8 +559,10 @@ router.delete('/:id', async (req, res) => {
     if (!result.affectedRows) return res.status(404).json({ error: 'Log non trouvé ou accès refusé' });
 
     await recordAudit({ userId: user.id, userEmail: user.email, action: 'delete_log', resourceType: 'log', resourceId: String(logId), details: `User deleted own log ${logId}`, ipAddress: req.ip });
+    await invalidateDashboard(user.id);
     res.json({ success: true });
   } catch (e) {
+    logger.error({ event: 'log_delete_error', error: e.message }, '[LOGS DELETE]');
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
