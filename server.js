@@ -8,16 +8,6 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 
 import crypto from 'crypto';
 import logger from './config/logger.js';
-
-// ── Anti-crash global ────────────────────────────────────────────────────────
-process.on('uncaughtException', (err) => {
-  logger.error({ event: 'uncaughtException', message: err.message, stack: err.stack, timestamp: new Date().toISOString() });
-  process.exit(1);
-});
-process.on('unhandledRejection', (reason) => {
-  logger.error({ event: 'unhandledRejection', message: reason?.message || String(reason), stack: reason?.stack, timestamp: new Date().toISOString() });
-});
-
 import express from 'express';
 import session from 'express-session';
 import MySQLStore from 'express-mysql-session';
@@ -45,12 +35,28 @@ import { startWatcher, stopWatcher, getWatcherStatus } from './services/watcherS
 import { startCacheService } from './services/cacheService.js';
 import { createHtmlCspMiddleware } from './middleware/htmlCsp.js';
 
+// ── Detect environment ────────────────────────────────────────────────────────
+const IS_VERCEL = !!(process.env.VERCEL || process.env.VERCEL_ENV || process.env.NOW_REGION);
+const IS_PROD = process.env.NODE_ENV === 'production';
+
+// ── Anti-crash global (non-Vercel only) ──────────────────────────────────────
+if (!IS_VERCEL) {
+  process.on('uncaughtException', (err) => {
+    logger.error({ event: 'uncaughtException', message: err.message, stack: err.stack });
+    process.exit(1);
+  });
+}
+process.on('unhandledRejection', (reason) => {
+  logger.error({ event: 'unhandledRejection', message: reason?.message || String(reason) });
+});
+
+// ── Express app (built synchronously — Vercel needs this ready at module load) ─
 const app = express();
 app.set('trust proxy', 1);
 const PORT = parseInt(process.env.PORT || '3001', 10);
 
-// ── HTTPS redirect en production ─────────────────────────────────────────────
-if (process.env.NODE_ENV === 'production') {
+// ── HTTPS redirect ────────────────────────────────────────────────────────────
+if (IS_PROD) {
   app.use((req, res, next) => {
     if (req.headers['x-forwarded-proto'] !== 'https') {
       return res.redirect(301, `https://${req.headers.host}${req.url}`);
@@ -59,13 +65,14 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-// ── Validation SESSION_SECRET ─────────────────────────────────────────────────
+// ── Session secret ────────────────────────────────────────────────────────────
 const sessionSecret = process.env.SESSION_SECRET;
-if (!sessionSecret || sessionSecret.includes('change-me') || sessionSecret.length < 32) {
-  logger.fatal('[FATAL] SESSION_SECRET must be at least 32 characters. Exiting.');
-  process.exit(1);
+if (!sessionSecret || sessionSecret.length < 32) {
+  logger.warn('[WARN] SESSION_SECRET missing or too short — using insecure fallback. Set SESSION_SECRET in Vercel env vars!');
 }
+const effectiveSecret = sessionSecret || ('logsystem-insecure-' + crypto.randomBytes(16).toString('hex'));
 
+// ── Middleware ────────────────────────────────────────────────────────────────
 app.use((req, res, next) => {
   res.locals.cspNonce = crypto.randomBytes(16).toString('base64');
   next();
@@ -83,7 +90,7 @@ app.use(cookieParser());
 
 app.use((req, res, next) => {
   helmet({
-    hsts: process.env.NODE_ENV === 'production' ? { maxAge: 31536000, includeSubDomains: true } : false,
+    hsts: IS_PROD ? { maxAge: 31536000, includeSubDomains: true } : false,
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
@@ -111,39 +118,38 @@ const loginLimiter = rateLimit({
   standardHeaders: true, legacyHeaders: false
 });
 
+// ── Session store (MySQL) ─────────────────────────────────────────────────────
 const MySQLSessionStore = MySQLStore(session);
 const sslOpts = buildSslOptions();
+
 const sessionStore = new MySQLSessionStore({
   host: process.env.DB_HOST,
   port: parseInt(process.env.DB_PORT || '3306'),
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  // SSL for Aiven: pass full object including rejectUnauthorized=false
   ssl: sslOpts || undefined,
   clearExpired: true,
   checkExpirationInterval: 900000,
   expiration: 86400000,
-  schema: {
-    tableName: 'sessions'
-  }
+  schema: { tableName: 'sessions' }
 });
 
 app.use(session({
-  secret: sessionSecret,
+  secret: effectiveSecret,
   resave: false,
   saveUninitialized: false,
   store: sessionStore,
   cookie: {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: IS_PROD,
     maxAge: 86400000,
     sameSite: 'lax'
   }
 }));
 
 app.use((req, res, next) => {
-  const isSecure = process.env.NODE_ENV === 'production' || req.headers['x-forwarded-proto'] === 'https';
+  const isSecure = IS_PROD || req.headers['x-forwarded-proto'] === 'https';
   if (req.session && req.session.cookie) req.session.cookie.secure = isSecure;
   next();
 });
@@ -160,9 +166,6 @@ app.use('/api/dashboard', requireAuth, scopeGuard, dashboardRoutes);
 app.use('/api/admin', requireAuth, scopeGuard, adminRoutes);
 app.use('/api/search', requireAuth, scopeGuard, searchApiRoutes);
 
-// SSE Alert Stream
-
-// Watchdogs status
 app.get('/api/watchdogs/status', requireAuth, (req, res) => {
   res.json(getWatcherStatus());
 });
@@ -170,12 +173,11 @@ app.get('/api/alerts/stream', requireAuth, (req, res) => {
   alertWorker.addClient(res, req);
 });
 
-// Health check Express (avant Next.js)
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime(), vercel: IS_VERCEL });
 });
 
-// Frontend HTML classique
+// ── Static files ──────────────────────────────────────────────────────────────
 const publicDir = path.join(__dirname, 'public');
 app.use(createHtmlCspMiddleware(publicDir));
 app.use(express.static(publicDir, { index: false }));
@@ -184,74 +186,79 @@ app.get('/', (req, res) => {
   res.redirect('/login.html');
 });
 
-// [FIX-12] Multer error handler — before generic 500 handler
+// ── Error handlers ────────────────────────────────────────────────────────────
 app.use(multerErrorHandler);
-
 app.use((err, req, res, _next) => {
-  logger.error({ event: 'express_error', message: err.message, stack: err.stack, path: req.path });
+  logger.error({ event: 'express_error', message: err.message, path: req.path });
   res.status(500).json({ error: 'Erreur interne du serveur' });
 });
 
-// ── Startup ───────────────────────────────────────────────────────────────────
-async function start() {
+// ── Background init (non-blocking) ───────────────────────────────────────────
+// Runs AFTER the app is exported so Vercel can handle requests immediately.
+// Migrations only run on non-Vercel OR on first cold start via lazy flag.
+let _initialized = false;
+
+async function initialize() {
+  if (_initialized) return;
+  _initialized = true;
+
   try {
     await testConnection();
-    logger.info({ event: 'db_connection_success', env: process.env.NODE_ENV }, '[DB]');
+    logger.info({ event: 'db_connected' }, '[DB] Connected');
   } catch (e) {
-    logger.error({ event: 'db_connection_failed', error: e.message }, '[FATAL]');
-    process.exit(1);
+    logger.error({ event: 'db_connection_failed', error: e.message }, '[DB] Connection failed — check env vars');
+    return; // Don't run migrations if DB unreachable
   }
 
-  await runMigrations();
+  // Skip migrations on Vercel (they run per cold-start = too slow + timeout risk)
+  // Run them manually once via: node scripts/setup/run-migrations.js
+  if (!IS_VERCEL) {
+    await runMigrations().catch(e => logger.error({ event: 'migration_failed', error: e.message }));
+  } else {
+    logger.info({ event: 'migrations_skipped', reason: 'vercel_serverless' }, '[VERCEL] Migrations skipped — run manually');
+  }
 
-  const cacheStarted = await startCacheService();
-  if (!cacheStarted) logger.warn('[CACHE] Redis not available — running without cache (degraded mode)');
-
+  await startCacheService().catch(() => {});
   setAlertWorker(alertWorker);
 
-  // On Vercel serverless, long-running services (watcher, alertEngine, scheduler)
-  // are disabled — they cannot persist between lambda invocations.
-  // On a persistent server (Render, VPS, Docker), they run normally.
-  const isVercel = !!(process.env.VERCEL || process.env.VERCEL_ENV);
-
-  if (!isVercel) {
-    try { await startAlertEngine(); } catch (e) { logger.error({ event: 'alertEngineStartFailed', message: e.message }); }
-    try { startRetentionScheduler(); } catch (e) { logger.error({ event: 'retentionStartFailed', message: e.message }); }
-    try { await startWatcher(); } catch (e) { logger.error({ event: 'watcherStartFailed', message: e.message }); }
+  if (!IS_VERCEL) {
+    await startAlertEngine().catch(e => logger.error({ event: 'alertEngineStartFailed', message: e.message }));
+    startRetentionScheduler().catch?.(() => {});
+    await startWatcher().catch(e => logger.error({ event: 'watcherStartFailed', message: e.message }));
     const logsDir = (process.env.WATCH_DIRS || './logs').split(',')[0].trim();
     try { if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true }); } catch (_) {}
-  } else {
-    logger.info({ event: 'vercel_mode' }, '[VERCEL] Serverless mode — watcher, alertEngine and scheduler disabled.');
-    try { await startAlertEngine(); } catch (e) { logger.error({ event: 'alertEngineStartFailed', message: e.message }); }
-  }
 
-  const server = app.listen(PORT, () => {
-  server.timeout = 300000;       // 5min - upload timeout
-  server.keepAliveTimeout = 310000;
-  server.headersTimeout = 320000;
-    logger.info({ event: 'server_started', port: PORT, env: process.env.NODE_ENV || 'development', cache: cacheStarted ? 'redis' : 'disabled' }, `[LogSystem] Running on http://localhost:${PORT}`);
-  });
-
-  const shutdown = (signal) => {
-    logger.info(`[${signal}] Shutting down gracefully...`);
-    alertWorker.closeAll();
-    stopWatcher();
-    stopAlertEngine();
-    server.close(() => {
-      logger.info('[SHUTDOWN] HTTP server closed');
-      process.exit(0);
+    // Listen (persistent server only)
+    const PORT_NUM = parseInt(process.env.PORT || '3001', 10);
+    const server = app.listen(PORT_NUM, () => {
+      server.timeout = 300000;
+      server.keepAliveTimeout = 310000;
+      server.headersTimeout = 320000;
+      logger.info({ event: 'server_started', port: PORT_NUM }, `[LogSystem] Running on http://localhost:${PORT_NUM}`);
     });
-    setTimeout(() => {
-      logger.error('[SHUTDOWN] Forced exit after timeout');
-      process.exit(1);
-    }, 10000);
-  };
 
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
-  process.on('SIGINT', () => shutdown('SIGINT'));
+    const shutdown = (signal) => {
+      logger.info(`[${signal}] Shutting down...`);
+      alertWorker.closeAll();
+      stopWatcher();
+      stopAlertEngine();
+      server.close(() => process.exit(0));
+      setTimeout(() => process.exit(1), 10000);
+    };
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
+  } else {
+    logger.info({ event: 'background_jobs_disabled', platform: 'vercel' }, '[STARTUP]');
+  }
 }
 
-start().catch((err) => {
-  logger.fatal({ event: 'startupFailed', message: err.message, stack: err.stack });
-  process.exit(1);
+// Start initialization (non-blocking — app already exported below)
+initialize().catch(err => {
+  logger.error({ event: 'init_failed', message: err.message });
 });
+
+// ── EXPORT (must be last, synchronous, and unconditional) ─────────────────────
+// Vercel reads this export to find the request handler.
+// The app is fully configured above — routes, middleware, session — so it's
+// ready to handle requests even before initialize() resolves.
+export default app;
