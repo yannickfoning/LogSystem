@@ -102,7 +102,7 @@ router.get('/export/csv', async (req, res) => {
     res.send('\uFEFF' + header + '\n' + body);
   } catch (e) {
     logger.error({ event: 'export_csv_failed', error: e.message }, '[EXPORT CSV]');
-    res.status(500).json({ error: 'Erreur export CSV' });
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur export CSV' });
   }
 });
 
@@ -195,7 +195,7 @@ router.get('/counts', async (req, res) => {
     res.json({ event_types: eventTypes, error_types: errorTypes, fingerprints, source_servers: sourceServers });
   } catch (e) {
     logger.error({ event: 'log_counts_failed', error: e.message }, '[LOG COUNTS]');
-    res.status(500).json({ error: 'Erreur calcul des décomptes' });
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur calcul des décomptes' });
   }
 });
 
@@ -251,7 +251,7 @@ router.get('/', async (req, res) => {
     res.json({ data, pagination: { cursor: nextCursor, has_more: hasMore, limit: limitVal } });
   } catch (e) {
     logger.error({ event: 'logs_get_failed', error: e.message }, '[LOGS GET]');
-    res.status(500).json({ error: 'Erreur récupération logs' });
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur récupération logs' });
   }
 });
 
@@ -332,7 +332,7 @@ router.get('/analysis/:fingerprint', async (req, res) => {
     });
   } catch (e) {
     logger.error({ event: 'analysis_failed', error: e.message }, '[ANALYSIS]');
-    res.status(500).json({ error: 'Erreur lors de l\'analyse' });
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur lors de l\'analyse' });
   }
 });
 
@@ -342,6 +342,38 @@ router.get('/watch/stream', async (req, res) => {
     const user = req.session?.user;
     if (!user) {
       return res.status(401).json({ error: 'Authentification requise' });
+    }
+
+    const isVercel = !!(process.env.VERCEL || process.env.VERCEL_ENV);
+    
+    // On Vercel serverless, SSE times out after 10-300s causing constant reconnections.
+    // Return a JSON response indicating polling mode instead.
+    if (isVercel) {
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
+      res.flushHeaders();
+      
+      res.write('event: connected\n');
+      res.write(`data: ${JSON.stringify({ connected: true, user_id: user.id, mode: 'polling', reason: 'vercel_serverless' })}\n\n`);
+      
+      // Send initial stats then close to avoid timeout
+      try {
+        const stats = await getWatchStats(user.id);
+        res.write('event: stats_update\n');
+        res.write(`data: ${JSON.stringify(stats)}\n\n`);
+      } catch (e) {
+        logger.error({ event: 'watch_stream_stats_error', error: e.message }, '[WATCH STREAM]');
+      }
+      
+      // Close after 5s to avoid timeout errors in logs
+      setTimeout(() => {
+        try {
+          res.end();
+        } catch (_) {}
+      }, 5000);
+      return;
     }
 
     res.setHeader('Content-Type', 'text/event-stream');
@@ -415,7 +447,7 @@ router.get('/watch/stats', async (req, res) => {
     res.json(stats);
   } catch (error) {
     logger.error({ event: 'watch_stats_failed', error: error.message }, '[WATCH STATS]');
-    res.status(500).json({ error: error.message });
+    if (!res.headersSent) res.status(500).json({ error: error.message });
   }
 });
 
@@ -431,7 +463,7 @@ router.get('/watch/anomalies', async (req, res) => {
     res.json(anomaly);
   } catch (error) {
     logger.error({ event: 'watch_anomalies_failed', error: error.message }, '[WATCH ANOMALIES]');
-    res.status(500).json({ error: error.message });
+    if (!res.headersSent) res.status(500).json({ error: error.message });
   }
 });
 
@@ -462,7 +494,7 @@ router.get('/directory', async (req, res) => {
     res.json({ data: rows });
   } catch (e) {
     logger.error({ event: 'log_directory_failed', error: e.message }, '[LOG DIRECTORY]');
-    res.status(500).json({ error: 'Erreur repertoire des logs' });
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur repertoire des logs' });
   }
 });
 
@@ -476,7 +508,7 @@ router.get('/:id', async (req, res) => {
     res.json(rows[0]);
   } catch (e) {
     logger.error({ event: 'log_detail_error', error: e.message }, '[LOGS GET ONE]');
-    res.status(500).json({ error: 'Erreur serveur' });
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -511,7 +543,7 @@ router.delete('/alerts/:id', async (req, res) => {
     res.json({ success: true, id: alertId });
   } catch (e) {
     logger.error({ event: 'alert_delete_failed', error: e.message }, '[ALERT DELETE]');
-    res.status(500).json({ error: 'Erreur lors de la suppression de l\'alerte' });
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur lors de la suppression de l\'alerte' });
   }
 });
 
@@ -583,7 +615,7 @@ router.delete('/:id', async (req, res) => {
     res.json({ success: true });
   } catch (e) {
     logger.error({ event: 'log_delete_error', error: e.message }, '[LOGS DELETE]');
-    res.status(500).json({ error: 'Erreur serveur' });
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 

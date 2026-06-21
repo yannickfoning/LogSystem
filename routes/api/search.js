@@ -233,7 +233,7 @@ router.get('/', async (req, res) => {
     });
   } catch (e) {
     logger.error({ event: 'search_error', error: e.message }, '[API]');
-    res.status(500).json({ error: 'Erreur lors de la recherche' });
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur lors de la recherche' });
   }
 });
 
@@ -321,7 +321,7 @@ router.get('/error-directory', async (req, res) => {
     });
   } catch (e) {
     logger.error({ event: 'error_directory_error', error: e.message }, '[API]');
-    res.status(500).json({ error: 'Erreur lors de la récupération du répertoire des erreurs' });
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur lors de la récupération du répertoire des erreurs' });
   }
 });
 
@@ -428,7 +428,7 @@ router.get('/trends', async (req, res) => {
     });
   } catch (e) {
     logger.error({ event: 'trends_error', error: e.message }, '[API]');
-    res.status(500).json({ error: 'Erreur lors du calcul des tendances' });
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur lors du calcul des tendances' });
   }
 });
 
@@ -488,7 +488,7 @@ router.get('/metadata', async (req, res) => {
     });
   } catch (e) {
     logger.error({ event: 'metadata_error', error: e.message }, '[API]');
-    res.status(500).json({ error: 'Erreur lors de la récupération des métadonnées' });
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur lors de la récupération des métadonnées' });
   }
 });
 

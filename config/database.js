@@ -67,6 +67,12 @@ function buildSslConfig() {
 
 const sslConfig = buildSslConfig();
 
+// Vercel serverless environment needs higher connection limits
+// Multiple serverless functions can run concurrently
+const isVercel = !!(process.env.VERCEL || process.env.VERCEL_ENV);
+const defaultConnectionLimit = isVercel ? 50 : 10;
+const defaultQueueLimit = isVercel ? 100 : 0;
+
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT || '3306', 10),
@@ -74,9 +80,11 @@ const dbConfig = {
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'logsystem',
   waitForConnections: true,
-  connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || '10', 10),
-  queueLimit: parseInt(process.env.DB_QUEUE_LIMIT || '0', 10),
+  connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || defaultConnectionLimit, 10),
+  queueLimit: parseInt(process.env.DB_QUEUE_LIMIT || defaultQueueLimit, 10),
   ssl: sslConfig,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 0,
 };
 
 const pool = mysql.createPool(dbConfig);
