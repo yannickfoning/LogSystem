@@ -11,6 +11,7 @@ import {
 import {
   validateBody,
   alertRuleSchema,
+  alertUpdateSchema,
   createUserSchema,
   updateUserSchema,
   resetPasswordSchema,
@@ -28,7 +29,7 @@ router.get("/users", async (req, res) => {
       "SELECT id, email, display_name, role, is_active, last_login, created_at FROM users ORDER BY created_at DESC",
     );
     res.json(rows);
-  } catch (_e) {
+  } catch (e) {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -62,7 +63,7 @@ router.post("/users", validateBody(createUserSchema), async (req, res) => {
     });
 
     res.json({ success: true, id: result.insertId });
-  } catch (_e) {
+  } catch (e) {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -120,7 +121,7 @@ router.put("/users/:id", validateBody(updateUserSchema), async (req, res) => {
     });
 
     res.json({ success: true });
-  } catch (_e) {
+  } catch (e) {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -162,7 +163,7 @@ router.delete("/users/:id", async (req, res) => {
     });
 
     res.json({ success: true });
-  } catch (_e) {
+  } catch (e) {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -192,22 +193,22 @@ router.post(
       });
 
       res.json({ success: true });
-    } catch (_e) {
+    } catch (e) {
       res.status(500).json({ error: "Erreur serveur" });
     }
   },
-)
+);
 
 // ─── ALERT RULES CRUD ──────────────────────────────────
 
 router.get("/alert-rules", async (req, res) => {
   try {
     const [rows] = await pool.execute(
-      "SELECT ar.*, u.email as created_by_email FROM alert_rules ar LEFT JOIN users u ON ar.created_by = u.id WHERE ar.created_by = ? ORDER BY ar.created_at DESC",
+      "SELECT ar.*, u.email as created_by_email FROM alert_rules ar LEFT JOIN users u ON ar.created_by = u.id WHERE ar.created_by = ? OR ar.is_global = 1 ORDER BY ar.created_at DESC",
       [req.session.user.id],
     );
     res.json(rows);
-  } catch (_e) {
+  } catch (e) {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -251,7 +252,7 @@ router.post("/alert-rules", validateBody(alertRuleSchema), async (req, res) => {
     });
 
     res.json({ success: true, id: result.insertId });
-  } catch (_e) {
+  } catch (e) {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -318,10 +319,10 @@ router.put("/alert-rules/:id", async (req, res) => {
       params,
     );
     if (result.affectedRows === 0)
-      return res.status(404).json({ error: "RÃ¨gle non trouvÃ©e" });
+      return res.status(404).json({ error: "Règle non trouvée" });
 
     res.json({ success: true });
-  } catch (_e) {
+  } catch (e) {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -333,7 +334,7 @@ router.delete("/alert-rules/:id", async (req, res) => {
       [req.params.id, req.session.user.id],
     );
     if (owned.length === 0)
-      return res.status(404).json({ error: "RÃ¨gle non trouvÃ©e" });
+      return res.status(404).json({ error: "Règle non trouvée" });
     await pool.execute("DELETE FROM alerts WHERE rule_id = ? AND user_id = ?", [
       req.params.id,
       req.session.user.id,
@@ -355,7 +356,7 @@ router.delete("/alert-rules/:id", async (req, res) => {
     });
 
     res.json({ success: true });
-  } catch (_e) {
+  } catch (e) {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -419,9 +420,9 @@ router.patch("/alerts/:id", async (req, res) => {
     }
 
     res.json({ success: true, id: alertId, status });
-  } catch (_e) {
+  } catch (e) {
     logger.error(
-      { event: "alert_status_error", error: _e.message },
+      { event: "alert_status_error", error: e.message },
       "[ALERT STATUS]",
     );
     res.status(500).json({ error: "Erreur serveur" });
@@ -513,7 +514,7 @@ router.get("/retention/stats", async (req, res) => {
     const user = req.session.user;
     const stats = await getRetentionStats(user.id);
     res.json(stats);
-  } catch (_e) {
+  } catch (e) {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -531,7 +532,7 @@ router.post("/retention/run", async (req, res) => {
       ipAddress: req.ip,
     });
     res.json(result);
-  } catch (_e) {
+  } catch (e) {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -566,7 +567,7 @@ router.post("/purge", validateBody(purgeSchema), async (req, res) => {
     });
 
     res.json({ deleted: result.affectedRows });
-  } catch (_e) {
+  } catch (e) {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -631,8 +632,8 @@ router.get("/system-stats", async (req, res) => {
       inflightProcesses: watcherStatus.inflight
       // watcherErrors24h: 0, // Placeholder for future implementation
     });
-  } catch (_e) {
-    logger.error({ event: 'system_stats_error', error: _e.message }, '[ADMIN]');
+  } catch (e) {
+    logger.error({ event: 'system_stats_error', error: e.message }, '[ADMIN]');
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -648,8 +649,8 @@ router.get("/system-status", async (req, res) => {
     try {
       await pool.execute('SELECT 1');
       status.database = { connected: true, provider: 'Aiven MySQL' };
-    } catch (_err) {
-      status.database = { connected: false, error: _err.message };
+    } catch (err) {
+      status.database = { connected: false, error: err.message };
     }
 
     try {
@@ -659,7 +660,7 @@ router.get("/system-status", async (req, res) => {
         connected: Boolean(cache.connected),
         memoryUsedMb: cache.memoryUsedMb || null,
       };
-    } catch (_err) {
+    } catch (err) {
       status.redis = { connected: false, error: 'Cache disabled' };
     }
 
@@ -674,7 +675,7 @@ router.get("/system-status", async (req, res) => {
         totalGb: (totalMem / 1024 / 1024 / 1024).toFixed(1),
         warning: usedPct > 90,
       };
-    } catch (_err) {
+    } catch (err) {
       status.disk = { usage: 'N/A' };
     }
 
@@ -687,7 +688,7 @@ router.get("/system-status", async (req, res) => {
     status.watcher = getWatcherStatus();
     try {
       status.retention = await getRetentionStats();
-    } catch (__) {
+    } catch (_) {
       status.retention = null;
     }
 
@@ -695,6 +696,44 @@ router.get("/system-status", async (req, res) => {
   } catch (e) {
     logger.error({ event: 'system_status_error', error: e.message }, '[ADMIN]');
     res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+
+// POST /alert-rules/seed-defaults — insérer les règles d'alerte par défaut
+router.post("/alert-rules/seed-defaults", async (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    const [existing] = await pool.execute(
+      "SELECT COUNT(*) as cnt FROM alert_rules WHERE created_by = ? OR is_global = 1",
+      [userId]
+    );
+    if (existing[0].cnt > 0) {
+      return res.json({ success: true, message: "Règles déjà existantes", seeded: 0 });
+    }
+
+    const defaults = [
+      { name: "Erreurs critiques", description: "Alerte quand des logs CRITICAL ou FATAL sont détectés", condition_type: "level", condition_value: "CRITICAL,FATAL", threshold_value: 1, time_window_minutes: 5, severity: "critical", cooldown_minutes: 15, is_global: 0 },
+      { name: "Pic d'erreurs", description: "Alerte si + de 10 erreurs en 10 minutes", condition_type: "error_rate", condition_value: "ERROR", threshold_value: 10, time_window_minutes: 10, severity: "high", cooldown_minutes: 30, is_global: 0 },
+      { name: "Volume anormal", description: "Alerte si anomalie de volume détectée", condition_type: "anomaly", condition_value: "volume", threshold_value: null, time_window_minutes: 60, severity: "medium", cooldown_minutes: 60, is_global: 0 },
+      { name: "Inactivité des logs", description: "Alerte si aucun log reçu depuis 2 heures", condition_type: "log_inactivity", condition_value: "2h", threshold_value: 120, time_window_minutes: 120, severity: "medium", cooldown_minutes: 120, is_global: 0 },
+    ];
+
+    let seeded = 0;
+    for (const rule of defaults) {
+      await pool.execute(
+        `INSERT IGNORE INTO alert_rules (name, description, condition_type, condition_value, threshold_value, time_window_minutes, severity, cooldown_minutes, is_active, is_global, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+        [rule.name, rule.description, rule.condition_type, rule.condition_value, rule.threshold_value, rule.time_window_minutes, rule.severity, rule.cooldown_minutes, rule.is_global, userId]
+      );
+      seeded++;
+    }
+
+    await recordAudit({ userId, userEmail: req.session.user.email, action: "seed_default_rules", resourceType: "alert_rules", details: `Seeded ${seeded} default alert rules`, ipAddress: req.ip });
+    res.json({ success: true, seeded, message: `${seeded} règles par défaut créées` });
+  } catch (e) {
+    logger.error({ event: "seed_defaults_error", error: e.message });
+    res.status(500).json({ error: "Erreur serveur" });
   }
 });
 

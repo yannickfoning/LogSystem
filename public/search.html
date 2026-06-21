@@ -145,7 +145,6 @@
       if (!window.api) return;
       var currentPage = 1;
       var totalPages = 1;
-      var esc = window.escapeHtml;
 
       document.getElementById('logout-btn').addEventListener('click', function(e) {
         e.preventDefault();
@@ -217,6 +216,8 @@
 
       document.getElementById('search-btn').addEventListener('click', function() { currentPage = 1; doSearch(); });
       document.getElementById('f-search').addEventListener('keyup', function(e) { if (e.key === 'Enter') { currentPage = 1; doSearch(); } });
+      // Auto-search on page load to show recent logs immediately
+      doSearch();
 
       function getSearchApiParams() {
         var p = getParams();

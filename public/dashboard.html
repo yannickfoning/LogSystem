@@ -47,6 +47,7 @@
     </div>
 
     <!-- KPI -->
+
     <div class="kpi-row">
       <div class="kpi-card-v2 blue">
         <div class="kpi-icon">📊</div>
@@ -83,40 +84,6 @@
         <div class="kpi-label-v2">Sources actives</div>
         <div class="kpi-value-v2" id="kpi-sources">—</div>
         <div class="kpi-trend" data-i18n="dashboard.kpi.distinct_sources">Distinct sources</div>
-      </div>
-    </div>
-
-    <!-- KPI row 2 : INFO / WARNING / ERROR / CRITICAL breakdown (point 6) -->
-    <div class="kpi-row kpi-row-gap">
-      <div class="kpi-card-v2 border-debug">
-        <div class="kpi-icon">🔵</div>
-        <div class="kpi-label-v2">DEBUG</div>
-        <div class="kpi-value-v2" id="kpi-debug">—</div>
-        <div class="kpi-trend text-kpi-trend" id="kpi-debug-pct">— %</div>
-      </div>
-      <div class="kpi-card-v2 border-info">
-        <div class="kpi-icon">ℹ️</div>
-        <div class="kpi-label-v2">INFO</div>
-        <div class="kpi-value-v2" id="kpi-info">—</div>
-        <div class="kpi-trend text-kpi-trend" id="kpi-info-pct">— %</div>
-      </div>
-      <div class="kpi-card-v2 border-warning">
-        <div class="kpi-icon">⚠️</div>
-        <div class="kpi-label-v2">WARNING</div>
-        <div class="kpi-value-v2" id="kpi-warning">—</div>
-        <div class="kpi-trend text-kpi-trend" id="kpi-warning-pct">— %</div>
-      </div>
-      <div class="kpi-card-v2 border-error">
-        <div class="kpi-icon">❌</div>
-        <div class="kpi-label-v2">ERROR</div>
-        <div class="kpi-value-v2" id="kpi-error">—</div>
-        <div class="kpi-trend text-kpi-trend" id="kpi-error-pct">— %</div>
-      </div>
-      <div class="kpi-card-v2 border-critical">
-        <div class="kpi-icon">🔴</div>
-        <div class="kpi-label-v2">CRITICAL</div>
-        <div class="kpi-value-v2" id="kpi-critical">—</div>
-        <div class="kpi-trend text-kpi-trend" id="kpi-critical-pct">— %</div>
       </div>
     </div>
 
@@ -489,6 +456,8 @@
       var r = getTrendsRange();
       var interval = trendsState.windowDays === 1 ? 'hour' : 'day';
       var url = '/api/dashboard/trends?date_from='+fmtDate(r.start)+'&date_to='+fmtDate(r.end)+'&interval='+interval;
+        // Also pass days parameter for server-side reference
+        if (interval === 'hour') url += '&days=1';
       return api.get(url).then(function(d) {
         if (!d || !d.labels) return;
         trendsState.lastPayload = d;
@@ -499,8 +468,7 @@
         if (trendsChart) { trendsChart.destroy(); trendsChart = null; }
         if (!hasAny) {
           var w = document.getElementById('trends-wrapper');
-          w.innerHTML = '<div class="trends-empty">' + t('dashboard.no_period_data') + '</div>';
-          setTimeout(function(){ w.innerHTML = '<canvas id="trends-chart" role="img" aria-label="Graphique des tendances de logs">' + t('dashboard.no_data') + '</canvas>'; }, 0);
+          w.innerHTML = '<div class="trends-empty" style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted,#888);font-size:13px;">Aucune donnée pour cette période</div>';
           return;
         }
         trendsChart = renderTrendsTo(canvas, d, false);

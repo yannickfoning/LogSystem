@@ -53,6 +53,7 @@ process.on('unhandledRejection', (reason) => {
 // ── Express app (built synchronously — Vercel needs this ready at module load) ─
 const app = express();
 app.set('trust proxy', 1);
+// eslint-disable-next-line no-unused-vars
 const PORT = parseInt(process.env.PORT || '3001', 10);
 
 // ── HTTPS redirect ────────────────────────────────────────────────────────────

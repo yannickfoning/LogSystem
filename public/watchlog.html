@@ -309,11 +309,48 @@
 
     // ─── Connexion SSE #2 : stats et détection d'anomalies ─────────────────
     function initStatsSSE() {
+      // Try SSE first (works on persistent servers, not on Vercel serverless)
       statsSource = new EventSource('/api/logs/watch/stream');
+      // Fallback: if SSE doesn't connect within 5s, switch to polling
+      var sseConnected = false;
+      statsSource.addEventListener('connected', function() { sseConnected = true; });
+      statsSource.addEventListener('stats_update', function() { sseConnected = true; });
+      statsSource.onerror = function() {
+        if (!sseConnected) {
+          console.warn('[WatchLog] SSE non disponible (Vercel serverless) — mode polling activé');
+          statsSource.close();
+          statsSource = null;
+          // Poll stats every 10 seconds instead
+          if (!window._watchPollInterval) {
+            window._watchPollInterval = setInterval(function() {
+              api.get('/api/logs/watch/stats').then(function(stats) {
+                if (stats) updateStats(stats);
+              }).catch(function(){});
+              // Also reload logs
+              if (typeof loadLogs === 'function') loadLogs();
+            }, 10000);
+          }
+        }
+      };
 
       statsSource.addEventListener('connected', function() {
         statsReconnectDelay = 1000;
       });
+
+      function updateStats(stats) {
+        if (stats.logs_last_hour !== undefined) {
+          var el = document.getElementById('stat-logs-min');
+          if (el) el.textContent = stats.logs_last_hour || 0;
+        }
+        if (stats.errors_last_hour !== undefined) {
+          var el2 = document.getElementById('stat-errors');
+          if (el2) el2.textContent = stats.errors_last_hour || 0;
+        }
+        if (stats.services_active !== undefined) {
+          var el3 = document.getElementById('stat-services');
+          if (el3) el3.textContent = stats.services_active || 0;
+        }
+      }
 
       statsSource.addEventListener('stats_update', function(e) {
         try {
@@ -743,7 +780,8 @@
 
     function loadRecentLogs() {
       const twentyFourHoursAgo = new Date(Date.now() - TWENTY_FOUR_HOURS_MS).toISOString().slice(0,19);
-      return api.get('/api/logs?limit=100&sort=id&order=desc&date_from=' + encodeURIComponent(twentyFourHoursAgo)).then(function(resp) {
+      // Load recent logs by import time (not log timestamp) so imported logs always appear
+      return api.get('/api/logs?limit=100&sort=id&order=desc').then(function(resp) {
         const rows = resp && resp.data ? resp.data : (Array.isArray(resp) ? resp : []);
         replaceBufferWithLogs(rows);
       }).catch(function(err) {
