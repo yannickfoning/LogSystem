@@ -81,7 +81,7 @@ const dbConfig = {
 
 const pool = mysql.createPool(dbConfig);
 
-// Test connexion au démarrage
+// Test connexion au démarrage — sans process.exit (incompatible Vercel serverless)
 pool.getConnection()
   .then(connection => {
     logger.info({
@@ -93,8 +93,9 @@ pool.getConnection()
     connection.release();
   })
   .catch(err => {
-    logger.error({ event: 'db_connection_error', error: err.message, code: err.code }, '[DB] Failed to connect to MySQL database.');
-    if (process.env.NODE_ENV !== 'test') process.exit(1);
+    // Ne pas appeler process.exit() — sur Vercel cela tuerait la lambda pour toutes les requêtes
+    // L'erreur sera visible dans les logs et chaque requête DB retournera une erreur 500
+    logger.error({ event: 'db_connection_error', error: err.message, code: err.code }, '[DB] Failed to connect to MySQL. Check DB_HOST, DB_USER, DB_PASSWORD, DB_SSL env vars.');
   });
 
 export default pool;
