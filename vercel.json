@@ -3,7 +3,14 @@
   "builds": [
     {
       "src": "server.js",
-      "use": "@vercel/node"
+      "use": "@vercel/node",
+      "config": {
+        "maxLambdaSize": "50mb"
+      }
+    },
+    {
+      "src": "public/**",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
@@ -12,15 +19,15 @@
       "dest": "server.js"
     },
     {
-      "src": "/(.*\\.html)",
-      "dest": "/public/$1"
+      "src": "/health",
+      "dest": "server.js"
     },
     {
-      "src": "/(.*\\.js)",
-      "dest": "/public/$1"
+      "src": "/alerts/stream",
+      "dest": "server.js"
     },
     {
-      "src": "/(.*\\.css)",
+      "src": "/(.*\\.(html|css|js|svg|png|jpg|ico|webp|woff2?|ttf|eot|txt))",
       "dest": "/public/$1"
     },
     {
@@ -31,18 +38,5 @@
       "src": "/(.*)",
       "dest": "server.js"
     }
-  ],
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
-      ]
-    }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  }
+  ]
 }

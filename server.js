@@ -1,9 +1,10 @@
-import './config/loadEnv.js';
+import dotenv from 'dotenv';
 import path from 'path';
-import { fileURLToPath, pathToFileURL } from 'url';
+import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 import crypto from 'crypto';
 import logger from './config/logger.js';
@@ -26,7 +27,7 @@ import rateLimit from 'express-rate-limit';
 import compression from 'compression';
 import fs from 'fs';
 
-import { testConnection, buildSslOptions, describeSslStatus } from './config/database.js';
+import { testConnection, buildSslOptions } from './config/database.js';
 import { runMigrations } from './lib/database/migrationRunner.js';
 import { requireAuth } from './middleware/auth.js';
 import { scopeGuard } from './middleware/scopeGuard.js';
@@ -47,10 +48,6 @@ import { createHtmlCspMiddleware } from './middleware/htmlCsp.js';
 const app = express();
 app.set('trust proxy', 1);
 const PORT = parseInt(process.env.PORT || '3001', 10);
-const IS_VERCEL = process.env.VERCEL === '1';
-const START_BACKGROUND_JOBS = process.env.START_BACKGROUND_JOBS !== 'false' && !IS_VERCEL;
-let initialized = false;
-let initializationPromise = null;
 
 // ── HTTPS redirect en production ─────────────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {
@@ -115,16 +112,21 @@ const loginLimiter = rateLimit({
 });
 
 const MySQLSessionStore = MySQLStore(session);
+const sslOpts = buildSslOptions();
 const sessionStore = new MySQLSessionStore({
   host: process.env.DB_HOST,
   port: parseInt(process.env.DB_PORT || '3306'),
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  ssl: buildSslOptions(),
+  // SSL for Aiven: pass full object including rejectUnauthorized=false
+  ssl: sslOpts || undefined,
   clearExpired: true,
   checkExpirationInterval: 900000,
-  expiration: 86400000
+  expiration: 86400000,
+  schema: {
+    tableName: 'sessions'
+  }
 });
 
 app.use(session({
@@ -168,7 +170,7 @@ app.get('/api/alerts/stream', requireAuth, (req, res) => {
   alertWorker.addClient(res, req);
 });
 
-// Health check
+// Health check Express (avant Next.js)
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
 });
@@ -191,47 +193,37 @@ app.use((err, req, res, _next) => {
 });
 
 // ── Startup ───────────────────────────────────────────────────────────────────
-export async function initializeApp() {
-  if (initialized) return { app, cacheStarted: false };
-  if (initializationPromise) return initializationPromise;
-
-  initializationPromise = (async () => {
+async function start() {
   try {
     await testConnection();
-    logger.info({ event: 'db_connection_success', env: process.env.NODE_ENV, ssl: describeSslStatus() }, '[DB]');
+    logger.info({ event: 'db_connection_success', env: process.env.NODE_ENV }, '[DB]');
   } catch (e) {
     logger.error({ event: 'db_connection_failed', error: e.message }, '[FATAL]');
-    throw e;
+    process.exit(1);
   }
 
-  if (process.env.RUN_MIGRATIONS_ON_START !== 'false') {
-    await runMigrations();
-  }
+  await runMigrations();
 
   const cacheStarted = await startCacheService();
   if (!cacheStarted) logger.warn('[CACHE] Redis not available — running without cache (degraded mode)');
 
   setAlertWorker(alertWorker);
-  if (START_BACKGROUND_JOBS) {
+
+  // On Vercel serverless, long-running services (watcher, alertEngine, scheduler)
+  // are disabled — they cannot persist between lambda invocations.
+  // On a persistent server (Render, VPS, Docker), they run normally.
+  const isVercel = !!(process.env.VERCEL || process.env.VERCEL_ENV);
+
+  if (!isVercel) {
     try { await startAlertEngine(); } catch (e) { logger.error({ event: 'alertEngineStartFailed', message: e.message }); }
     try { startRetentionScheduler(); } catch (e) { logger.error({ event: 'retentionStartFailed', message: e.message }); }
     try { await startWatcher(); } catch (e) { logger.error({ event: 'watcherStartFailed', message: e.message }); }
+    const logsDir = (process.env.WATCH_DIRS || './logs').split(',')[0].trim();
+    try { if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true }); } catch (_) {}
   } else {
-    logger.info({ event: 'background_jobs_disabled', platform: IS_VERCEL ? 'vercel' : 'default' }, '[STARTUP]');
+    logger.info({ event: 'vercel_mode' }, '[VERCEL] Serverless mode — watcher, alertEngine and scheduler disabled.');
+    try { await startAlertEngine(); } catch (e) { logger.error({ event: 'alertEngineStartFailed', message: e.message }); }
   }
-
-  const logsDir = (process.env.WATCH_DIRS || './logs').split(',')[0].trim();
-  if (START_BACKGROUND_JOBS && !fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
-
-  initialized = true;
-  return { app, cacheStarted };
-  })();
-
-  return initializationPromise;
-}
-
-async function start() {
-  const { cacheStarted } = await initializeApp();
 
   const server = app.listen(PORT, () => {
   server.timeout = 300000;       // 5min - upload timeout
@@ -259,17 +251,7 @@ async function start() {
   process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
-export default async function handler(req, res) {
-  await initializeApp();
-  return app(req, res);
-}
-
-export { app };
-
-const isDirectRun = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
-if (isDirectRun) {
-  start().catch((err) => {
-    logger.fatal({ event: 'startupFailed', message: err.message, stack: err.stack });
-    process.exit(1);
-  });
-}
+start().catch((err) => {
+  logger.fatal({ event: 'startupFailed', message: err.message, stack: err.stack });
+  process.exit(1);
+});
