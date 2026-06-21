@@ -37,6 +37,10 @@ router.get('/', async (req, res) => {
       source_server = null,
       target_user = null,
       fingerprint = null,
+      source_system = null,
+      main_service = null,
+      hostname = null,
+      log_origin = null,
       from_timestamp = null,
       to_timestamp = null,
       from_imported_at = null,
@@ -101,6 +105,26 @@ router.get('/', async (req, res) => {
       params.push(source_server);
     }
 
+    if (source_system) {
+      whereConditions.push('source_system = ?');
+      params.push(source_system);
+    }
+
+    if (main_service) {
+      whereConditions.push('main_service = ?');
+      params.push(main_service);
+    }
+
+    if (hostname) {
+      whereConditions.push('hostname = ?');
+      params.push(hostname);
+    }
+
+    if (log_origin) {
+      whereConditions.push('log_origin LIKE ?');
+      params.push('%' + log_origin + '%');
+    }
+
     if (target_user) {
       whereConditions.push('target_user = ?');
       params.push(target_user);
@@ -114,13 +138,13 @@ router.get('/', async (req, res) => {
     // Filtres timestamps (P-05: Index composite user_ts, user_level_ts, etc.)
     if (from_timestamp) {
       const ts = normalizeTimestamp(from_timestamp);
-      whereConditions.push('timestamp >= ?');
+      whereConditions.push('COALESCE(event_timestamp, timestamp) >= ?');
       params.push(ts);
     }
 
     if (to_timestamp) {
       const ts = normalizeTimestamp(to_timestamp);
-      whereConditions.push('timestamp <= ?');
+      whereConditions.push('COALESCE(event_timestamp, timestamp) <= ?');
       params.push(ts);
     }
 
@@ -155,13 +179,14 @@ router.get('/', async (req, res) => {
     // Fetch logs avec pagination
     const [logs] = await pool.execute(
       `SELECT 
-        id, timestamp, created_time, imported_at, log_level, source, source_server, service, 
+        id, timestamp, event_timestamp, created_time, imported_at, log_level, source, source_server,
+        source_system, main_service, hostname, log_origin, service,
         message, normalized_message, event_type, fingerprint, module, error_type,
         stack_trace, target_user, log_user, log_source, file_name, import_job_id,
         parser_format, timestamp_inferred, classification_confidence
        FROM logs 
        WHERE ${whereClause}
-       ORDER BY timestamp DESC
+       ORDER BY COALESCE(event_timestamp, timestamp) DESC
        LIMIT ? OFFSET ?`,
       [...params, limitNum, offsetNum]
     );
@@ -318,7 +343,7 @@ router.get('/trends', async (req, res) => {
     const [byLevel] = await pool.execute(
       `SELECT log_level, COUNT(*) as count
        FROM logs 
-       WHERE imported_at >= DATE_SUB(NOW(), INTERVAL ? HOUR) ${scope.sql || ''}
+       WHERE COALESCE(event_timestamp, timestamp) >= DATE_SUB(NOW(), INTERVAL ? HOUR) ${scope.sql || ''}
        GROUP BY log_level
        ORDER BY FIELD(log_level, 'FATAL', 'CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG')`,
       [windowHours, ...(scope.params || [])]
@@ -331,11 +356,11 @@ router.get('/trends', async (req, res) => {
         MAX(error_type) as error_type, 
         MAX(event_type) as event_type, 
         COUNT(*) as count, 
-        MAX(timestamp) as lastSeen,
+        MAX(COALESCE(event_timestamp, timestamp)) as lastSeen,
         MAX(message) as message,
-        MAX(service) as source
+        MAX(main_service) as source
        FROM logs 
-       WHERE imported_at >= DATE_SUB(NOW(), INTERVAL ? HOUR) 
+       WHERE COALESCE(event_timestamp, timestamp) >= DATE_SUB(NOW(), INTERVAL ? HOUR) 
          AND log_level IN ('ERROR', 'CRITICAL', 'FATAL') ${scope.sql || ''}
        GROUP BY fingerprint
        ORDER BY count DESC
@@ -345,11 +370,11 @@ router.get('/trends', async (req, res) => {
 
     // Top services
     const [topServices] = await pool.execute(
-      `SELECT service, COUNT(*) as count, 
+      `SELECT main_service as service, COUNT(*) as count, 
               COUNT(CASE WHEN log_level IN ('ERROR', 'CRITICAL', 'FATAL') THEN 1 END) as error_count
        FROM logs 
-       WHERE imported_at >= DATE_SUB(NOW(), INTERVAL ? HOUR) AND service IS NOT NULL ${scope.sql || ''}
-       GROUP BY service
+       WHERE COALESCE(event_timestamp, timestamp) >= DATE_SUB(NOW(), INTERVAL ? HOUR) AND main_service IS NOT NULL ${scope.sql || ''}
+       GROUP BY main_service
        ORDER BY count DESC
        LIMIT 10`,
       [windowHours, ...(scope.params || [])]
@@ -360,19 +385,31 @@ router.get('/trends', async (req, res) => {
       `SELECT module, COUNT(*) as count, 
               COUNT(CASE WHEN log_level IN ('ERROR', 'CRITICAL', 'FATAL') THEN 1 END) as error_count
        FROM logs 
-       WHERE imported_at >= DATE_SUB(NOW(), INTERVAL ? HOUR) AND module IS NOT NULL ${scope.sql || ''}
+       WHERE COALESCE(event_timestamp, timestamp) >= DATE_SUB(NOW(), INTERVAL ? HOUR) AND module IS NOT NULL ${scope.sql || ''}
        GROUP BY module
        ORDER BY count DESC
        LIMIT 10`,
       [windowHours, ...(scope.params || [])]
     );
 
-    // Ingestion throughput (basé sur imported_at pour voir les imports récents)
+    // Event trends by log event time
     const [hourly] = await pool.execute(
       `SELECT 
-        DATE_FORMAT(imported_at, '%Y-%m-%d %H:00') as date, 
+        DATE_FORMAT(COALESCE(event_timestamp, timestamp), '%Y-%m-%d %H:00') as date, 
         COUNT(*) as count,
         COUNT(CASE WHEN log_level IN ('ERROR', 'CRITICAL', 'FATAL') THEN 1 END) as errorCount
+       FROM logs 
+       WHERE COALESCE(event_timestamp, timestamp) >= DATE_SUB(NOW(), INTERVAL ? HOUR) ${scope.sql || ''}
+       GROUP BY date
+       ORDER BY date DESC`,
+      [windowHours, ...(scope.params || [])]
+    );
+
+    // Import throughput (separate from event time)
+    const [importHourly] = await pool.execute(
+      `SELECT 
+        DATE_FORMAT(imported_at, '%Y-%m-%d %H:00') as date, 
+        COUNT(*) as count
        FROM logs 
        WHERE imported_at >= DATE_SUB(NOW(), INTERVAL ? HOUR) ${scope.sql || ''}
        GROUP BY date
@@ -386,7 +423,8 @@ router.get('/trends', async (req, res) => {
       topErrors: topErrors,
       topServices: topServices,
       topModules: topModules,
-      trends: hourly
+      trends: hourly,
+      importTrends: importHourly,
     });
   } catch (e) {
     logger.error({ event: 'trends_error', error: e.message }, '[API]');
@@ -415,6 +453,21 @@ router.get('/metadata', async (req, res) => {
     );
 
     const [sources] = await pool.execute(
+      `SELECT DISTINCT source_system FROM logs WHERE source_system IS NOT NULL ${scope.sql || ''} LIMIT 100`,
+      scope.params || []
+    );
+
+    const [mainServices] = await pool.execute(
+      `SELECT DISTINCT main_service FROM logs WHERE main_service IS NOT NULL ${scope.sql || ''} LIMIT 100`,
+      scope.params || []
+    );
+
+    const [hostnames] = await pool.execute(
+      `SELECT DISTINCT hostname FROM logs WHERE hostname IS NOT NULL ${scope.sql || ''} LIMIT 100`,
+      scope.params || []
+    );
+
+    const [sourceServers] = await pool.execute(
       `SELECT DISTINCT source_server FROM logs WHERE source_server IS NOT NULL ${scope.sql || ''} LIMIT 100`,
       scope.params || []
     );
@@ -427,7 +480,10 @@ router.get('/metadata', async (req, res) => {
     res.json({
       services: services.map(r => r.service).filter(Boolean),
       modules: modules.map(r => r.module).filter(Boolean),
-      sources: sources.map(r => r.source_server).filter(Boolean),
+      sources: sources.map(r => r.source_system).filter(Boolean),
+      source_servers: sourceServers.map(r => r.source_server).filter(Boolean),
+      main_services: mainServices.map(r => r.main_service).filter(Boolean),
+      hostnames: hostnames.map(r => r.hostname).filter(Boolean),
       target_users: users.map(r => r.target_user).filter(Boolean)
     });
   } catch (e) {

@@ -98,16 +98,21 @@ router.get('/summary', async (req, res) => {
     const [total] = await pool.execute('SELECT COUNT(*) as cnt FROM logs WHERE 1=1' + scope.sql, [...scope.params]);
     
     /**
-     * Note : todayCount est basé sur 'imported_at' pour refléter l'activité d'ingestion (Bug 5).
-     * Pour les logs basés sur le temps événement, filtrer sur 'timestamp'.
+     * todayCount: logs whose event occurred today (event_timestamp).
+     * importedTodayCount: logs imported today (ingestion activity).
      */
     const todayStr = new Date().toISOString().slice(0, 10);
+    const eventTsCol = 'COALESCE(event_timestamp, timestamp)';
     const [today] = await pool.execute(
+      `SELECT COUNT(*) as cnt FROM logs WHERE ${eventTsCol} >= ?` + scope.sql,
+      [todayStr + ' 00:00:00', ...scope.params]
+    );
+    const [importedToday] = await pool.execute(
       'SELECT COUNT(*) as cnt FROM logs WHERE imported_at >= ?' + scope.sql,
       [todayStr + ' 00:00:00', ...scope.params]
     );
     const [errorCount] = await pool.execute(
-      "SELECT COUNT(*) as cnt FROM logs WHERE imported_at >= ? AND log_level IN ('ERROR', 'CRITICAL', 'FATAL')" + scope.sql,
+      `SELECT COUNT(*) as cnt FROM logs WHERE ${eventTsCol} >= ? AND log_level IN ('ERROR', 'CRITICAL', 'FATAL')` + scope.sql,
       [todayStr + ' 00:00:00', ...scope.params]
     );
     const alertFilter = alertScope(req);
@@ -124,7 +129,7 @@ router.get('/summary', async (req, res) => {
       scope.params
     );
     const [sourceCount] = await pool.execute(
-      'SELECT COUNT(DISTINCT source) as cnt FROM logs WHERE source IS NOT NULL AND source != \'\'' + scope.sql,
+      'SELECT COUNT(DISTINCT COALESCE(source_system, source)) as cnt FROM logs WHERE COALESCE(source_system, source) IS NOT NULL AND COALESCE(source_system, source) != \'\'' + scope.sql,
       scope.params
     );
     const [levelRows] = await pool.execute(
@@ -146,6 +151,7 @@ router.get('/summary', async (req, res) => {
       totalLogs: Number(total[0].cnt),
       todayCount: Number(today[0].cnt),
       todayLogs: Number(today[0].cnt),
+      importedTodayCount: Number(importedToday[0].cnt),
       errorCount: Number(errorCount[0].cnt),
       unreadAlerts: Number(unreadAlerts[0].cnt),
       fatalCount: Number(fatalCount[0].cnt),
@@ -157,6 +163,7 @@ router.get('/summary', async (req, res) => {
       // snake_case pour compatibilité
       total_logs: Number(total[0].cnt),
       today_logs: Number(today[0].cnt),
+      imported_today_count: Number(importedToday[0].cnt),
       error_count: Number(errorCount[0].cnt),
       unread_alerts: Number(unreadAlerts[0].cnt),
       fatal_count: Number(fatalCount[0].cnt),

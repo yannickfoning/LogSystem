@@ -12,6 +12,7 @@ import { levelSeverity, normalizeLevel } from '../lib/levels.js';
 import { detectFormat, parseLogContent } from '../lib/processing/universalParser.js';
 import { detectEncoding, convertToUtf8 } from '../lib/processing/encodingDetector.js';
 import { isArchive, detectArchiveType } from '../lib/processing/archiveHandler.js';
+import { enrichLogMetadata, detectSourceSystem, detectMainService } from '../lib/processing/logMetadata.js';
 
 describe('Log Processing', () => {
   afterAll(async () => {
@@ -111,6 +112,34 @@ describe('Log Processing', () => {
 
     it('should fallback to INFO for unknown levels', () => {
       expect(normalizeLevel('unknown')).toBe('INFO');
+    });
+  });
+
+  describe('logMetadata', () => {
+    it('should detect nginx source from format', () => {
+      expect(detectSourceSystem({ parser_format: 'nginx' })).toBe('Nginx');
+    });
+
+    it('should detect firewall from message', () => {
+      expect(detectSourceSystem({ message: 'Fortinet firewall blocked connection' })).toBe('Fortinet');
+    });
+
+    it('should detect main service from auth message', () => {
+      expect(detectMainService({ message: 'User login failed' }, 'authentication')).toBe('Authentication');
+    });
+
+    it('should enrich log with event_timestamp and metadata', () => {
+      const enriched = enrichLogMetadata({
+        timestamp: '2026-05-18 14:32:10',
+        message: 'GET /api/users 401',
+        parser_format: 'nginx',
+        source_server: 'web01',
+      }, { source_type: 'import', filename: 'access.log' });
+      expect(enriched.event_timestamp).toBe('2026-05-18 14:32:10');
+      expect(enriched.source_system).toBe('Nginx');
+      expect(enriched.main_service).toBe('Web Server');
+      expect(enriched.hostname).toBe('web01');
+      expect(enriched.log_origin).toContain('import');
     });
   });
 });

@@ -12,17 +12,21 @@ router.use(requireAuth);
 
 const MAX_LIMIT = 500;
 const DEFAULT_LIMIT = 50;
-const LOG_COLUMNS = 'id, timestamp, created_time, imported_at, log_level, source, source_server, service, message, normalized_message, event_type, error_type, fingerprint, user_id, target_user, module, parser_format, timestamp_inferred, created_at, file_name, file_created_at, import_job_id, imported_by_user_id, log_source, log_user';
+const LOG_COLUMNS = 'id, timestamp, event_timestamp, created_time, imported_at, log_level, source, source_server, source_system, main_service, hostname, log_origin, service, message, normalized_message, event_type, error_type, fingerprint, user_id, target_user, module, parser_format, timestamp_inferred, created_at, file_name, file_created_at, import_job_id, imported_by_user_id, log_source, log_user';
 
 // ── Helper : filtres SQL partagés ─────────────────────────────────────────────
 function buildFilters(query, userScopeFilter) {
-  const { log_level, source, source_server, service, event_type, error_type, fingerprint, date_from, date_to, imported_from, imported_to, search, from_timestamp, to_timestamp, realtime } = query;
+  const { log_level, source, source_server, source_system, main_service, hostname, log_origin, service, event_type, error_type, fingerprint, date_from, date_to, imported_from, imported_to, search, from_timestamp, to_timestamp, event_from, event_to, realtime } = query;
   let sql = userScopeFilter.sql;
   const params = [...userScopeFilter.params];
 
   if (log_level) { sql += ' AND log_level = ?';  params.push(log_level); }
   if (source)    { sql += ' AND source = ?';      params.push(source); }
   if (source_server) { sql += ' AND source_server = ?'; params.push(source_server); }
+  if (source_system) { sql += ' AND source_system = ?'; params.push(source_system); }
+  if (main_service) { sql += ' AND main_service = ?'; params.push(main_service); }
+  if (hostname) { sql += ' AND hostname = ?'; params.push(hostname); }
+  if (log_origin) { sql += ' AND log_origin LIKE ?'; params.push('%' + log_origin + '%'); }
   if (service)   { sql += ' AND service = ?';     params.push(service); }
   if (event_type) { sql += ' AND event_type = ?'; params.push(event_type); }
   if (error_type) { sql += ' AND error_type = ?'; params.push(error_type); }
@@ -33,14 +37,15 @@ function buildFilters(query, userScopeFilter) {
     sql += " AND ingested_realtime = 1 AND source_type IN ('watch', 'api', 'manual')";
   }
 
-  // FIX SEARCH-02: Valider le format des dates avant injection dans la requete
   const ISO_RE = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2})?$/;
-  if (date_from && ISO_RE.test(date_from)) { sql += ' AND timestamp >= ?';  params.push(date_from.replace('T',' ')); }
-  if (date_to   && ISO_RE.test(date_to))   { sql += ' AND timestamp <= ?';  params.push(date_to.replace('T',' ')); }
+  const eventFrom = event_from || date_from;
+  const eventTo = event_to || date_to;
+  if (eventFrom && ISO_RE.test(eventFrom)) { sql += ' AND COALESCE(event_timestamp, timestamp) >= ?';  params.push(eventFrom.replace('T',' ')); }
+  if (eventTo   && ISO_RE.test(eventTo))   { sql += ' AND COALESCE(event_timestamp, timestamp) <= ?';  params.push(eventTo.replace('T',' ')); }
 
-  // New: explicit timestamp filters
-  if (from_timestamp && ISO_RE.test(from_timestamp)) { sql += ' AND timestamp >= ?'; params.push(from_timestamp.replace('T',' ')); }
-  if (to_timestamp && ISO_RE.test(to_timestamp)) { sql += ' AND timestamp <= ?'; params.push(to_timestamp.replace('T',' ')); }
+  // Legacy timestamp filters (alias event)
+  if (from_timestamp && ISO_RE.test(from_timestamp)) { sql += ' AND COALESCE(event_timestamp, timestamp) >= ?'; params.push(from_timestamp.replace('T',' ')); }
+  if (to_timestamp && ISO_RE.test(to_timestamp)) { sql += ' AND COALESCE(event_timestamp, timestamp) <= ?'; params.push(to_timestamp.replace('T',' ')); }
 
   // New: explicit imported_at filters
   if (imported_from && ISO_RE.test(imported_from)) { sql += ' AND imported_at >= ?'; params.push(imported_from.replace('T',' ')); }
@@ -51,9 +56,9 @@ function buildFilters(query, userScopeFilter) {
     const safeSearch = search.replace(/[<>()~*@"]/g, '').trim().substring(0, 200);
     if (safeSearch.length > 0) {
       // Tente d'abord FULLTEXT sur message/normalized_message, complète avec LIKE sur les autres colonnes
-      sql += ' AND (MATCH(message, normalized_message) AGAINST(? IN BOOLEAN MODE) OR source LIKE ? OR source_server LIKE ? OR service LIKE ? OR target_user LIKE ? OR error_type LIKE ?)';
+      sql += ' AND (MATCH(message, normalized_message) AGAINST(? IN BOOLEAN MODE) OR source LIKE ? OR source_server LIKE ? OR source_system LIKE ? OR main_service LIKE ? OR hostname LIKE ? OR service LIKE ? OR target_user LIKE ? OR error_type LIKE ?)';
       const like = '%' + safeSearch + '%';
-      params.push(safeSearch + '*', like, like, like, like, like);
+      params.push(safeSearch + '*', like, like, like, like, like, like, like, like);
     }
   }
   return { sql, params };
@@ -65,19 +70,33 @@ router.get('/export/csv', async (req, res) => {
     const userScopeFilter = userScope(req);
     const { sql: filters, params } = buildFilters(req.query, userScopeFilter);
     const [rows] = await pool.execute(
-      `SELECT id, timestamp, imported_at, log_level, source, source_server, service, event_type, error_type, fingerprint, target_user, log_user, log_source, file_name, message FROM logs WHERE 1=1 ${filters} ORDER BY timestamp DESC LIMIT 10000`,
+      `SELECT id, event_timestamp, timestamp, imported_at, log_level, source, source_system, main_service, hostname, source_server, service, event_type, error_type, fingerprint, target_user, log_user, log_source, log_origin, file_name, message FROM logs WHERE 1=1 ${filters} ORDER BY COALESCE(event_timestamp, timestamp) DESC LIMIT 10000`,
       params
     );
     if (rows.length >= 10000) {
       return res.status(422).json({ error: 'Trop de résultats (10K max). Affinez votre recherche.' });
     }
     const escape = v => `"${String(v ?? '').replace(/"/g, '""').replace(/[\n\r]/g, ' ')}"`;
-    const header = ['ID', 'Date', 'Heure', 'Niveau', 'Source', 'Service', 'Utilisateur', 'Message', 'Importé le', 'Fichier', 'Source log'].map(escape).join(',');
-    const body = rows.map(r => [
-      r.id, String(r.timestamp ?? '').slice(0, 10), String(r.timestamp ?? '').slice(11, 19),
-      r.log_level ?? '', r.source ?? '', r.service ?? '', (r.log_user || r.target_user || ''), r.message ?? '',
-      r.imported_at ?? '', r.file_name ?? '', r.log_source ?? ''
-    ].map(escape).join(',')).join('\n');
+    const header = ['ID', 'Date événement', 'Heure événement', 'Date import', 'Heure import', 'Niveau', 'Source système', 'Service principal', 'Hôte', 'Service', 'Utilisateur', 'Origine', 'Message', 'Fichier'].map(escape).join(',');
+    const body = rows.map(r => {
+      const eventTs = r.event_timestamp || r.timestamp;
+      return [
+        r.id,
+        String(eventTs ?? '').slice(0, 10),
+        String(eventTs ?? '').slice(11, 19),
+        String(r.imported_at ?? '').slice(0, 10),
+        String(r.imported_at ?? '').slice(11, 19),
+        r.log_level ?? '',
+        r.source_system ?? r.source ?? '',
+        r.main_service ?? '',
+        r.hostname ?? r.source_server ?? '',
+        r.service ?? '',
+        (r.log_user || r.target_user || ''),
+        r.log_origin ?? '',
+        r.message ?? '',
+        r.file_name ?? '',
+      ].map(escape).join(',');
+    }).join('\n');
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="logs_export_${new Date().toISOString().slice(0,10)}.csv"`);
     res.send('\uFEFF' + header + '\n' + body);
@@ -102,7 +121,7 @@ router.get('/export/pdf', async (req, res) => {
       return res.status(422).json({ error: 'Trop de résultats pour PDF. Max 10K. Affinez votre recherche.' });
     }
     const [rows] = await pool.execute(
-      `SELECT id, timestamp, imported_at, log_level, source, source_server, service, event_type, error_type, fingerprint, target_user, log_user, log_source, file_name, file_created_at, message FROM logs WHERE 1=1 ${filters} ORDER BY timestamp DESC LIMIT ${MAX_PDF_ROWS}`,
+      `SELECT id, event_timestamp, timestamp, imported_at, log_level, source, source_system, main_service, hostname, source_server, service, event_type, error_type, fingerprint, target_user, log_user, log_source, log_origin, file_name, file_created_at, message FROM logs WHERE 1=1 ${filters} ORDER BY COALESCE(event_timestamp, timestamp) DESC LIMIT ${MAX_PDF_ROWS}`,
       params
     );
 
@@ -190,8 +209,9 @@ router.get('/', async (req, res) => {
     const pageVal = parseInt(req.query.page, 10);
     const { sql: filterSql, params: filterParams } = buildFilters(req.query, userScopeFilter);
 
-    const allowed = ['timestamp', 'log_level', 'source', 'service', 'event_type', 'id'];
-    const sortBy  = allowed.includes(sort) ? sort : 'timestamp';
+    const allowed = ['timestamp', 'event_timestamp', 'log_level', 'source', 'source_system', 'main_service', 'service', 'event_type', 'id'];
+    const sortBy  = allowed.includes(sort) ? sort : 'event_timestamp';
+    const sortColumn = sortBy === 'event_timestamp' ? 'COALESCE(event_timestamp, timestamp)' : sortBy;
     const orderBy = order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
     // Pagination par page (page Recherche)
@@ -204,7 +224,7 @@ router.get('/', async (req, res) => {
       const pages = Math.max(1, Math.ceil(total / limitVal));
       const offset = (pageVal - 1) * limitVal;
       const [rows] = await pool.execute(
-        `SELECT ${LOG_COLUMNS} FROM logs WHERE 1=1 ${filterSql} ORDER BY ${sortBy} ${orderBy} LIMIT ${limitVal} OFFSET ${offset}`,
+        `SELECT ${LOG_COLUMNS} FROM logs WHERE 1=1 ${filterSql} ORDER BY ${sortColumn} ${orderBy} LIMIT ${limitVal} OFFSET ${offset}`,
         filterParams
       );
       return res.json({
@@ -220,7 +240,7 @@ router.get('/', async (req, res) => {
       sql += ' AND id < ?';
       params.push(last_id);
     }
-    sql += ` ORDER BY ${sortBy} ${orderBy} LIMIT ${limitVal + 1}`;
+    sql += ` ORDER BY ${sortColumn} ${orderBy} LIMIT ${limitVal + 1}`;
 
     const [rows] = await pool.execute(sql, params);
 
@@ -450,7 +470,7 @@ router.get('/directory', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const scope = userScope(req);
-    const cols = 'id, timestamp, created_time, imported_at, timezone, log_level, source, source_server, service, message, normalized_message, event_type, fingerprint, user_id, client_ip, module, error_type, stack_trace, target_user, raw_log, parser_format, timestamp_inferred, classification_confidence, created_at, file_name, file_created_at, import_job_id, imported_by_user_id, log_source, log_user';
+    const cols = LOG_COLUMNS + ', timezone, client_ip, stack_trace, raw_log';
     const [rows] = await pool.execute(`SELECT ${cols} FROM logs WHERE id = ?` + scope.sql, [req.params.id, ...scope.params]);
     if (!rows.length) return res.status(404).json({ error: 'Log non trouvé' });
     res.json(rows[0]);

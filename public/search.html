@@ -69,11 +69,19 @@
           <input type="text" id="f-service" placeholder="Service">
         </div>
         <div class="form-group">
-          <label class="filter-label" for="f-date-from">Date de</label>
+          <label class="filter-label" for="f-main-service">Service principal</label>
+          <input type="text" id="f-main-service" placeholder="Authentication, Database...">
+        </div>
+        <div class="form-group">
+          <label class="filter-label" for="f-hostname">Hôte</label>
+          <input type="text" id="f-hostname" placeholder="hostname">
+        </div>
+        <div class="form-group">
+          <label class="filter-label" for="f-date-from">Date log (de)</label>
           <input type="date" id="f-date-from">
         </div>
         <div class="form-group">
-          <label class="filter-label" for="f-date-to">Date à</label>
+          <label class="filter-label" for="f-date-to">Date log (à)</label>
           <input type="date" id="f-date-to">
         </div>
       </div>
@@ -105,10 +113,11 @@
         <table class="search-table">
           <thead>
             <tr>
-              <th data-i18n="common.timestamp">Horodatage</th>
+              <th>Date log</th>
               <th data-i18n="common.level">Niveau</th>
               <th data-i18n="common.source">Source</th>
-              <th class="col-hide-mobile" data-i18n="common.service">Service</th>
+              <th class="col-hide-mobile">Service princ.</th>
+              <th class="col-hide-mobile">Hôte</th>
               <th class="col-hide-mobile">Utilisateur</th>
               <th class="col-hide-mobile">Import</th>
               <th data-i18n="common.message">Message</th>
@@ -184,25 +193,27 @@
           renderFacets(resp.facets);
           var tb = document.getElementById('logs-body');
           if (!rows.length) {
-            tb.innerHTML = '<tr><td colspan="7" class="no-data" data-i18n="search.no_results">Aucun résultat</td></tr>';
+            tb.innerHTML = '<tr><td colspan="8" class="no-data" data-i18n="search.no_results">Aucun résultat</td></tr>';
             document.getElementById('logs-pagination').innerHTML = '';
             return;
           }
           tb.innerHTML = rows.map(function(r) {
+            var eventTs = r.event_timestamp || r.timestamp;
             var tsCell = r.timestamp_inferred
-              ? '<td><span class="ts-inferred" title="Date inférée">' + fmtDT(r.timestamp) + ' <small>~</small></span></td>'
-              : '<td>' + fmtDT(r.timestamp) + '</td>';
+              ? '<td><span class="ts-inferred" title="Date inférée">' + fmtDT(eventTs) + ' <small>~</small></span></td>'
+              : '<td>' + fmtDT(eventTs) + '</td>';
             var userCell = r.log_user || r.target_user
-              ? '<td><span class="user-badge">' + esc(r.log_user || r.target_user) + '</span></td>'
-              : '<td><span class="user-empty">—</span></td>';
+              ? '<td class="col-hide-mobile"><span class="user-badge">' + esc(r.log_user || r.target_user) + '</span></td>'
+              : '<td class="col-hide-mobile"><span class="user-empty">—</span></td>';
             var importCell = r.imported_at
               ? '<td class="col-hide-mobile cell-muted">' + fmtDT(r.imported_at) + '</td>'
               : '<td class="col-hide-mobile"><span class="user-empty">—</span></td>';
             return '<tr data-id="'+r.id+'">'
               + tsCell
               + '<td>'+badge(r.log_level)+'</td>'
-              + '<td>'+esc(r.log_source || r.source)+'</td>'
-              + '<td class="col-hide-mobile">'+esc(r.service)+'</td>'
+              + '<td>'+esc(r.source_system || r.log_source || r.source)+'</td>'
+              + '<td class="col-hide-mobile">'+esc(r.main_service || '—')+'</td>'
+              + '<td class="col-hide-mobile">'+esc(r.hostname || r.source_server || '—')+'</td>'
               + userCell
               + importCell
               + '<td class="text-truncate">'+esc(r.message)+'</td>'
@@ -227,8 +238,10 @@
         };
         if (p.search) apiParams.query = p.search;
         if (p.log_level) apiParams.level = p.log_level;
-        if (p.source) apiParams.source_server = p.source;
+        if (p.source) apiParams.source_system = p.source;
         if (p.service) apiParams.service = p.service;
+        if (p.main_service) apiParams.main_service = p.main_service;
+        if (p.hostname) apiParams.hostname = p.hostname;
         if (p.date_from) apiParams.from_timestamp = p.date_from + 'T00:00:00';
         if (p.date_to) apiParams.to_timestamp = p.date_to + 'T23:59:59';
         return apiParams;
@@ -239,6 +252,8 @@
         document.getElementById('f-level').value = '';
         document.getElementById('f-source').value = '';
         document.getElementById('f-service').value = '';
+        document.getElementById('f-main-service').value = '';
+        document.getElementById('f-hostname').value = '';
         document.getElementById('f-date-from').value = '';
         document.getElementById('f-date-to').value = '';
         currentPage = 1;
@@ -251,12 +266,16 @@
         var level = document.getElementById('f-level').value;
         var source = document.getElementById('f-source').value.trim();
         var service = document.getElementById('f-service').value.trim();
+        var mainService = document.getElementById('f-main-service').value.trim();
+        var hostname = document.getElementById('f-hostname').value.trim();
         var dateFrom = document.getElementById('f-date-from').value;
         var dateTo = document.getElementById('f-date-to').value;
         if (search) p.search = search;
         if (level) p.log_level = level;
         if (source) p.source = source;
         if (service) p.service = service;
+        if (mainService) p.main_service = mainService;
+        if (hostname) p.hostname = hostname;
         if (dateFrom) p.date_from = dateFrom;
         if (dateTo) p.date_to = dateTo;
         return p;
@@ -338,41 +357,35 @@
         if (!tr) return;
         var id = tr.getAttribute('data-id');
         api.get('/api/logs/' + id).then(function(log) {
+          if (window.renderLogDetailHtml) {
+            document.getElementById('detail-content').innerHTML = window.renderLogDetailHtml(log, esc, fmtDT, badge);
+          } else {
           var html = '<div style="font-size:13px;line-height:1.8">';
           html += '<p><strong data-i18n="modal.id">Identifiant:</strong> ' + log.id + '</p>';
-          // FIX 3c: Add date inferee badge
-          html += '<p><strong data-i18n="modal.timestamp">Horodatage :</strong> ' + fmtDT(log.timestamp);
+          var eventTs = log.event_timestamp || log.timestamp;
+          html += '<p><strong>Date du log:</strong> ' + fmtDT(eventTs);
           if (log.timestamp_inferred) {
             html += ' <span title="La date originale du log n\'a pas pu être extraite. Cette date correspond au moment de l\'import." '
                   + 'style="background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:4px;font-size:11px;margin-left:6px">'
                   + '⚠ date inférée</span>';
           }
           html += '</p>';
+          if (log.imported_at) html += '<p><strong>Date d\'import:</strong> ' + fmtDT(log.imported_at) + '</p>';
           html += '<p><strong data-i18n="modal.level">Importance:</strong> ' + badge(log.log_level) + '</p>';
-          html += '<p><strong data-i18n="modal.source">Source:</strong> ' + esc(log.log_source || log.source) + '</p>';
+          html += '<p><strong data-i18n="modal.source">Source:</strong> ' + esc(log.source_system || log.log_source || log.source) + '</p>';
+          html += '<p><strong>Service principal:</strong> ' + esc(log.main_service || '—') + '</p>';
+          html += '<p><strong>Hôte:</strong> ' + esc(log.hostname || log.source_server || '—') + '</p>';
           html += '<p><strong data-i18n="modal.service">Service:</strong> ' + esc(log.service) + '</p>';
           html += '<p><strong>Utilisateur (log):</strong> ' + esc(log.log_user || log.target_user || '—') + '</p>';
+          if (log.log_origin) html += '<p><strong>Origine:</strong> ' + esc(log.log_origin) + '</p>';
           html += '<hr style="border-color:var(--border);margin:12px 0">';
-          html += '<p><strong>IMPORT METADATA</strong></p>';
-          if (log.imported_at) html += '<p><strong>Importé le:</strong> ' + fmtDT(log.imported_at) + '</p>';
-          if (log.import_job_id) html += '<p><strong>Job import:</strong> #' + esc(log.import_job_id) + '</p>';
-          if (log.file_name) html += '<p><strong>Fichier:</strong> ' + esc(log.file_name) + '</p>';
-          if (log.file_created_at) html += '<p><strong>Fichier créé:</strong> ' + fmtDT(log.file_created_at) + '</p>';
           html += '<p><strong data-i18n="modal.message">Message:</strong></p><pre style="background:var(--surface2);padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-all;font-size:12px;max-height:200px;overflow:auto">' + esc(log.message) + '</pre>';
           if (log.stack_trace) {
             html += '<p style="margin-top:8px"><strong>Stack trace:</strong></p><pre style="background:#1a0000;color:#ff6b6b;padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-all;font-size:11px;max-height:200px;overflow:auto">' + esc(log.stack_trace) + '</pre>';
           }
-          if (log.raw_log) {
-            html += '<p style="margin-top:8px"><strong data-i18n="modal.raw">Log brut:</strong></p><pre style="background:var(--surface2);padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-all;font-size:11px;max-height:150px;overflow:auto">' + esc(log.raw_log) + '</pre>';
-          }
-          if (log.created_at) {
-            html += '<p><strong>Créé à:</strong> ' + fmtDT(log.created_at) + '</p>';
-          }
-          if (log.user_id) {
-            html += '<p><strong>ID utilisateur:</strong> ' + esc(log.user_id) + '</p>';
-          }
           html += '</div>';
           document.getElementById('detail-content').innerHTML = html;
+          }
           document.getElementById('detail-modal').classList.add('active');
         });
       });

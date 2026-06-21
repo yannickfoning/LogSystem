@@ -12,6 +12,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { alertEngineBus } from './alertEngine.js'; // FIX #5: Import du bus event-driven
 import { alertWorker } from '../workers/alertWorker.js';
+import { enrichLogMetadata } from '../lib/processing/logMetadata.js';
 
 let watcher = null;
 const fileOffsets = new Map(); // FIX #4: Suivi des offsets par fichier
@@ -184,21 +185,35 @@ async function processLogFile(filePath, incremental = true) {
       logger.warn({ event: 'orphan_log_detected', filePath }, '[WATCHER] File has no assigned owner in WATCH_DIR_USER_MAP. Logs will be imported with user_id = NULL.');
     }
 
-    const entries = parsed.map(entry => ({
-      ...entry,
-      normalized_message: normalizeMessage(entry.message),
-      event_type: classifyLog(entry.message, entry.service || 'watched', entry.service),
-      fingerprint: generateFingerprint(entry.service, classifyLog(entry.message, entry.service || 'watched', entry.service), normalizeMessage(entry.message), userId),
-      log_level: normalizeLevel(entry.log_level || 'INFO'),
-      log_format: detected,
-      user_id: userId,
-      source_server: entry.source_server || entry.host || entry.source || path.basename(filePath),
-      created_time: entry.created_time || String(entry.timestamp || '').slice(11, 19) || null,
-      timezone: entry.timezone || null,
-      timestamp_inferred: entry.timestamp_inferred ? 1 : 0,
-      classification_confidence: entry.classification_confidence || null,
-      source_type: 'watch'
-    }));
+    const entries = parsed.map(entry => {
+      const enriched = enrichLogMetadata({
+        ...entry,
+        normalized_message: normalizeMessage(entry.message),
+        event_type: classifyLog(entry.message, entry.service || 'watched', entry.service),
+        log_level: normalizeLevel(entry.log_level || 'INFO'),
+        log_format: detected,
+        parser_format: detected,
+        user_id: userId,
+        source_server: entry.source_server || entry.host || entry.hostname || entry.source || path.basename(filePath),
+        created_time: entry.created_time || String(entry.timestamp || '').slice(11, 19) || null,
+        timezone: entry.timezone || null,
+        timestamp_inferred: entry.timestamp_inferred ? 1 : 0,
+        classification_confidence: entry.classification_confidence || null,
+        source_type: 'watch',
+        imported_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+      }, {
+        format: detected,
+        source_type: 'watch',
+        filePath,
+      });
+      enriched.fingerprint = generateFingerprint(
+        enriched.service,
+        enriched.event_type,
+        enriched.normalized_message,
+        userId
+      );
+      return enriched;
+    });
 
     // FIX #9: UNE seule connexion pour tout le fichier
     const conn = await pool.getConnection();
@@ -209,6 +224,7 @@ async function processLogFile(filePath, incremental = true) {
       const logValues = entries.map(entry => [
         entry.raw_log,
         entry.timestamp,
+        entry.event_timestamp || entry.timestamp,
         entry.created_time,
         entry.timezone,
         entry.log_level,
@@ -226,16 +242,22 @@ async function processLogFile(filePath, incremental = true) {
         entry.error_type || null,
         entry.stack_trace || null,
         entry.target_user || null,
-        entry.log_format || null,
+        entry.log_format || entry.parser_format || null,
         entry.timestamp_inferred,
-        entry.classification_confidence
+        entry.classification_confidence,
+        entry.imported_at || null,
+        entry.source_system || null,
+        entry.main_service || null,
+        entry.hostname || null,
+        entry.log_origin || null,
       ]);
 
       await conn.query(
         `INSERT IGNORE INTO logs (
-          raw_log, timestamp, created_time, timezone, log_level, source, source_server, service, message, normalized_message,
+          raw_log, timestamp, event_timestamp, created_time, timezone, log_level, source, source_server, service, message, normalized_message,
           event_type, fingerprint, user_id, source_type, client_ip, module, error_type, stack_trace,
-          target_user, parser_format, timestamp_inferred, classification_confidence
+          target_user, parser_format, timestamp_inferred, classification_confidence,
+          imported_at, source_system, main_service, hostname, log_origin
         ) VALUES ?`,
         [logValues]
       );

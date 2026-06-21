@@ -37,6 +37,41 @@
     return d.innerHTML;
   };
 
+  /** Format log event timestamp (prefers event_timestamp over timestamp). */
+  window.logEventTime = function (log) {
+    return log && (log.event_timestamp || log.timestamp) || null;
+  };
+
+  /** Render standardized log metadata block for detail modals. */
+  window.renderLogDetailHtml = function (log, esc, fmtDT, badge) {
+    if (!log) return '';
+    var eventTs = window.logEventTime(log);
+    var html = '<div style="font-size:13px;line-height:1.8">';
+    html += '<p><strong>Identifiant:</strong> ' + log.id + '</p>';
+    html += '<p><strong>Date du log:</strong> ' + fmtDT(eventTs);
+    if (log.timestamp_inferred) {
+      html += ' <span title="Date inférée lors de l\'import" style="background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:4px;font-size:11px;margin-left:6px">⚠ date inférée</span>';
+    }
+    html += '</p>';
+    if (log.imported_at) html += '<p><strong>Date d\'import:</strong> ' + fmtDT(log.imported_at) + '</p>';
+    html += '<p><strong>Niveau:</strong> ' + badge(log.log_level) + '</p>';
+    html += '<p><strong>Source:</strong> ' + esc(log.source_system || log.log_source || log.source || '—') + '</p>';
+    html += '<p><strong>Service principal:</strong> ' + esc(log.main_service || '—') + '</p>';
+    html += '<p><strong>Hôte:</strong> ' + esc(log.hostname || log.source_server || '—') + '</p>';
+    html += '<p><strong>Service:</strong> ' + esc(log.service || '—') + '</p>';
+    html += '<p><strong>Utilisateur:</strong> ' + esc(log.log_user || log.target_user || '—') + '</p>';
+    if (log.log_origin) html += '<p><strong>Origine:</strong> ' + esc(log.log_origin) + '</p>';
+    html += '<hr style="border-color:var(--border);margin:12px 0">';
+    html += '<p><strong>Message:</strong></p><pre style="background:var(--surface2);padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-all;font-size:12px;max-height:200px;overflow:auto">' + esc(log.message) + '</pre>';
+    if (log.stack_trace) {
+      html += '<p style="margin-top:8px"><strong>Stack trace:</strong></p><pre style="background:#1a0000;color:#ff6b6b;padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-all;font-size:11px;max-height:200px;overflow:auto">' + esc(log.stack_trace) + '</pre>';
+    }
+    if (log.file_name) html += '<p><strong>Fichier:</strong> ' + esc(log.file_name) + '</p>';
+    if (log.import_job_id) html += '<p><strong>Job import:</strong> #' + esc(log.import_job_id) + '</p>';
+    html += '</div>';
+    return html;
+  };
+
   function markActiveNav() {
     var path = window.location.pathname;
     document.querySelectorAll('.nav-links a[href]').forEach(function (a) {

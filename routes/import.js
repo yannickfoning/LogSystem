@@ -22,9 +22,12 @@ import { alertWorker } from "../workers/alertWorker.js";
 import { recordAudit } from "../middleware/audit.js";
 import { validateBody, importUploadSchema } from "../middleware/validation.js";
 import { invalidateDashboard } from "../services/cacheService.js";
+import { enrichLogMetadata } from "../lib/processing/logMetadata.js";
 import { extractArchive, isArchive, filterLogFiles, mapArchiveError, ArchiveError } from "../lib/processing/archiveHandler.js";
 import { importLimiter } from "../lib/rateLimiter.js";
 
+const IS_VERCEL = !!(process.env.VERCEL || process.env.VERCEL_ENV || process.env.NOW_REGION);
+const VERCEL_MAX_UPLOAD = parseInt(process.env.VERCEL_MAX_UPLOAD_BYTES || String(50 * 1024 * 1024), 10);
 const router = Router();
 router.use(requireAuth);
 const RETURN_GAP_DAYS = parseInt(process.env.ERROR_RETURN_GAP_DAYS || "7", 10);
@@ -306,15 +309,18 @@ async function processImport(
           continue;
         }
 
-        // FIX: uniquement les colonnes qui existent dans le schéma SQL
-        const normalized = {
+        const eventTs =
+          logEntry.event_timestamp ||
+          logEntry.timestamp ||
+          new Date().toISOString().slice(0, 19).replace("T", " ");
+
+        const normalized = enrichLogMetadata({
           raw_log: logEntry.raw_log || JSON.stringify(logEntry),
-          timestamp:
-            logEntry.timestamp ||
-            new Date().toISOString().slice(0, 19).replace("T", " "),
+          timestamp: eventTs,
+          event_timestamp: eventTs,
           created_time:
             logEntry.created_time ||
-            String(logEntry.timestamp || "").slice(11, 19) ||
+            String(eventTs || "").slice(11, 19) ||
             null,
           timezone: logEntry.timezone || null,
           log_level: normalizeLevel(logEntry.log_level || "INFO"),
@@ -323,17 +329,18 @@ async function processImport(
           source_server:
             logEntry.source_server ||
             logEntry.host ||
+            logEntry.hostname ||
             logEntry.source ||
             importSource ||
             null,
           service: logEntry.service || importService || null,
           message: logEntry.message || "",
-          client_ip: logEntry.ip_address || logEntry.client_ip || null, // FIX: ip_address → client_ip
+          client_ip: logEntry.ip_address || logEntry.client_ip || null,
           module: logEntry.module || null,
           error_type: logEntry.error_type || null,
           stack_trace: logEntry.stack_trace || null,
           target_user: logEntry.target_user || null,
-          parser_format: logEntry.log_format || null,
+          parser_format: logEntry.log_format || logEntry.parser_format || null,
           timestamp_inferred: logEntry.timestamp_inferred ? 1 : 0,
           classification_confidence: logEntry.classification_confidence || null,
           source_type: 'import',
@@ -344,16 +351,36 @@ async function processImport(
           import_job_id: jobId,
           imported_by_user_id: userId,
           imported_at: importTimestamp,
-          log_source: logEntry.source || logEntry.source_server || importSource || null,
+          log_source: logEntry.source_system || logEntry.source || logEntry.source_server || importSource || null,
           log_user: logEntry.target_user || logEntry.log_user || null,
-        };
+          hostname: logEntry.hostname || logEntry.source_server || logEntry.host || null,
+          source_system: logEntry.source_system || null,
+          main_service: logEntry.main_service || null,
+          log_origin: logEntry.log_origin || null,
+        }, {
+          format: logEntry.log_format || logEntry.parser_format,
+          importSource,
+          importService,
+          source_type: 'import',
+          filename: logEntry.file_name || filename,
+        });
 
         normalized.normalized_message = normalizeMessage(normalized.message);
         normalized.event_type = classifyLog(
           normalized.message,
-          normalized.source,
-          normalized.service,
+          normalized.source_system || normalized.source,
+          normalized.main_service || normalized.service,
         );
+        if (!normalized.main_service) {
+          normalized.main_service = enrichLogMetadata(normalized, {
+            format: normalized.parser_format,
+            importSource,
+            importService,
+            source_type: 'import',
+            filename: normalized.file_name,
+            event_type: normalized.event_type,
+          }).main_service;
+        }
         normalized.fingerprint = generateFingerprint(
           normalized.service,
           normalized.event_type,
@@ -442,6 +469,7 @@ async function insertBatch(conn, batch, userId) {
     const logValues = batch.map((entry) => [
       entry.raw_log,
       entry.timestamp,
+      entry.event_timestamp || entry.timestamp,
       entry.created_time,
       entry.timezone,
       entry.log_level,
@@ -471,14 +499,19 @@ async function insertBatch(conn, batch, userId) {
       entry.imported_at || null,
       entry.log_source || null,
       entry.log_user || null,
+      entry.source_system || null,
+      entry.main_service || null,
+      entry.hostname || null,
+      entry.log_origin || null,
     ]);
 
     await conn.query(
       `INSERT IGNORE INTO logs (
-        raw_log, timestamp, created_time, timezone, log_level, source, source_server, service, message, normalized_message,
+        raw_log, timestamp, event_timestamp, created_time, timezone, log_level, source, source_server, service, message, normalized_message,
         event_type, fingerprint, user_id, source_type, ingested_realtime, client_ip, module, error_type,
         stack_trace, target_user, parser_format, timestamp_inferred, classification_confidence,
-        file_created_at, file_modified_at, file_name, import_job_id, imported_by_user_id, imported_at, log_source, log_user
+        file_created_at, file_modified_at, file_name, import_job_id, imported_by_user_id, imported_at, log_source, log_user,
+        source_system, main_service, hostname, log_origin
       ) VALUES ?`,
       [logValues],
     );
@@ -586,12 +619,15 @@ router.post(
         return res.status(400).json({ error: "Aucun fichier fourni" });
       }
 
-      const maxSize = parseInt(process.env.UPLOAD_MAX_SIZE || process.env.IMPORT_MAX_SIZE || "524288000", 10);
+      const maxSize = IS_VERCEL
+        ? Math.min(parseInt(process.env.UPLOAD_MAX_SIZE || process.env.IMPORT_MAX_SIZE || "524288000", 10), VERCEL_MAX_UPLOAD)
+        : parseInt(process.env.UPLOAD_MAX_SIZE || process.env.IMPORT_MAX_SIZE || "524288000", 10);
       if (req.file.size > maxSize) {
         clearTimeout(importTimeout);
         fs.rm(req.file.path, { force: true }).catch(() => {});
+        const hint = IS_VERCEL ? ' Limite Vercel serverless — utilisez des fichiers plus petits ou un serveur persistant.' : '';
         return res.status(413).json({
-          error: `Fichier trop gros (${formatBytes(req.file.size)} reçu, limite ${formatBytes(maxSize)}). Divisez en plusieurs archives.`,
+          error: `Fichier trop gros (${formatBytes(req.file.size)} reçu, limite ${formatBytes(maxSize)}).${hint}`,
         });
       }
 

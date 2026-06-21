@@ -586,8 +586,11 @@
             div.setAttribute('data-log-id', log.id);
           }
 
-          const time = new Date(log.timestamp || Date.now()).toLocaleTimeString('fr-FR');
-          const svc = log.service ? `<div class="log-service" style="font-size:10px;color:var(--text2);margin-right:6px">${esc(log.service)}</div>` : '';
+          const time = new Date(log.event_timestamp || log.timestamp || Date.now()).toLocaleTimeString('fr-FR');
+          const src = log.source_system || log.source || '';
+          const svc = log.main_service || log.service;
+          const svcEl = svc ? `<div class="log-service" style="font-size:10px;color:var(--text2);margin-right:6px">${esc(svc)}</div>` : '';
+          const srcEl = src ? `<div class="log-service" style="font-size:10px;color:var(--text2);margin-right:6px">${esc(src)}</div>` : '';
           const st = log.source_type || 'watch';
           const conf = SOURCE_CONFIG[st] || SOURCE_CONFIG.watch;
           const sourceBadge = `<span style="font-size:9px; padding: 1px 4px; border: 1px solid ${conf.color}; color: ${conf.color}; background: ${conf.color}11; border-radius: 4px; margin-right: 6px; font-weight: bold;">${conf.label}</span>`;
@@ -596,7 +599,8 @@
             <div class="log-time">${time}</div>
             <div class="log-level ${escAttr(log.log_level)}">${esc(log.log_level)}</div>
             ${sourceBadge}
-            ${svc}
+            ${srcEl}
+            ${svcEl}
             <div class="log-message">${esc((log.message || "").slice(0, 200))}</div>
           `;
           fragment.appendChild(div);
@@ -739,12 +743,23 @@
       api.get('/api/logs/' + logId).then(function(log) {
         const l = log && (log.data || log);
         if (!l) return;
+        if (window.renderLogDetailHtml) {
+          var modal = document.getElementById('wl-modal-detail');
+          if (modal) {
+            var t=modal.querySelector('#wl-modal-title');
+            var b=modal.querySelector('#wl-modal-body');
+            if(t) t.textContent='Log #'+l.id;
+            if(b) b.innerHTML=window.renderLogDetailHtml(l, esc, function(s){ return s ? new Date(s).toLocaleString('fr-FR') : '-'; }, function(lvl){ return esc(lvl); });
+            modal.classList.add('is-open');
+          }
+          return;
+        }
         const fmtDT = function(s){ return s ? new Date(s).toLocaleString('fr-FR') : '-'; };
+        const eventTs = l.event_timestamp || l.timestamp;
         let html = '<div style="font-size:12px;line-height:1.9">';
-        [['ID',l.id],['Horodatage',fmtDT(l.timestamp)],['Niveau',l.log_level],
-         ['Source',l.source],['Service',l.service],['Module',l.module],
-         ['Type evenement',l.event_type],['IP client',l.client_ip],
-         ['Utilisateur cible',l.target_user],['Type erreur',l.error_type]
+        [['ID',l.id],['Date log',fmtDT(eventTs)],['Date import',fmtDT(l.imported_at)],['Niveau',l.log_level],
+         ['Source',l.source_system||l.source],['Service principal',l.main_service],['Hôte',l.hostname||l.source_server],
+         ['Service',l.service],['Utilisateur',l.log_user||l.target_user]
         ].forEach(function(kv){ if(kv[1]!=null&&kv[1]!=='') html+='<p><strong>'+esc(kv[0])+':</strong> '+esc(String(kv[1]))+'</p>'; });
         
         // Ajout des informations SIEM de provenance et temporalite
@@ -753,7 +768,7 @@
         const ingestedAt = l.imported_at || l.created_at;
 
         html += `<p><strong>Provenance:</strong> <span style="font-size:10px; padding: 2px 6px; border: 1px solid ${conf.color}; color: ${conf.color}; background: ${conf.color}11; border-radius: 4px; font-weight: bold;">${conf.label}</span></p>`;
-        html += `<p><strong style="color:#f59e0b">Temps Événement:</strong> ${fmtDT(l.timestamp)}</p>`;
+        html += `<p><strong style="color:#f59e0b">Temps Événement:</strong> ${fmtDT(eventTs)}</p>`;
         html += `<p><strong style="color:#3b82f6">Temps Ingestion:</strong> ${ingestedAt ? fmtDT(ingestedAt) : 'N/A'}</p>`;
         
         html += '<p><strong>Message:</strong></p><pre style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;white-space:pre-wrap;font-size:11px;max-height:150px;overflow:auto">'+esc(l.message||'')+'</pre>';
