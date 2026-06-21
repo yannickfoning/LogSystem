@@ -1,10 +1,5 @@
 import { Router } from "express";
 import multer from "multer";
-import fs from "fs/promises";
-import { createReadStream } from "fs";
-import os from "os";
-import path from "path";
-import { createHash } from "crypto";
 import logger from "../config/logger.js";
 import { v4 as uuidv4 } from "uuid";
 import pool from "../config/database.js";
@@ -22,33 +17,15 @@ import { alertWorker } from "../workers/alertWorker.js";
 import { recordAudit } from "../middleware/audit.js";
 import { validateBody, importUploadSchema } from "../middleware/validation.js";
 import { invalidateDashboard } from "../services/cacheService.js";
-import { enrichLogMetadata } from "../lib/processing/logMetadata.js";
 import { extractArchive, isArchive, filterLogFiles, mapArchiveError, ArchiveError } from "../lib/processing/archiveHandler.js";
 import { importLimiter } from "../lib/rateLimiter.js";
 
-const IS_VERCEL = !!(process.env.VERCEL || process.env.VERCEL_ENV || process.env.NOW_REGION);
-const VERCEL_MAX_UPLOAD = parseInt(process.env.VERCEL_MAX_UPLOAD_BYTES || String(50 * 1024 * 1024), 10);
 const router = Router();
 router.use(requireAuth);
 const RETURN_GAP_DAYS = parseInt(process.env.ERROR_RETURN_GAP_DAYS || "7", 10);
 
-const uploadDir = path.join(os.tmpdir(), "logsystem-uploads");
-
 const upload = multer({
-  storage: multer.diskStorage({
-    async destination(_req, _file, cb) {
-      try {
-        await fs.mkdir(uploadDir, { recursive: true });
-        cb(null, uploadDir);
-      } catch (e) {
-        cb(e);
-      }
-    },
-    filename(_req, file, cb) {
-      const ext = path.extname(file.originalname || "");
-      cb(null, `${uuidv4()}${ext}`);
-    },
-  }),
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: parseInt(process.env.UPLOAD_MAX_SIZE || process.env.IMPORT_MAX_SIZE || "524288000", 10),
     files: parseInt(process.env.UPLOAD_MAX_FILES || "10", 10),
@@ -119,22 +96,15 @@ const upload = multer({
   },
 });
 
-function hashFile(filePath) {
-  return new Promise((resolve, reject) => {
-    const hash = createHash("sha256");
-    const stream = createReadStream(filePath);
-    stream.on("data", (chunk) => hash.update(chunk));
-    stream.on("error", reject);
-    stream.on("end", () => resolve(hash.digest("hex")));
-  });
-}
-
-function formatBytes(bytes) {
-  const value = Number(bytes || 0);
-  if (value >= 1024 * 1024 * 1024) return `${(value / 1024 / 1024 / 1024).toFixed(1)} GB`;
-  if (value >= 1024 * 1024) return `${Math.round(value / 1024 / 1024)} MB`;
-  return `${Math.round(value / 1024)} KB`;
-}
+// Ordre de sévérité pour error_groups
+const SEV_ORDER = {
+  DEBUG: 0,
+  INFO: 1,
+  WARNING: 2,
+  ERROR: 3,
+  CRITICAL: 4,
+  FATAL: 5,
+};
 
 async function processImport(
   jobId,
@@ -155,7 +125,7 @@ async function processImport(
   );
   const importTimestamp = new Date().toISOString().slice(0, 19).replace("T", " ");
 
-  let filesToProcess;
+  let filesToProcess = [];
 
   if (isArchive(filename)) {
     logger.info({ event: "archive_detected", file: filename }, "[IMPORT]");
@@ -309,18 +279,15 @@ async function processImport(
           continue;
         }
 
-        const eventTs =
-          logEntry.event_timestamp ||
-          logEntry.timestamp ||
-          new Date().toISOString().slice(0, 19).replace("T", " ");
-
-        const normalized = enrichLogMetadata({
+        // FIX: uniquement les colonnes qui existent dans le schéma SQL
+        const normalized = {
           raw_log: logEntry.raw_log || JSON.stringify(logEntry),
-          timestamp: eventTs,
-          event_timestamp: eventTs,
+          timestamp:
+            logEntry.timestamp ||
+            new Date().toISOString().slice(0, 19).replace("T", " "),
           created_time:
             logEntry.created_time ||
-            String(eventTs || "").slice(11, 19) ||
+            String(logEntry.timestamp || "").slice(11, 19) ||
             null,
           timezone: logEntry.timezone || null,
           log_level: normalizeLevel(logEntry.log_level || "INFO"),
@@ -329,18 +296,17 @@ async function processImport(
           source_server:
             logEntry.source_server ||
             logEntry.host ||
-            logEntry.hostname ||
             logEntry.source ||
             importSource ||
             null,
           service: logEntry.service || importService || null,
           message: logEntry.message || "",
-          client_ip: logEntry.ip_address || logEntry.client_ip || null,
+          client_ip: logEntry.ip_address || logEntry.client_ip || null, // FIX: ip_address → client_ip
           module: logEntry.module || null,
           error_type: logEntry.error_type || null,
           stack_trace: logEntry.stack_trace || null,
           target_user: logEntry.target_user || null,
-          parser_format: logEntry.log_format || logEntry.parser_format || null,
+          parser_format: logEntry.log_format || null,
           timestamp_inferred: logEntry.timestamp_inferred ? 1 : 0,
           classification_confidence: logEntry.classification_confidence || null,
           source_type: 'import',
@@ -351,36 +317,16 @@ async function processImport(
           import_job_id: jobId,
           imported_by_user_id: userId,
           imported_at: importTimestamp,
-          log_source: logEntry.source_system || logEntry.source || logEntry.source_server || importSource || null,
+          log_source: logEntry.source || logEntry.source_server || importSource || null,
           log_user: logEntry.target_user || logEntry.log_user || null,
-          hostname: logEntry.hostname || logEntry.source_server || logEntry.host || null,
-          source_system: logEntry.source_system || null,
-          main_service: logEntry.main_service || null,
-          log_origin: logEntry.log_origin || null,
-        }, {
-          format: logEntry.log_format || logEntry.parser_format,
-          importSource,
-          importService,
-          source_type: 'import',
-          filename: logEntry.file_name || filename,
-        });
+        };
 
         normalized.normalized_message = normalizeMessage(normalized.message);
         normalized.event_type = classifyLog(
           normalized.message,
-          normalized.source_system || normalized.source,
-          normalized.main_service || normalized.service,
+          normalized.source,
+          normalized.service,
         );
-        if (!normalized.main_service) {
-          normalized.main_service = enrichLogMetadata(normalized, {
-            format: normalized.parser_format,
-            importSource,
-            importService,
-            source_type: 'import',
-            filename: normalized.file_name,
-            event_type: normalized.event_type,
-          }).main_service;
-        }
         normalized.fingerprint = generateFingerprint(
           normalized.service,
           normalized.event_type,
@@ -469,7 +415,6 @@ async function insertBatch(conn, batch, userId) {
     const logValues = batch.map((entry) => [
       entry.raw_log,
       entry.timestamp,
-      entry.event_timestamp || entry.timestamp,
       entry.created_time,
       entry.timezone,
       entry.log_level,
@@ -499,19 +444,14 @@ async function insertBatch(conn, batch, userId) {
       entry.imported_at || null,
       entry.log_source || null,
       entry.log_user || null,
-      entry.source_system || null,
-      entry.main_service || null,
-      entry.hostname || null,
-      entry.log_origin || null,
     ]);
 
     await conn.query(
       `INSERT IGNORE INTO logs (
-        raw_log, timestamp, event_timestamp, created_time, timezone, log_level, source, source_server, service, message, normalized_message,
+        raw_log, timestamp, created_time, timezone, log_level, source, source_server, service, message, normalized_message,
         event_type, fingerprint, user_id, source_type, ingested_realtime, client_ip, module, error_type,
         stack_trace, target_user, parser_format, timestamp_inferred, classification_confidence,
-        file_created_at, file_modified_at, file_name, import_job_id, imported_by_user_id, imported_at, log_source, log_user,
-        source_system, main_service, hostname, log_origin
+        file_created_at, file_modified_at, file_name, import_job_id, imported_by_user_id, imported_at, log_source, log_user
       ) VALUES ?`,
       [logValues],
     );
@@ -608,26 +548,18 @@ router.post(
   upload.single("file"),
   validateBody(importUploadSchema),
   async (req, res) => {
-    let importAccepted = false;
     const importTimeout = setTimeout(() => {
       logger.warn({ event: "import_upload_timeout" }, "[IMPORT] Timeout after 10 minutes");
     }, 10 * 60 * 1000);
 
     try {
-      if (!req.file) {
-        clearTimeout(importTimeout);
+      if (!req.file)
         return res.status(400).json({ error: "Aucun fichier fourni" });
-      }
 
-      const maxSize = IS_VERCEL
-        ? Math.min(parseInt(process.env.UPLOAD_MAX_SIZE || process.env.IMPORT_MAX_SIZE || "524288000", 10), VERCEL_MAX_UPLOAD)
-        : parseInt(process.env.UPLOAD_MAX_SIZE || process.env.IMPORT_MAX_SIZE || "524288000", 10);
+      const maxSize = parseInt(process.env.UPLOAD_MAX_SIZE || process.env.IMPORT_MAX_SIZE || "524288000", 10);
       if (req.file.size > maxSize) {
-        clearTimeout(importTimeout);
-        fs.rm(req.file.path, { force: true }).catch(() => {});
-        const hint = IS_VERCEL ? ' Limite Vercel serverless — utilisez des fichiers plus petits ou un serveur persistant.' : '';
         return res.status(413).json({
-          error: `Fichier trop gros (${formatBytes(req.file.size)} reçu, limite ${formatBytes(maxSize)}).${hint}`,
+          error: "Fichier trop gros (500 MB max). Divisez en plusieurs archives.",
         });
       }
 
@@ -637,7 +569,9 @@ router.post(
       const service = req.body.service || null;
       const locale = req.body.locale || null;
 
-      const fileHash = await hashFile(req.file.path);
+      const fileHash = await import("crypto").then(({ createHash }) =>
+        createHash("sha256").update(req.file.buffer).digest("hex"),
+      );
 
       await pool.execute(
         "INSERT INTO import_jobs (id, filename, file_size, file_hash, import_ip_address, user_id, import_source, import_service, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')",
@@ -653,53 +587,64 @@ router.post(
         ],
       );
 
-      importAccepted = true;
-      Promise.resolve().then(async () => {
-        const buffer = await fs.readFile(req.file.path);
-        return processImport(
-          jobId,
-          buffer,
-          req.file.originalname,
-          userId,
-          source,
-          service,
-          locale,
-        );
-      }).catch((e) => {
-        const mapped = e instanceof ArchiveError ? e : mapArchiveError(e);
-        pool.execute(
-          "UPDATE import_jobs SET status = ?, error_message = ?, completed_at = NOW() WHERE id = ?",
-          ["failed", mapped.message.substring(0, 1000), jobId],
-        ).catch(() => {});
-        logger.error(
-          { event: "import_fatal", jobId, error: mapped.message, code: mapped.code },
-          "[IMPORT]",
-        );
-      }).finally(() => {
+      const isVercel = !!(process.env.VERCEL || process.env.VERCEL_ENV);
+
+      if (isVercel) {
+        // On Vercel: process synchronously BEFORE sending response
+        // Lambda is frozen after res.json() — background tasks never run
+        try {
+          await processImport(jobId, req.file.buffer, req.file.originalname, userId, source, service, locale);
+        } catch (e) {
+          const mapped = e instanceof ArchiveError ? e : mapArchiveError(e);
+          await pool.execute(
+            "UPDATE import_jobs SET status = ?, error_message = ?, completed_at = NOW() WHERE id = ?",
+            ["failed", mapped.message.substring(0, 1000), jobId],
+          ).catch(() => {});
+          logger.error({ event: "import_fatal", jobId, error: mapped.message, code: mapped.code }, "[IMPORT]");
+        }
         clearTimeout(importTimeout);
-        fs.rm(req.file.path, { force: true }).catch(() => {});
-      });
 
-      await recordAudit({
-        userId,
-        userEmail: req.session.user.email,
-        action: "import_upload",
-        resourceType: "import_job",
-        resourceId: jobId,
-        details: {
-          file: req.file.originalname,
-          size: req.file.size || null,
-          hash: fileHash,
-        },
-        ipAddress: req.ip,
-      });
+        await recordAudit({
+          userId,
+          userEmail: req.session.user.email,
+          action: "import_upload",
+          resourceType: "import_job",
+          resourceId: jobId,
+          details: { file: req.file.originalname, size: req.file.size || null, hash: fileHash },
+          ipAddress: req.ip,
+        });
 
-      res.json({ job_id: jobId, filename: req.file.originalname });
+        // Fetch the completed job status to return directly
+        const [jobRows] = await pool.execute("SELECT * FROM import_jobs WHERE id = ?", [jobId]).catch(() => [[]]);
+        const job = jobRows[0] || {};
+        res.json({ job_id: jobId, filename: req.file.originalname, status: job.status, processed_lines: job.processed_lines, error_count: job.error_count });
+
+      } else {
+        // Persistent server: fire-and-forget (non-blocking)
+        processImport(jobId, req.file.buffer, req.file.originalname, userId, source, service, locale)
+          .catch((e) => {
+            const mapped = e instanceof ArchiveError ? e : mapArchiveError(e);
+            pool.execute(
+              "UPDATE import_jobs SET status = ?, error_message = ?, completed_at = NOW() WHERE id = ?",
+              ["failed", mapped.message.substring(0, 1000), jobId],
+            ).catch(() => {});
+            logger.error({ event: "import_fatal", jobId, error: mapped.message, code: mapped.code }, "[IMPORT]");
+          }).finally(() => clearTimeout(importTimeout));
+
+        await recordAudit({
+          userId,
+          userEmail: req.session.user.email,
+          action: "import_upload",
+          resourceType: "import_job",
+          resourceId: jobId,
+          details: { file: req.file.originalname, size: req.file.size || null, hash: fileHash },
+          ipAddress: req.ip,
+        });
+
+        res.json({ job_id: jobId, filename: req.file.originalname });
+      }
     } catch (e) {
       clearTimeout(importTimeout);
-      if (!importAccepted && req.file?.path) {
-        fs.rm(req.file.path, { force: true }).catch(() => {});
-      }
       logger.error({ event: "upload_error", error: e.message }, "[IMPORT]");
       if (e instanceof ArchiveError) {
         return res.status(e.status).json({ error: e.message });
@@ -734,7 +679,6 @@ router.get("/jobs", async (req, res) => {
 
     res.json(normalized);
   } catch (e) {
-    logger.error({ event: "import_jobs_list_error", error: e.message }, "[IMPORT]");
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -751,7 +695,6 @@ router.get("/jobs/:id", async (req, res) => {
       return res.status(404).json({ error: "Job non trouvé" });
     res.json(rows[0]);
   } catch (e) {
-    logger.error({ event: "import_job_detail_error", error: e.message }, "[IMPORT]");
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -831,7 +774,7 @@ export function multerErrorHandler(err, req, res, next) {
   if (err && err.code && err.code.startsWith('LIMIT_')) {
     // MulterError : fichier trop grand, trop de fichiers, champ inconnu...
     const messages = {
-      LIMIT_FILE_SIZE: `Fichier trop gros (limite ${formatBytes(parseInt(process.env.UPLOAD_MAX_SIZE || process.env.IMPORT_MAX_SIZE || "524288000", 10))}). Divisez en plusieurs archives.`,
+      LIMIT_FILE_SIZE: 'Fichier trop gros (500 MB max). Divisez en plusieurs archives.',
       LIMIT_FILE_COUNT: 'Trop de fichiers',
       LIMIT_UNEXPECTED_FILE: 'Champ de fichier inattendu',
     };

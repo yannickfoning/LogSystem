@@ -86,8 +86,7 @@
                     </p>
                     <p class="text-hint" data-i18n="import.formats">
                         Formats supportés : .log, .txt, .json, .jsonl, .csv,
-                        .xml, .zip, .gz, .tar, .rar, <strong>.7z</strong> (max
-                        500 Mo par defaut)
+                        .xml, .zip, .gz, .tar, .rar, <strong>.7z</strong> (max 100 Mo)
                     </p>
                     <input
                         type="file"
@@ -198,7 +197,6 @@
                 var selectedFile = null;
                 var currentJobId = null;
                 var pollTimer = null;
-                var esc = window.escapeHtml;
 
                 document
                     .getElementById("logout-btn")

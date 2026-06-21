@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -53,7 +54,6 @@ process.on('unhandledRejection', (reason) => {
 // ── Express app (built synchronously — Vercel needs this ready at module load) ─
 const app = express();
 app.set('trust proxy', 1);
-// eslint-disable-next-line no-unused-vars
 const PORT = parseInt(process.env.PORT || '3001', 10);
 
 // ── HTTPS redirect ────────────────────────────────────────────────────────────
@@ -171,6 +171,21 @@ app.get('/api/watchdogs/status', requireAuth, (req, res) => {
   res.json(getWatcherStatus());
 });
 app.get('/api/alerts/stream', requireAuth, (req, res) => {
+  const isVercel = !!(process.env.VERCEL || process.env.VERCEL_ENV);
+  if (isVercel) {
+    // On Vercel serverless, SSE times out after 10-300s causing constant reconnections.
+    // Return a JSON response indicating polling mode instead.
+    // The client (dashboard.html, watchlog.html) falls back to polling automatically.
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    // Send one event then close — client will reconnect via polling fallback
+    res.write('event: connected\ndata: {"mode":"polling","reason":"vercel_serverless"}\n\n');
+    // Close after 5s to avoid timeout errors in logs
+    setTimeout(() => { try { res.end(); } catch(_){} }, 5000);
+    return;
+  }
   alertWorker.addClient(res, req);
 });
 
