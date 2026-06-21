@@ -17,6 +17,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "7zip-min": "^3.0.1",
     "bcryptjs": "^3.0.3",
     "chokidar": "^3.6.0",
