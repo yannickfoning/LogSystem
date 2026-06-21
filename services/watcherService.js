@@ -231,7 +231,7 @@ async function processLogFile(filePath, incremental = true) {
         entry.classification_confidence
       ]);
 
-      const [_logResult] = await conn.query(
+      await conn.query(
         `INSERT IGNORE INTO logs (
           raw_log, timestamp, created_time, timezone, log_level, source, source_server, service, message, normalized_message,
           event_type, fingerprint, user_id, source_type, client_ip, module, error_type, stack_trace,

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import logger from '../config/logger.js';
 import pool from '../config/database.js';
 import { userScope, requireAuth, requireAdmin } from '../middleware/auth.js';
-import { getCachedDashboard, setCachedDashboard } from '../services/cacheService.js';
+import { getCachedDashboard, setCachedDashboard, invalidateDashboard } from '../services/cacheService.js';
 import { getWatcherStatus } from '../services/watcherService.js';
 import { getRedisClient } from '../services/cacheService.js';
 
@@ -29,12 +29,15 @@ function alertScope(req) {
 router.put('/alerts/read-all', async (req, res) => {
   try {
     const scope = alertScope(req);
+    const currentUserId = req.session.user.id;
     await pool.execute(
       "UPDATE alerts SET status = 'read', read_at = NOW() WHERE status = 'new'" + scope.sql,
       [...scope.params]
     );
+    await invalidateDashboard(currentUserId);
     res.json({ success: true });
-  } catch (_e) {
+  } catch (e) {
+    logger.error({ event: 'alert_read_all_failed', error: e.message }, '[DASHBOARD]');
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -53,8 +56,10 @@ router.put('/alerts/:id/read', async (req, res) => {
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Alerte introuvable' });
     }
+    await invalidateDashboard(req.session.user.id);
     res.json({ success: true });
-  } catch (_e) {
+  } catch (e) {
+    logger.error({ event: 'alert_read_failed', error: e.message }, '[DASHBOARD]');
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -70,6 +75,7 @@ router.post('/alerts/read-all', async (req, res) => {
       "UPDATE alerts SET status = 'read', read_at = NOW() WHERE status = 'new'" + scope.sql,
       [...scope.params]
     );
+    await invalidateDashboard(req.session.user.id);
     res.json({ success: true });
   } catch (e) {
     logger.error({ event: 'alert_read_all_alias_failed', error: e.message }, '[DASHBOARD]');
@@ -165,7 +171,8 @@ router.get('/summary', async (req, res) => {
     // P-09: Cache the result with 30s TTL
     await setCachedDashboard(userId, data);
     res.json(data);
-  } catch (_e) {
+  } catch (e) {
+    logger.error({ event: 'dashboard_stats_error', error: e.message }, '[DASHBOARD]');
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -359,7 +366,8 @@ router.get('/top-errors', async (req, res) => {
       lastSeen: r.last_seen,
     }));
     res.json({ topErrors: normalized, errors: normalized });
-  } catch (_e) {
+  } catch (e) {
+    logger.error({ event: 'dashboard_top_errors_error', error: e.message }, '[DASHBOARD]');
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -422,7 +430,8 @@ router.get('/per-level', async (req, res) => {
     const result = {};
     for (const r of rows) result[r.log_level] = r.cnt;
     res.json(result);
-  } catch (_e) {
+  } catch (e) {
+    logger.error({ event: 'dashboard_level_distribution_error', error: e.message }, '[DASHBOARD]');
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -440,7 +449,8 @@ router.get('/hourly', async (req, res) => {
       scope.params
     );
     res.json(rows);
-  } catch (_e) {
+  } catch (e) {
+    logger.error({ event: 'dashboard_hourly_activity_error', error: e.message }, '[DASHBOARD]');
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -528,7 +538,8 @@ router.get('/today', async (req, res) => {
       main_trends: mainTrends.map(row => ({ level: row.log_level, count: Number(row.cnt) })),
       peak_hour: activityPeaks[0]?.hour ?? null
     });
-  } catch (_e) {
+  } catch (e) {
+    logger.error({ event: 'dashboard_today_error', error: e.message }, '[DASHBOARD]');
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -539,12 +550,18 @@ router.get('/system', requireAdmin, async (req, res) => {
   try {
     await pool.execute('SELECT 1');
     status.db = 'ok';
-  } catch (_e) { status.db = 'error'; }
+  } catch (e) {
+    logger.warn({ event: 'dashboard_health_db_check_failed', error: e.message }, '[DASHBOARD]');
+    status.db = 'error';
+  }
 
   try {
     const r = getRedisClient();
     status.redis = r ? 'ok' : 'unavailable';
-  } catch (_e) { status.redis = 'error'; }
+  } catch (e) {
+    logger.warn({ event: 'dashboard_health_redis_check_failed', error: e.message }, '[DASHBOARD]');
+    status.redis = 'error';
+  }
 
   try {
     status.watcher = getWatcherStatus();
@@ -580,7 +597,8 @@ router.get('/alerts/:id', async (req, res) => {
     );
     if (!rows.length) return res.status(404).json({ error: 'Alerte introuvable' });
     res.json(rows[0]);
-  } catch (_e) {
+  } catch (e) {
+    logger.error({ event: 'dashboard_alert_detail_error', error: e.message }, '[DASHBOARD]');
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
