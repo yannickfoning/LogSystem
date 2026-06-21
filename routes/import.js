@@ -697,8 +697,7 @@ router.get("/jobs", async (req, res) => {
     }));
 
     res.json(normalized);
-  } catch (e) {
-    logger.error({ event: "import_jobs_list_error", error: e.message }, "[IMPORT]");
+  } catch (_e) {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -714,8 +713,7 @@ router.get("/jobs/:id", async (req, res) => {
     if (rows.length === 0)
       return res.status(404).json({ error: "Job non trouvé" });
     res.json(rows[0]);
-  } catch (e) {
-    logger.error({ event: "import_job_detail_error", error: e.message }, "[IMPORT]");
+  } catch (_e) {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });

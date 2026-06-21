@@ -5,38 +5,27 @@
       "src": "server.js",
       "use": "@vercel/node",
       "config": {
-        "maxLambdaSize": "50mb"
+        "includeFiles": "node_modules/node-unrar-js/**/*.wasm"
       }
-    },
-    {
-      "src": "public/**",
-      "use": "@vercel/static"
     }
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "server.js"
-    },
-    {
-      "src": "/health",
-      "dest": "server.js"
-    },
-    {
-      "src": "/alerts/stream",
-      "dest": "server.js"
-    },
-    {
-      "src": "/(.*\\.(html|css|js|svg|png|jpg|ico|webp|woff2?|ttf|eot|txt))",
-      "dest": "/public/$1"
-    },
-    {
-      "src": "/",
-      "dest": "server.js"
-    },
-    {
       "src": "/(.*)",
       "dest": "server.js"
     }
-  ]
+  ],
+  "functions": {
+    "server.js": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  },
+  "env": {
+    "NODE_ENV": "production",
+    "START_BACKGROUND_JOBS": "false",
+    "RUN_MIGRATIONS_ON_START": "true",
+    "UPLOAD_MAX_SIZE": "4500000",
+    "IMPORT_BATCH_SIZE": "500"
+  }
 }

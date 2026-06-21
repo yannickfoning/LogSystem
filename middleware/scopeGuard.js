@@ -4,8 +4,6 @@
  * Applies to all sensitive API endpoints
  */
 
-import logger from '../config/logger.js';
-
 /**
  * Middleware to verify authentication and inject scoped user ID
  * Must be applied to all /api/logs, /api/dashboard, /api/import, /api/alerts routes
@@ -97,8 +95,7 @@ export function verifyResourceScope(resourceIdParamName = 'id') {
       req.isAdmin = req.session.user.role === 'admin';
       
       next();
-    } catch (e) {
-      logger.error({ event: 'scope_guard_failed', error: e.message, path: req.path }, '[SCOPE_GUARD]');
+    } catch (_e) {
       res.status(500).json({ error: 'Erreur vérification scope' });
     }
   };

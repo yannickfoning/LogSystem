@@ -81,8 +81,7 @@ router.post('/login', validateBody(loginSchema), async (req, res) => {
         });
       });
     });
-  } catch (e) {
-    logger.error({ event: 'login_error', error: e.message }, '[AUTH]');
+  } catch (_e) {
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -140,8 +139,7 @@ router.put('/profile', validateBody(profileSchema), async (req, res) => {
     );
     req.session.user.display_name = display_name || null;
     res.json({ success: true, display_name: display_name || null });
-  } catch (e) {
-    logger.error({ event: 'profile_update_error', error: e.message }, '[AUTH]');
+  } catch (_e) {
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -172,8 +170,7 @@ router.put('/password', validateBody(passwordSchema), async (req, res) => {
     });
 
     res.json({ success: true });
-  } catch (e) {
-    logger.error({ event: 'password_change_error', error: e.message }, '[AUTH]');
+  } catch (_e) {
     await recordAudit({
       userId: req.session.user?.id,
       userEmail: req.session.user?.email,

@@ -9,7 +9,7 @@ import logger from '../config/logger.js';
  *   user_create, user_update, alert_create, alert_update,
  *   admin_action, password_change, audit_log_read
  */
-export async function recordAudit({ userId, userEmail, action, resourceType, resourceId, details, ipAddress, status = 'success' }) {
+export async function recordAudit({ userId, userEmail, action, resourceType, resourceId, details, ipAddress, status: _status = 'success' }) {
   try {
     const detailStr = details
       ? (typeof details === 'string' ? details : JSON.stringify(details))
@@ -17,8 +17,8 @@ export async function recordAudit({ userId, userEmail, action, resourceType, res
 
     await pool.execute(
       `INSERT INTO audit_log
-         (user_id, user_email, action, resource_type, resource_id, details, ip_address, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+         (user_id, user_email, action, resource_type, resource_id, details, ip_address)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         userId   || null,
         userEmail || null,
@@ -26,8 +26,7 @@ export async function recordAudit({ userId, userEmail, action, resourceType, res
         resourceType || null,
         resourceId !== undefined ? String(resourceId) : null,
         detailStr ? detailStr.substring(0, 2000) : null,
-        ipAddress || null,
-        status || 'success'
+        ipAddress || null
       ]
     );
   } catch (e) {
@@ -52,8 +51,7 @@ export function auditMiddleware(action, resourceType) {
         resourceType,
         resourceId: req.params?.id || body?.id || null,
         details: { status, method: req.method, path: req.path },
-        ipAddress: req.ip,
-        status
+        ipAddress: req.ip
       }).catch(() => {});
       return origJson(body);
     };

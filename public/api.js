@@ -158,7 +158,7 @@
   toast.prototype.warning = function(msg) { this._add(msg, 'warning'); };
   toast.prototype.info = function(msg) { this._add(msg, 'info'); };
 
-  function paginationHtml(current, total) {
+  function paginationHtml(current, total, _cb) {
     if (total <= 1) return '';
     var pages = [];
     var start = Math.max(1, current - 2);

@@ -4,7 +4,6 @@ import pool from '../config/database.js';
 import { requireAuth, userScope } from '../middleware/auth.js';
 import { detectAnomalies, getWatchStats } from '../services/watcherService.js';
 import { recordAudit } from '../middleware/audit.js';
-import { invalidateDashboard } from '../services/cacheService.js';
 import { generateLogPdf } from '../lib/pdfExport.js';
 
 const router = Router();
@@ -58,6 +57,7 @@ function buildFilters(query, userScopeFilter) {
   }
   return { sql, params };
 }
+
 
 // ── GET /export/csv ───────────────────────────────────────────────────────────
 router.get('/export/csv', async (req, res) => {
@@ -454,8 +454,7 @@ router.get('/:id', async (req, res) => {
     const [rows] = await pool.execute(`SELECT ${cols} FROM logs WHERE id = ?` + scope.sql, [req.params.id, ...scope.params]);
     if (!rows.length) return res.status(404).json({ error: 'Log non trouvé' });
     res.json(rows[0]);
-  } catch (e) {
-    logger.error({ event: 'log_detail_error', error: e.message }, '[LOGS GET ONE]');
+  } catch (_e) {
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -498,10 +497,9 @@ router.delete('/alerts/:id', async (req, res) => {
 // Helper function for error suggestions (AMÉLIORATION 6)
 function generateSuggestion(errorType, message, stackTrace) {
   const msg = String(message || '').toLowerCase();
-  const stack = String(stackTrace || '').toLowerCase();
+  const _stack = String(stackTrace || '').toLowerCase(); // currently unused — suggestion logic only matches message/errorType today
   const err = String(errorType || '').toUpperCase();
-  const haystack = `${msg} ${stack}`;
-
+  
   const suggestions = {
     'ECONNREFUSED': 'Vérifiez que le service cible est démarré et accessible sur le port indiqué.',
     'ETIMEDOUT': 'Augmentez le timeout ou vérifiez la latence réseau vers l\'hôte distant.',
@@ -514,24 +512,23 @@ function generateSuggestion(errorType, message, stackTrace) {
   // Check error type first
   if (suggestions[err]) return suggestions[err];
   
-  // Check message + stack trace patterns (stack often carries the clue the
-  // top-level message doesn't, e.g. a DB driver error wrapped by app code)
-  if (haystack.includes('401') || haystack.includes('unauthorized')) {
+  // Check message patterns
+  if (msg.includes('401') || msg.includes('unauthorized')) {
     return 'Erreur d\'authentification. Vérifiez les tokens et les identifiants.';
   }
-  if (haystack.includes('403') || haystack.includes('forbidden')) {
+  if (msg.includes('403') || msg.includes('forbidden')) {
     return 'Erreur d\'autorisation. Vérifiez les droits d\'accès et les permissions.';
   }
-  if (haystack.includes('500') || haystack.includes('internal server')) {
+  if (msg.includes('500') || msg.includes('internal server')) {
     return 'Erreur serveur interne. Consultez les logs du serveur pour plus de détails.';
   }
-  if (haystack.includes('cannot read') || haystack.includes('cannot set')) {
+  if (msg.includes('cannot read') || msg.includes('cannot set')) {
     return 'Une propriété est accédée sur une valeur null/undefined. Ajoutez une vérification null.';
   }
-  if (haystack.includes('out of memory') || haystack.includes('heap')) {
+  if (msg.includes('out of memory') || msg.includes('heap')) {
     return 'Mémoire insuffisante. Vérifiez les fuites mémoire ou augmentez --max-old-space-size.';
   }
-  if (haystack.includes('deadlock')) {
+  if (msg.includes('deadlock')) {
     return 'Deadlock détecté en base de données. Revisitez la logique de transation.';
   }
   
@@ -550,7 +547,6 @@ router.delete('/:id', async (req, res) => {
       const [result] = await pool.execute('DELETE FROM logs WHERE id = ?', [logId]);
       if (!result.affectedRows) return res.status(404).json({ error: 'Log non trouvé' });
       await recordAudit({ userId: user.id, userEmail: user.email, action: 'delete_log', resourceType: 'log', resourceId: String(logId), details: `Admin deleted log ${logId}`, ipAddress: req.ip });
-      await invalidateDashboard(user.id);
       return res.json({ success: true });
     }
 
@@ -559,10 +555,8 @@ router.delete('/:id', async (req, res) => {
     if (!result.affectedRows) return res.status(404).json({ error: 'Log non trouvé ou accès refusé' });
 
     await recordAudit({ userId: user.id, userEmail: user.email, action: 'delete_log', resourceType: 'log', resourceId: String(logId), details: `User deleted own log ${logId}`, ipAddress: req.ip });
-    await invalidateDashboard(user.id);
     res.json({ success: true });
-  } catch (e) {
-    logger.error({ event: 'log_delete_error', error: e.message }, '[LOGS DELETE]');
+  } catch (_e) {
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
