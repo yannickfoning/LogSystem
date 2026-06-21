@@ -96,6 +96,8 @@ Variables identiques à `.env.example`, avec `DB_SSL=true` et les credentials Ai
 
 Configurez les variables dans le dashboard Vercel (voir section VERCEL dans `.env.example`).
 
+**MySQL Aiven sur Vercel :** `DB_SSL=true` + `DB_SSL_REJECT_UNAUTHORIZED=false` (fix rapide), ou `DB_SSL_CA_BASE64` (recommandé).
+
 ## 5. Vérifications essentielles
 
 - [ ] Log `[DB]` au démarrage sans erreur `[FATAL]`

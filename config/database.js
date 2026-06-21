@@ -14,14 +14,37 @@ export function levelSeverity(level) {
   return map[normalizeLevel(level)] || 0;
 }
 
-// [FIX-SEC-01] Lecture sécurisée du CA — ne crashe pas si le fichier est absent
-function readCaFile() {
+function normalizePem(value) {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  return trimmed.includes('\\n') ? trimmed.replace(/\\n/g, '\n') : trimmed;
+}
+
+/** Lit le certificat CA : DB_SSL_CA → DB_SSL_CA_BASE64 → DB_SSL_CA_PATH */
+export function readSslCa() {
+  if (process.env.DB_SSL_CA) {
+    return normalizePem(process.env.DB_SSL_CA);
+  }
+
+  if (process.env.DB_SSL_CA_BASE64) {
+    try {
+      const pem = Buffer.from(process.env.DB_SSL_CA_BASE64.trim(), 'base64').toString('utf8');
+      return normalizePem(pem);
+    } catch (err) {
+      const msg = `[DB] Cannot decode DB_SSL_CA_BASE64: ${err.message}`;
+      try { logger.warn({ event: 'ssl_ca_base64_error', error: err.message }, msg); }
+      catch { console.warn(msg); }
+      return undefined;
+    }
+  }
+
   const caPath = process.env.DB_SSL_CA_PATH;
   if (!caPath) return undefined;
+
   try {
-    return fs.readFileSync(caPath);
+    return fs.readFileSync(caPath, 'utf8');
   } catch (err) {
-    // logger may not be initialized yet at module load — use console as fallback
     const msg = `[DB] Cannot read SSL CA file (${caPath}): ${err.message}`;
     try { logger.warn({ event: 'ssl_ca_read_error', path: caPath, error: err.message }, msg); }
     catch { console.warn(msg); }
@@ -29,8 +52,32 @@ function readCaFile() {
   }
 }
 
-// [FIX-SEC-01] rejectUnauthorized: true par défaut — mettre DB_SSL_REJECT_UNAUTHORIZED=false uniquement si CA Aiven pose problème
-const rejectUnauthorized = process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false';
+export function describeSslStatus() {
+  if (process.env.DB_SSL !== 'true') return 'disabled';
+  const ca = readSslCa();
+  const rejectUnauthorized = process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false';
+  return `enabled (rejectUnauthorized=${rejectUnauthorized}, ca=${Boolean(ca)})`;
+}
+
+export function buildSslOptions() {
+  if (process.env.DB_SSL !== 'true') return undefined;
+
+  const ca = readSslCa();
+  const rejectUnauthorized = process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false';
+
+  if (!ca && rejectUnauthorized) {
+    const hint = process.env.VERCEL
+      ? 'Set DB_SSL_CA, DB_SSL_CA_BASE64, or DB_SSL_REJECT_UNAUTHORIZED=false on Vercel'
+      : 'Set DB_SSL_CA (inline PEM), DB_SSL_CA_BASE64, or DB_SSL_CA_PATH (file path)';
+    try {
+      logger.warn({ event: 'ssl_ca_missing', hint }, '[DB] SSL enabled without CA certificate');
+    } catch {
+      console.warn(`[DB] SSL enabled without CA certificate. ${hint}`);
+    }
+  }
+
+  return { ca, rejectUnauthorized };
+}
 
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
@@ -41,13 +88,19 @@ const dbConfig = {
   waitForConnections: true,
   connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || '10', 10),
   queueLimit: parseInt(process.env.DB_QUEUE_LIMIT || '0', 10),
-  ssl: process.env.DB_SSL === 'true' ? {
-    ca: readCaFile(),
-    rejectUnauthorized
-  } : undefined
+  ssl: buildSslOptions(),
 };
 
 const pool = mysql.createPool(dbConfig);
+
+try {
+  logger.info(
+    { event: 'db_pool_initialized', ssl: describeSslStatus() },
+    '[DB] MySQL connection pool initialized successfully.'
+  );
+} catch {
+  console.log('[DB] MySQL connection pool initialized successfully.', `ssl: "${describeSslStatus()}"`);
+}
 
 export default pool;
 
@@ -55,12 +108,4 @@ export async function testConnection() {
   const conn = await pool.getConnection();
   conn.release();
   return true;
-}
-
-export function buildSslOptions() {
-  if (process.env.DB_SSL === 'false' || !process.env.DB_SSL) return undefined;
-  return {
-    ca: readCaFile(),
-    rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false'
-  };
 }

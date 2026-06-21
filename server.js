@@ -26,7 +26,7 @@ import rateLimit from 'express-rate-limit';
 import compression from 'compression';
 import fs from 'fs';
 
-import { testConnection, buildSslOptions } from './config/database.js';
+import { testConnection, buildSslOptions, describeSslStatus } from './config/database.js';
 import { runMigrations } from './lib/database/migrationRunner.js';
 import { requireAuth } from './middleware/auth.js';
 import { scopeGuard } from './middleware/scopeGuard.js';
@@ -198,7 +198,7 @@ export async function initializeApp() {
   initializationPromise = (async () => {
   try {
     await testConnection();
-    logger.info({ event: 'db_connection_success', env: process.env.NODE_ENV }, '[DB]');
+    logger.info({ event: 'db_connection_success', env: process.env.NODE_ENV, ssl: describeSslStatus() }, '[DB]');
   } catch (e) {
     logger.error({ event: 'db_connection_failed', error: e.message }, '[FATAL]');
     throw e;

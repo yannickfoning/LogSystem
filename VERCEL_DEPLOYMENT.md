@@ -117,37 +117,61 @@ git push origin main
 
 3. **Configurer les variables d'environnement**
 
-Ajouter dans Vercel Dashboard → Project Settings → Environment Variables:
+Aller dans : **Project → Settings → Environment Variables**
 
-```env
-# ─ NODE & APPLICATION
-NODE_ENV=production
-PORT=3000
+| Nom | Valeur | Notes |
+|-----|--------|-------|
+| `NODE_ENV` | `production` | |
+| `DB_HOST` | `mysql-xxx.aivencloud.com` | Aiven → Service → Connection info |
+| `DB_PORT` | `13306` | Port Aiven (rarement 3306) |
+| `DB_USER` | `avnadmin` | |
+| `DB_PASSWORD` | `votre_password_aiven` | |
+| `DB_NAME` | `logsystem` | |
+| `DB_SSL` | `true` | Obligatoire pour Aiven |
+| `DB_SSL_REJECT_UNAUTHORIZED` | `false` | Fix principal erreur SSL sur Vercel |
+| `SESSION_SECRET` | `<64 chars random>` | `npm run secret` |
+| `CSRF_SECRET` | `<64 chars random>` | Différent de SESSION_SECRET |
+| `BCRYPT_ROUNDS` | `12` | |
+| `UPLOAD_MAX_SIZE` | `4500000` | Max ~4,5 Mo sur Vercel (limite serverless) |
+| `DB_CONNECTION_LIMIT` | `5` | Recommandé serverless |
+| `ALERT_EVAL_INTERVAL` | `60000` | |
+| `ERROR_RETURN_GAP_DAYS` | `7` | |
 
-# ─ DATABASE - AIVEN MYSQL
-DB_HOST=mysql-aab9c07-yannickfoning22-33d3.d.aivencloud.com
-DB_PORT=21661
-DB_USER=avnadmin
-DB_PASSWORD=AVNS_tflDPmE7FE7dnWKpjFY
-DB_NAME=defaultdb
-DB_SSL=true
-DB_SSL_CA_PATH=/etc/ssl/certs/ca-certificates.crt
-DB_CONNECTION_LIMIT=5
+> **Note uploads :** Vercel limite le body HTTP à ~4,5 Mo. Les imports volumineux (RAR 100 Mo+) nécessitent le service always-on (Render/Railway) — voir `ARCHITECTURE.md`.
 
-# ─ REDIS (OPTIONAL)
-# REDIS_URL=redis://<user>:<pass>@<host>:<port>
+#### Option alternative : CA Aiven en base64 (plus sécurisé)
 
-# ─ SECURITY
-SESSION_SECRET=<GÉNÉRER: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))">
-CSRF_SECRET=<GÉNÉRER: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))">
+Au lieu de `DB_SSL_REJECT_UNAUTHORIZED=false`, fournir le certificat CA Aiven :
 
-# ─ APPLICATION
-BCRYPT_ROUNDS=12
-UPLOAD_MAX_SIZE=4500000
-IMPORT_BATCH_SIZE=500
-ALERT_EVAL_INTERVAL=60000
-RETENTION_CRON_HOUR=3
+1. Télécharger `ca.pem` depuis Aiven → Service → Connection info → Download CA cert
+2. Convertir en base64 :
+   ```bash
+   # Linux/macOS
+   base64 -i ca.pem | tr -d '\n'
+
+   # PowerShell
+   [Convert]::ToBase64String([IO.File]::ReadAllBytes("ca.pem"))
+   ```
+3. Variable Vercel : `DB_SSL_CA_BASE64` = `<chaîne base64>`
+4. **Ne pas** définir `DB_SSL_REJECT_UNAUTHORIZED=false` — la validation automatique s'active
+
+Avec le CA fourni, la connexion est **chiffrée et validée** — plus sécurisé que `rejectUnauthorized=false`.
+
+#### Vérification après déploiement
+
+Les logs Vercel doivent afficher :
+
 ```
+[DB] MySQL connection pool initialized successfully.
+ssl: "enabled (rejectUnauthorized=false, ca=false)"
+[DB] MySQL connection successful
+```
+
+Si `ca=true`, le certificat Aiven est bien chargé. Si encore `HANDSHAKE_SSL_ERROR` :
+
+1. Vérifier `DB_SSL=true`
+2. Vérifier `DB_SSL_REJECT_UNAUTHORIZED=false` (ou `DB_SSL_CA_BASE64` défini)
+3. Redéployer (Vercel peut mettre les variables en cache)
 
 1. **Valider & Déployer**
    - Cliquer sur "Deploy"
@@ -396,9 +420,24 @@ git push origin main
 - Réduire UPLOAD_MAX_SIZE
 - Augmenter maxDuration dans vercel.json (si Pro)
 
-### Erreur: "SSL Certificate verification failed"
+### Erreur: "self-signed certificate in certificate chain" / SSL handshake failed
 
-**Solution:** Vérifier que DB_SSL_CA_PATH est configuré correctement pour Aiven
+**Cause :** Aiven MySQL exige SSL. Sur Vercel, les chemins fichier (`DB_SSL_CA_PATH`) ne fonctionnent pas.
+
+**Fix rapide :**
+
+```
+DB_SSL=true
+DB_SSL_REJECT_UNAUTHORIZED=false
+```
+
+**Fix sécurisé (recommandé) :**
+
+1. Télécharger le CA Aiven (`ca.pem`)
+2. Définir `DB_SSL_CA_BASE64` avec le contenu encodé en base64
+3. Laisser `DB_SSL_REJECT_UNAUTHORIZED` non défini (défaut : validation active)
+
+Redéployer après modification des variables.
 
 ---
 
