@@ -3,29 +3,46 @@
   "builds": [
     {
       "src": "server.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": "node_modules/node-unrar-js/**/*.wasm"
-      }
+      "use": "@vercel/node"
     }
   ],
   "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "server.js"
+    },
+    {
+      "src": "/(.*\\.html)",
+      "dest": "/public/$1"
+    },
+    {
+      "src": "/(.*\\.js)",
+      "dest": "/public/$1"
+    },
+    {
+      "src": "/(.*\\.css)",
+      "dest": "/public/$1"
+    },
+    {
+      "src": "/",
+      "dest": "server.js"
+    },
     {
       "src": "/(.*)",
       "dest": "server.js"
     }
   ],
-  "functions": {
-    "server.js": {
-      "maxDuration": 60,
-      "memory": 1024
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+      ]
     }
-  },
+  ],
   "env": {
-    "NODE_ENV": "production",
-    "START_BACKGROUND_JOBS": "false",
-    "RUN_MIGRATIONS_ON_START": "true",
-    "UPLOAD_MAX_SIZE": "4500000",
-    "IMPORT_BATCH_SIZE": "500"
+    "NODE_ENV": "production"
   }
 }
