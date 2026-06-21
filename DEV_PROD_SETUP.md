@@ -61,9 +61,8 @@ Au premier démarrage sur une base **vide** :
 Comptes créés par `create-admin` (à changer après la première connexion) :
 
 | Rôle | Email | Mot de passe |
-|---|---|---|
-| admin | admin@logsystem.local | Admin@1234 |
-| user | user@logsystem.local | User@1234 |
+| admin | <admin@logsystem.local> | Admin@1234 |
+| user | <user@logsystem.local> | User@1234 |
 
 ## 3. Migrations
 
@@ -108,7 +107,6 @@ Configurez les variables dans le dashboard Vercel (voir section VERCEL dans `.en
 ## 6. Dépannage
 
 | Symptôme | Cause probable | Solution |
-|---|---|---|
 | `CSRF_SECRET must be set` | `.env` absent ou secret trop court | Vérifier `.env`, régénérer les secrets |
 | `SESSION_SECRET must be at least 32 characters` | Secret manquant ou contient `change-me` | Régénérer et mettre à jour `.env` |
 | `Tables manquantes après migrations` | MySQL inaccessible ou migrations en échec | Vérifier credentials, logs `[MIGRATION]` |
