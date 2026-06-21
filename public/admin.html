@@ -410,23 +410,39 @@
       var es = null;
       var sseRetryDelay = 1000;
       var sseHeartbeat = Date.now();
+      var ssePollingMode = false;
+      var zombieCheck = null;
       function connectSSE() {
+        if (ssePollingMode) return;
         if (es) {
           try { es.close(); } catch (_) {}
           es = null;
         }
+        if (zombieCheck) clearInterval(zombieCheck);
         es = new EventSource('/api/alerts/stream');
         sseHeartbeat = Date.now();
-        
-        // Zombie detection
-        var zombieCheck = setInterval(() => {
+
+        zombieCheck = setInterval(() => {
+          if (ssePollingMode) return;
           if (Date.now() - sseHeartbeat > 120000) {
             clearInterval(zombieCheck);
             try { es.close(); } catch (_) {}
             connectSSE();
           }
         }, 30000);
-        
+
+        es.addEventListener('connected', function(e) {
+          sseHeartbeat = Date.now();
+          var data = {};
+          try { data = JSON.parse(e.data || '{}'); } catch (_err) {}
+          if (data.mode === 'polling') {
+            ssePollingMode = true;
+            if (zombieCheck) clearInterval(zombieCheck);
+            try { es.close(); } catch (_) {}
+            return;
+          }
+          sseRetryDelay = 1000;
+        });
         es.addEventListener('alert', function(e) {
           sseHeartbeat = Date.now();
           var a = JSON.parse(e.data);
@@ -435,7 +451,7 @@
           updateAdminBadge(++adminUnreadAlerts);
           window.toast.warning(a.message);
           var severity = a.severity || 'medium';
-          showAdminNotification('🔔 Admin Alert: ' + a.message, {
+          showAdminNotification('Admin Alert: ' + a.message, {
             body: 'Severity: ' + severity,
             tag: 'admin-alert-' + a.id
           });
@@ -445,6 +461,7 @@
           sseHeartbeat = Date.now();
         });
         es.onerror = function() {
+          if (ssePollingMode) return;
           try { es.close(); } catch (_) {}
           fetch('/api/auth/me', { credentials: 'same-origin' })
             .then(function(r) {

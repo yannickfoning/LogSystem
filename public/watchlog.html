@@ -245,12 +245,26 @@
     }
     const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
-    // ─── Connexion SSE #1 : flux de logs et alertes en direct ──────────────
+    // ─── Connexion SSE #1 : flux de logs et alertes en direct ─────────────
     // Les logs arrivent via "log" / "log_batch"; les vraies alertes via "alert".
     function initSSE() {
+      if (window._alertsPollingMode) return;
       eventSource = new EventSource('/api/alerts/stream');
 
-      eventSource.addEventListener('connected', function() {
+      eventSource.addEventListener('connected', function(e) {
+        var data = {};
+        try { data = JSON.parse(e.data || '{}'); } catch (_err) {}
+        if (data.mode === 'polling') {
+          window._alertsPollingMode = true;
+          if (eventSource) eventSource.close();
+          document.querySelector('.status-indicator').style.background = '#f59e0b';
+          if (!window._watchLogsPollInterval) {
+            window._watchLogsPollInterval = setInterval(function() {
+              if (!document.hidden) loadRecentLogs();
+            }, 10000);
+          }
+          return;
+        }
         document.querySelector('.status-indicator').style.background = '#22c55e';
         reconnectDelay = 1000;
       });
@@ -259,11 +273,9 @@
         try {
           var data = JSON.parse(e.data);
           if (data.event_type === 'log') {
-            // Compat anciennes sessions avant separation des evenements.
             addLogEntry(data);
             scheduleLiveRefresh();
           } else if (data.message && data.severity) {
-            // Vraie alerte système : l'afficher dans le flux ET dans le panneau alertes
             addLogEntry({
               timestamp: data.created_at || new Date().toISOString(),
               log_level: data.severity === 'critical' ? 'CRITICAL' : data.severity === 'high' ? 'ERROR' : 'WARNING',
@@ -271,7 +283,7 @@
               service: 'alerts',
               source: 'system'
             });
-            prependAlertItem(data); // ajout immédiat dans le panneau alertes
+            prependAlertItem(data);
           }
         } catch (err) {
           // Ignore malformed alert event
@@ -300,6 +312,7 @@
       eventSource.addEventListener('heartbeat', function() { /* keep-alive */ });
 
       eventSource.onerror = function() {
+        if (window._alertsPollingMode) return;
         document.querySelector('.status-indicator').style.background = '#ef4444';
         if (eventSource) eventSource.close();
         setTimeout(initSSE, reconnectDelay);
@@ -307,35 +320,11 @@
       };
     }
 
-    // ─── Connexion SSE #2 : stats et détection d'anomalies ─────────────────
+    // ─── Connexion SSE #2 : stats et détection d'anomalies ─────────────
     function initStatsSSE() {
-      // Try SSE first (works on persistent servers, not on Vercel serverless)
+      if (window._watchStatsPollingMode) return;
       statsSource = new EventSource('/api/logs/watch/stream');
-      // Fallback: if SSE doesn't connect within 5s, switch to polling
       var sseConnected = false;
-      statsSource.addEventListener('connected', function() { sseConnected = true; });
-      statsSource.addEventListener('stats_update', function() { sseConnected = true; });
-      statsSource.onerror = function() {
-        if (!sseConnected) {
-          console.warn('[WatchLog] SSE non disponible (Vercel serverless) — mode polling activé');
-          statsSource.close();
-          statsSource = null;
-          // Poll stats every 10 seconds instead
-          if (!window._watchPollInterval) {
-            window._watchPollInterval = setInterval(function() {
-              api.get('/api/logs/watch/stats').then(function(stats) {
-                if (stats) updateStats(stats);
-              }).catch(function(){});
-              // Also reload logs
-              if (typeof loadLogs === 'function') loadLogs();
-            }, 10000);
-          }
-        }
-      };
-
-      statsSource.addEventListener('connected', function() {
-        statsReconnectDelay = 1000;
-      });
 
       function updateStats(stats) {
         if (stats.logs_last_hour !== undefined) {
@@ -352,10 +341,36 @@
         }
       }
 
+      function startStatsPolling() {
+        window._watchStatsPollingMode = true;
+        if (statsSource) {
+          try { statsSource.close(); } catch (_err) {}
+          statsSource = null;
+        }
+        if (!window._watchPollInterval) {
+          window._watchPollInterval = setInterval(function() {
+            api.get('/api/logs/watch/stats').then(function(stats) {
+              if (stats) updateStats(stats);
+            }).catch(function(){});
+            if (typeof loadRecentLogs === 'function' && !document.hidden) loadRecentLogs();
+          }, 10000);
+        }
+      }
+
+      statsSource.addEventListener('connected', function(e) {
+        sseConnected = true;
+        statsReconnectDelay = 1000;
+        var data = {};
+        try { data = JSON.parse(e.data || '{}'); } catch (_err) {}
+        if (data.mode === 'polling') startStatsPolling();
+      });
+
       statsSource.addEventListener('stats_update', function(e) {
+        sseConnected = true;
         try {
           var data = JSON.parse(e.data);
           if (data.stats) updateMetricsFromStats(data.stats);
+          else updateStats(data);
         } catch (err) { console.warn('[WatchLog] Stats parse error:', err); }
       });
 
@@ -368,6 +383,11 @@
       });
 
       statsSource.onerror = function() {
+        if (window._watchStatsPollingMode) return;
+        if (!sseConnected) {
+          startStatsPolling();
+          return;
+        }
         if (statsSource) statsSource.close();
         setTimeout(initStatsSSE, statsReconnectDelay);
         statsReconnectDelay = Math.min(statsReconnectDelay * 2, 30000);
