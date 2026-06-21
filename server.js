@@ -110,13 +110,27 @@ app.use((req, res, next) => {
   })(req, res, next);
 });
 
-const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 500, standardHeaders: true, legacyHeaders: false });
+// Adjust rate limits for Vercel serverless environment
+const isVercel = !!(process.env.VERCEL || process.env.VERCEL_ENV);
+const globalMax = isVercel ? 1000 : 500;
+const loginMax = isVercel ? 30 : 10;
+
+const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: globalMax, standardHeaders: true, legacyHeaders: false });
 app.use(globalLimiter);
 
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, max: 10,
+  windowMs: 15 * 60 * 1000, max: loginMax,
   message: { error: 'Trop de tentatives de connexion. Réessayez dans 15 minutes.' },
   standardHeaders: true, legacyHeaders: false
+});
+
+// Add specific rate limiter for alerts/stream to prevent abuse
+const alertsStreamLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute window
+  max: isVercel ? 60 : 30, // 60 requests per minute on Vercel, 30 otherwise
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.method !== 'GET'
 });
 
 // ── Session store (MySQL) ─────────────────────────────────────────────────────
@@ -173,7 +187,7 @@ app.use('/api/search', requireAuth, scopeGuard, searchApiRoutes);
 app.get('/api/watchdogs/status', requireAuth, (req, res) => {
   res.json(getWatcherStatus());
 });
-app.get('/api/alerts/stream', requireAuth, (req, res) => {
+app.get('/api/alerts/stream', alertsStreamLimiter, requireAuth, (req, res) => {
   if (IS_VERCEL) {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');

@@ -77,9 +77,9 @@ const dbConfig = {
   waitForConnections: true,
   connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || (isServerless ? '2' : '10'), 10),
   queueLimit: parseInt(process.env.DB_QUEUE_LIMIT || (isServerless ? '25' : '0'), 10),
+  ssl: sslConfig,
   enableKeepAlive: true,
   keepAliveInitialDelay: 0,
-  ssl: sslConfig,
 };
 
 const pool = mysql.createPool(dbConfig);

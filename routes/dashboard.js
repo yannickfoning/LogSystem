@@ -38,7 +38,7 @@ router.put('/alerts/read-all', async (req, res) => {
     res.json({ success: true });
   } catch (e) {
     logger.error({ event: 'alert_read_all_failed', error: e.message }, '[DASHBOARD]');
-    res.status(500).json({ error: 'Erreur serveur' });
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -60,7 +60,7 @@ router.put('/alerts/:id/read', async (req, res) => {
     res.json({ success: true });
   } catch (e) {
     logger.error({ event: 'alert_read_failed', error: e.message }, '[DASHBOARD]');
-    res.status(500).json({ error: 'Erreur serveur' });
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -79,7 +79,7 @@ router.post('/alerts/read-all', async (req, res) => {
     res.json({ success: true });
   } catch (e) {
     logger.error({ event: 'alert_read_all_alias_failed', error: e.message }, '[DASHBOARD]');
-    res.status(500).json({ error: 'Erreur serveur' });
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -180,7 +180,7 @@ router.get('/summary', async (req, res) => {
     res.json(data);
   } catch (e) {
     logger.error({ event: 'dashboard_stats_error', error: e.message }, '[DASHBOARD]');
-    res.status(500).json({ error: 'Erreur serveur' });
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -345,7 +345,7 @@ router.get('/trends', async (req, res) => {
     });
   } catch (e) {
     logger.error({ event: 'dashboard_trends_error', error: e.message }, '[DASHBOARD]');
-    res.status(500).json({ error: 'Erreur serveur' });
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -375,7 +375,7 @@ router.get('/top-errors', async (req, res) => {
     res.json({ topErrors: normalized, errors: normalized });
   } catch (e) {
     logger.error({ event: 'dashboard_top_errors_error', error: e.message }, '[DASHBOARD]');
-    res.status(500).json({ error: 'Erreur serveur' });
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -401,7 +401,7 @@ router.get('/recent-logs', async (req, res) => {
     res.json({ recentLogs: normalized, logs: normalized });
   } catch (e) {
     logger.error({ event: 'recent_logs_error', error: e.message }, '[DASHBOARD]');
-    res.status(500).json({ error: 'Erreur serveur', details: e.message });
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur', details: e.message });
   }
 });
 
@@ -422,7 +422,7 @@ router.get('/alerts', async (req, res) => {
     res.json(rows);
   } catch (e) {
     logger.error({ event: 'alerts_error', error: e.message, sql: e.sql }, '[DASHBOARD ALERTS]');
-    res.status(500).json({ error: 'Erreur serveur', details: e.message });
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur', details: e.message });
   }
 });
 
@@ -439,7 +439,7 @@ router.get('/per-level', async (req, res) => {
     res.json(result);
   } catch (e) {
     logger.error({ event: 'dashboard_level_distribution_error', error: e.message }, '[DASHBOARD]');
-    res.status(500).json({ error: 'Erreur serveur' });
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -458,7 +458,7 @@ router.get('/hourly', async (req, res) => {
     res.json(rows);
   } catch (e) {
     logger.error({ event: 'dashboard_hourly_activity_error', error: e.message }, '[DASHBOARD]');
-    res.status(500).json({ error: 'Erreur serveur' });
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -547,7 +547,7 @@ router.get('/today', async (req, res) => {
     });
   } catch (e) {
     logger.error({ event: 'dashboard_today_error', error: e.message }, '[DASHBOARD]');
-    res.status(500).json({ error: 'Erreur serveur' });
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -606,7 +606,7 @@ router.get('/alerts/:id', async (req, res) => {
     res.json(rows[0]);
   } catch (e) {
     logger.error({ event: 'dashboard_alert_detail_error', error: e.message }, '[DASHBOARD]');
-    res.status(500).json({ error: 'Erreur serveur' });
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 

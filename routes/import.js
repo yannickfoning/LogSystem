@@ -649,7 +649,7 @@ router.post(
       if (e instanceof ArchiveError) {
         return res.status(e.status).json({ error: e.message });
       }
-      res.status(500).json({ error: e.message || "Erreur lors de l'upload" });
+      if (!res.headersSent) res.status(500).json({ error: e.message || "Erreur lors de l'upload" });
     }
   },
 );
@@ -679,7 +679,7 @@ router.get("/jobs", async (req, res) => {
 
     res.json(normalized);
   } catch (e) {
-    res.status(500).json({ error: "Erreur serveur" });
+    if (!res.headersSent) res.status(500).json({ error: "Erreur serveur" });
   }
 });
 
@@ -695,7 +695,7 @@ router.get("/jobs/:id", async (req, res) => {
       return res.status(404).json({ error: "Job non trouvé" });
     res.json(rows[0]);
   } catch (e) {
-    res.status(500).json({ error: "Erreur serveur" });
+    if (!res.headersSent) res.status(500).json({ error: "Erreur serveur" });
   }
 });
 
@@ -762,7 +762,7 @@ router.get("/jobs/:id/summary", async (req, res) => {
     res.json(summary);
   } catch (e) {
     logger.error({ event: "summary_error", error: e.message }, "[IMPORT]");
-    res.status(500).json({ error: "Erreur lors du calcul du résumé" });
+    if (!res.headersSent) res.status(500).json({ error: "Erreur lors du calcul du résumé" });
   }
 });
 
@@ -781,7 +781,10 @@ export function multerErrorHandler(err, req, res, next) {
     const message = messages[err.code] || 'Erreur de téléversement';
     logger.warn({ event: 'multer_error', code: err.code, field: err.field }, `[IMPORT] ${message}`);
     const status = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
-    return res.status(status).json({ error: message });
+    // Check if headers have already been sent to avoid "Cannot set headers after they are sent" error
+    if (!res.headersSent) {
+      return res.status(status).json({ error: message });
+    }
   }
   next(err);
 }
