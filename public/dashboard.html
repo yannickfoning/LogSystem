@@ -863,24 +863,43 @@ function showLogDetail(logId){
 
     // ── SSE ──
     var sseStatusEl = document.getElementById('status-sse');
+    var ssePollingMode = false;
+    var sseWatchdogTimer = null;
     function connectSSE(){
+      if (ssePollingMode) return;
       var es = new EventSource('/api/alerts/stream');
       var heartbeat = Date.now();
       if (sseStatusEl) sseStatusEl.textContent = 'Déconnecté';
-      es.addEventListener('connected', function(){ if(sseStatusEl) sseStatusEl.textContent='✅ Connecté'; });
+      es.addEventListener('connected', function(e){
+        heartbeat = Date.now();
+        var data = {};
+        try { data = JSON.parse(e.data || '{}'); } catch(_err) {}
+        if (data.mode === 'polling') {
+          ssePollingMode = true;
+          if (sseStatusEl) sseStatusEl.textContent = 'Polling';
+          if (sseWatchdogTimer) clearInterval(sseWatchdogTimer);
+          es.close();
+          return;
+        }
+        if(sseStatusEl) sseStatusEl.textContent='Connecté';
+      });
       es.addEventListener('alert', function(e){
         heartbeat = Date.now();
         var a; try{ a=JSON.parse(e.data); } catch(ex){ return; }
         if (a.event_type === 'log' || a.event_type === 'log_batch') return;
-        toast.warning('🔔 ' + (a.message||'Nouvelle alerte'));
+        toast.warning(a.message||'Nouvelle alerte');
         loadSummary(); loadAlerts();
       });
       es.addEventListener('heartbeat', function(){ heartbeat = Date.now(); });
-      es.onerror = function(){ if(sseStatusEl) sseStatusEl.textContent='🔴 Déconnecté'; es.close(); setTimeout(connectSSE, 5000); };
+      es.onerror = function(){
+        if (ssePollingMode) return;
+        if(sseStatusEl) sseStatusEl.textContent='Déconnecté';
+        es.close();
+        setTimeout(connectSSE, 5000);
+      };
       es.addEventListener('log', function(e){
         try {
           var data = JSON.parse(e.data);
-          // Refresh dashboard stats silently on new log
           if (data && data.log_level) {
             clearTimeout(window._sseRefreshTimer);
             window._sseRefreshTimer = setTimeout(function(){ if(typeof loadDashboard === 'function') loadDashboard(); }, 3000);
@@ -891,12 +910,16 @@ function showLogDetail(logId){
         try {
           var data = JSON.parse(e.data);
           if (data && data.message) {
-            showToast('⚠️ Alerte: ' + data.message, 'warning');
+            showToast('Alerte: ' + data.message, 'warning');
             if(typeof loadAlerts === 'function') loadAlerts();
           }
         } catch(err){}
       });
-      setInterval(function(){ if(Date.now()-heartbeat>120000){ es.close(); setTimeout(connectSSE, 1000);} }, 30000);
+      if (sseWatchdogTimer) clearInterval(sseWatchdogTimer);
+      sseWatchdogTimer = setInterval(function(){
+        if(ssePollingMode) return;
+        if(Date.now()-heartbeat>120000){ es.close(); setTimeout(connectSSE, 1000);}
+      }, 30000);
     }
 
     // ── Auto-refresh ──
