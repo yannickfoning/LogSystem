@@ -96,7 +96,8 @@ const upload = multer({
   },
 });
 
-// Ordre de sévérité pour error_groups
+// Ordre de sévérité pour error_groups (réservé pour usage futur)
+/*
 const SEV_ORDER = {
   DEBUG: 0,
   INFO: 1,
@@ -105,6 +106,7 @@ const SEV_ORDER = {
   CRITICAL: 4,
   FATAL: 5,
 };
+*/
 
 async function processImport(
   jobId,
@@ -125,8 +127,7 @@ async function processImport(
   );
   const importTimestamp = new Date().toISOString().slice(0, 19).replace("T", " ");
 
-  let filesToProcess = [];
-
+  let filesToProcess;
   if (isArchive(filename)) {
     logger.info({ event: "archive_detected", file: filename }, "[IMPORT]");
     try {
@@ -678,7 +679,7 @@ router.get("/jobs", async (req, res) => {
     }));
 
     res.json(normalized);
-  } catch (e) {
+  } catch (_e) {
     if (!res.headersSent) res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -694,7 +695,7 @@ router.get("/jobs/:id", async (req, res) => {
     if (rows.length === 0)
       return res.status(404).json({ error: "Job non trouvé" });
     res.json(rows[0]);
-  } catch (e) {
+  } catch (_e) {
     if (!res.headersSent) res.status(500).json({ error: "Erreur serveur" });
   }
 });

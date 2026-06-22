@@ -11,7 +11,6 @@ import {
 import {
   validateBody,
   alertRuleSchema,
-  alertUpdateSchema,
   createUserSchema,
   updateUserSchema,
   resetPasswordSchema,
@@ -29,7 +28,7 @@ router.get("/users", async (req, res) => {
       "SELECT id, email, display_name, role, is_active, last_login, created_at FROM users ORDER BY created_at DESC",
     );
     res.json(rows);
-  } catch (e) {
+  } catch (_e) {
     if (!res.headersSent) res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -63,7 +62,7 @@ router.post("/users", validateBody(createUserSchema), async (req, res) => {
     });
 
     res.json({ success: true, id: result.insertId });
-  } catch (e) {
+  } catch (_e) {
     if (!res.headersSent) res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -121,7 +120,7 @@ router.put("/users/:id", validateBody(updateUserSchema), async (req, res) => {
     });
 
     res.json({ success: true });
-  } catch (e) {
+  } catch (_e) {
     if (!res.headersSent) res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -163,7 +162,7 @@ router.delete("/users/:id", async (req, res) => {
     });
 
     res.json({ success: true });
-  } catch (e) {
+  } catch (_e) {
     if (!res.headersSent) res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -193,7 +192,7 @@ router.post(
       });
 
       res.json({ success: true });
-    } catch (e) {
+    } catch (_e) {
       res.status(500).json({ error: "Erreur serveur" });
     }
   },
@@ -208,7 +207,7 @@ router.get("/alert-rules", async (req, res) => {
       [req.session.user.id],
     );
     res.json(rows);
-  } catch (e) {
+  } catch (_e) {
     if (!res.headersSent) res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -252,7 +251,7 @@ router.post("/alert-rules", validateBody(alertRuleSchema), async (req, res) => {
     });
 
     res.json({ success: true, id: result.insertId });
-  } catch (e) {
+  } catch (_e) {
     if (!res.headersSent) res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -322,7 +321,7 @@ router.put("/alert-rules/:id", async (req, res) => {
       return res.status(404).json({ error: "Règle non trouvée" });
 
     res.json({ success: true });
-  } catch (e) {
+  } catch (_e) {
     if (!res.headersSent) res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -356,7 +355,7 @@ router.delete("/alert-rules/:id", async (req, res) => {
     });
 
     res.json({ success: true });
-  } catch (e) {
+  } catch (_e) {
     if (!res.headersSent) res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -514,7 +513,7 @@ router.get("/retention/stats", async (req, res) => {
     const user = req.session.user;
     const stats = await getRetentionStats(user.id);
     res.json(stats);
-  } catch (e) {
+  } catch (_e) {
     if (!res.headersSent) res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -532,7 +531,7 @@ router.post("/retention/run", async (req, res) => {
       ipAddress: req.ip,
     });
     res.json(result);
-  } catch (e) {
+  } catch (_e) {
     if (!res.headersSent) res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -567,7 +566,7 @@ router.post("/purge", validateBody(purgeSchema), async (req, res) => {
     });
 
     res.json({ deleted: result.affectedRows });
-  } catch (e) {
+  } catch (_e) {
     if (!res.headersSent) res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -660,7 +659,7 @@ router.get("/system-status", async (req, res) => {
         connected: Boolean(cache.connected),
         memoryUsedMb: cache.memoryUsedMb || null,
       };
-    } catch (err) {
+    } catch (_err) {
       status.redis = { connected: false, error: 'Cache disabled' };
     }
 
@@ -675,7 +674,7 @@ router.get("/system-status", async (req, res) => {
         totalGb: (totalMem / 1024 / 1024 / 1024).toFixed(1),
         warning: usedPct > 90,
       };
-    } catch (err) {
+    } catch (_err) {
       status.disk = { usage: 'N/A' };
     }
 
