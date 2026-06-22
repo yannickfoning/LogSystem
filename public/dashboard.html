@@ -131,11 +131,11 @@
           <div class="scroll-y">
             <table class="log-table">
               <thead>
-                <tr><th>Heure</th><th>Niveau</th><th>Source</th><th class="col-hide-mobile">User</th><th class="col-hide-mobile">Import</th><th>Message</th></tr>
+                <tr><th>Heure</th><th>Niveau</th><th>Source</th><th class="col-hide-mobile">Service</th><th class="col-hide-mobile">User</th><th class="col-hide-mobile">Import</th><th class="col-hide-mobile">Hôte</th><th>Message</th></tr>
               </thead>
               <tbody id="logs-tbody">
-                <tr><td colspan="6"><div class="skeleton skeleton-line"></div></td></tr>
-                <tr><td colspan="6"><div class="skeleton skeleton-line w-80"></div></td></tr>
+                <tr><td colspan="8"><div class="skeleton skeleton-line"></div></td></tr>
+                <tr><td colspan="8"><div class="skeleton skeleton-line w-80"></div></td></tr>
               </tbody>
             </table>
           </div>
@@ -461,7 +461,13 @@
       return api.get(url).then(function(d) {
         if (!d || !d.labels) return;
         trendsState.lastPayload = d;
+        var wrapper = document.getElementById('trends-wrapper');
         var canvas = document.getElementById('trends-chart');
+        if (!canvas && wrapper) {
+          wrapper.innerHTML = '<canvas id="trends-chart" role="img" aria-label="Graphique des tendances de logs">Aucune donnee disponible.</canvas>';
+          canvas = document.getElementById('trends-chart');
+        }
+        if (!canvas) return;
         var hasAny = ['INFO','WARNING','ERROR','CRITICAL','FATAL','DEBUG'].some(function(k){
           return ((d.series||{})[k]||[]).some(function(v){ return Number(v)>0; });
         });
@@ -563,14 +569,16 @@
       return api.get('/api/logs?limit=20&sort=timestamp&order=desc').then(function(d){
         var rows = d && d.data ? d.data : [];
         var tbody = document.getElementById('logs-tbody');
-        if (!rows.length) { tbody.innerHTML='<tr><td colspan="6" class="cell-empty">' + t('dashboard.no_logs') + '</td></tr>'; return; }
+        if (!rows.length) { tbody.innerHTML='<tr><td colspan="8" class="cell-empty">' + t('dashboard.no_logs') + '</td></tr>'; return; }
         tbody.innerHTML = rows.map(function(r){
           return '<tr class="log-row-link" data-log-id="'+r.id+'">'
             + '<td class="cell-muted cell-nowrap">'+timeAgo(r.timestamp)+'</td>'
             + '<td>'+lvlBadge(r.log_level)+'</td>'
-            + '<td class="cell-muted cell-ellipsis-sm" title="'+esc(r.log_source||r.source)+'">'+esc(r.log_source||r.source||'—')+'</td>'
+            + '<td class="cell-muted cell-ellipsis-sm" title="'+esc(r.source_system||r.log_source||r.source)+'">'+esc(r.source_system||r.log_source||r.source||'—')+'</td>'
+            + '<td class="col-hide-mobile cell-muted">'+esc(r.main_service||r.service||'—')+'</td>'
             + '<td class="col-hide-mobile cell-muted">'+esc(r.log_user||r.target_user||'—')+'</td>'
             + '<td class="col-hide-mobile cell-muted">'+esc(r.imported_at ? timeAgo(r.imported_at) : '—')+'</td>'
+            + '<td class="col-hide-mobile cell-muted cell-ellipsis-sm" title="'+esc(r.hostname||r.source_server||'')+'">'+esc(r.hostname||r.source_server||'—')+'</td>'
             + '<td class="cell-ellipsis-lg" title="'+esc(r.message)+'">'+esc(r.message||'—')+'</td>'
             + '</tr>';
         }).join('');
@@ -712,7 +720,11 @@ function showLogDetail(logId){
         var body = document.getElementById('modal-detail-body');
         var l = log && (log.data||log);
         if (!l) { body.innerHTML = '<p style="color:var(--text2);">Log introuvable</p>'; return; }
-        body.innerHTML = '<div class="section-title">Log</div>' + renderKV(l) + '<div id="related-alert"></div><div id="related-watchdogs"></div>';
+        if (window.renderLogDetailHtml) {
+          body.innerHTML = window.renderLogDetailHtml(l, esc, fmtDateTime, lvlBadge);
+        } else {
+          body.innerHTML = '<div class="section-title">Log</div>' + renderKV(l) + '<div id="related-alert"></div><div id="related-watchdogs"></div>';
+        }
       }).catch(function(e){
         document.getElementById('modal-detail-body').innerHTML = '<p style="color:var(--accent-red);">Erreur: '+esc(e&&e.message||e)+'</p>';
       });
@@ -850,11 +862,26 @@ function showLogDetail(logId){
 
     // ── SSE ──
     var sseStatusEl = document.getElementById('status-sse');
+    var ssePollingMode = false;
+    var sseWatchdogTimer = null;
     function connectSSE(){
+      if (ssePollingMode) return;
       var es = new EventSource('/api/alerts/stream');
       var heartbeat = Date.now();
       if (sseStatusEl) sseStatusEl.textContent = 'Déconnecté';
-      es.addEventListener('connected', function(){ if(sseStatusEl) sseStatusEl.textContent='✅ Connecté'; });
+      es.addEventListener('connected', function(e){
+        heartbeat = Date.now();
+        var data = {};
+        try { data = JSON.parse(e.data || '{}'); } catch(_err) {}
+        if (data.mode === 'polling') {
+          ssePollingMode = true;
+          if (sseStatusEl) sseStatusEl.textContent = 'Polling';
+          if (sseWatchdogTimer) clearInterval(sseWatchdogTimer);
+          es.close();
+          return;
+        }
+        if(sseStatusEl) sseStatusEl.textContent='✅ Connecté';
+      });
       es.addEventListener('alert', function(e){
         heartbeat = Date.now();
         var a; try{ a=JSON.parse(e.data); } catch(ex){ return; }
@@ -863,7 +890,12 @@ function showLogDetail(logId){
         loadSummary(); loadAlerts();
       });
       es.addEventListener('heartbeat', function(){ heartbeat = Date.now(); });
-      es.onerror = function(){ if(sseStatusEl) sseStatusEl.textContent='🔴 Déconnecté'; es.close(); setTimeout(connectSSE, 5000); };
+      es.onerror = function(){
+        if (ssePollingMode) return;
+        if(sseStatusEl) sseStatusEl.textContent='🔴 Déconnecté';
+        es.close();
+        setTimeout(connectSSE, 5000);
+      };
       es.addEventListener('log', function(e){
         try {
           var data = JSON.parse(e.data);

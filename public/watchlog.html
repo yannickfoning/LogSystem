@@ -260,7 +260,17 @@
       // Polling uniquement — SSE épuise le pool MySQL
       // Les stats sont rafraîchies par loadWatchStats() appelé toutes les 15s
       console.info('[WatchLog] Stats mode polling actif');
-      if (false) { // disabled SSE
+      // Poll stats every 15 seconds
+      if (!window._watchStatsInterval) {
+        window._watchStatsInterval = setInterval(function() {
+          api.get('/api/logs/watch/stats').then(function(stats) {
+            if (stats) updateMetricsFromStats(stats);
+          }).catch(function(err){
+            console.warn('[WatchLog] Stats polling error:', err);
+          });
+        }, 15000);
+      }
+      // SSE disabled - using polling instead
         statsSource = null;
         var sseConnected = false;
         if (false) {
@@ -280,8 +290,8 @@
         }
       };
 
-      statsSource.addEventListener('connected', function() {
-        statsReconnectDelay = 1000;
+      /* statsSource.addEventListener('connected', function() {
+        // statsReconnectDelay = 1000;
       });
 
       function updateStats(stats) {

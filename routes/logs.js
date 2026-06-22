@@ -11,7 +11,7 @@ router.use(requireAuth);
 
 const MAX_LIMIT = 500;
 const DEFAULT_LIMIT = 50;
-const LOG_COLUMNS = 'id, timestamp, created_time, imported_at, log_level, source, source_server, service, message, normalized_message, event_type, error_type, fingerprint, user_id, target_user, module, parser_format, timestamp_inferred, created_at, file_name, file_created_at, import_job_id, imported_by_user_id, log_source, log_user';
+const LOG_COLUMNS = 'id, timestamp, created_time, imported_at, log_level, source, source_server, service, message, normalized_message, event_type, error_type, fingerprint, user_id, target_user, module, parser_format, timestamp_inferred, created_at, file_name, file_created_at, import_job_id, imported_by_user_id, log_source, log_user, source_system, main_service, hostname, event_timestamp';
 
 // ── Helper : filtres SQL partagés ─────────────────────────────────────────────
 function buildFilters(query, userScopeFilter, useImportedAtForDateRange = false) {
