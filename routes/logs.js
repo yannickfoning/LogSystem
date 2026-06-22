@@ -9,6 +9,7 @@ import { generateLogPdf } from '../lib/pdfExport.js';
 
 const router = Router();
 router.use(requireAuth);
+const IS_VERCEL = !!(process.env.VERCEL || process.env.VERCEL_ENV || process.env.NOW_REGION);
 
 const MAX_LIMIT = 500;
 const DEFAULT_LIMIT = 50;
@@ -380,6 +381,12 @@ router.get('/watch/stream', async (req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
+    if (IS_VERCEL) {
+      res.write('retry: 60000\n');
+      res.write(`event: connected\ndata: ${JSON.stringify({ mode: 'polling', reason: 'vercel_serverless', user_id: user.id })}\n\n`);
+      setTimeout(() => { try { res.end(); } catch (_) {} }, 100);
+      return;
+    }
     res.flushHeaders();
 
     res.write('event: connected\n');

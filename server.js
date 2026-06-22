@@ -130,7 +130,7 @@ const alertsStreamLimiter = rateLimit({
   max: isVercel ? 60 : 30, // 60 requests per minute on Vercel, 30 otherwise
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.method === 'GET' // Only limit GET requests
+  skip: (req) => req.method !== 'GET'
 });
 
 // ── Session store (MySQL) ─────────────────────────────────────────────────────
@@ -143,8 +143,11 @@ const sessionStore = new MySQLSessionStore({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
+  waitForConnections: true,
+  connectionLimit: parseInt(process.env.DB_SESSION_CONNECTION_LIMIT || (IS_VERCEL ? '1' : '10'), 10),
+  queueLimit: parseInt(process.env.DB_SESSION_QUEUE_LIMIT || (IS_VERCEL ? '25' : '0'), 10),
   ssl: sslOpts || undefined,
-  clearExpired: true,
+  clearExpired: !IS_VERCEL,
   checkExpirationInterval: 900000,
   expiration: 86400000,
   schema: { tableName: 'sessions' }
@@ -185,19 +188,14 @@ app.get('/api/watchdogs/status', requireAuth, (req, res) => {
   res.json(getWatcherStatus());
 });
 app.get('/api/alerts/stream', alertsStreamLimiter, requireAuth, (req, res) => {
-  const isVercel = !!(process.env.VERCEL || process.env.VERCEL_ENV);
-  if (isVercel) {
-    // On Vercel serverless, SSE times out after 10-300s causing constant reconnections.
-    // Return a JSON response indicating polling mode instead.
-    // The client (dashboard.html, watchlog.html) falls back to polling automatically.
+  if (IS_VERCEL) {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
-    // Send one event then close — client will reconnect via polling fallback
+    res.write('retry: 60000\n');
     res.write('event: connected\ndata: {"mode":"polling","reason":"vercel_serverless"}\n\n');
-    // Close after 5s to avoid timeout errors in logs
-    setTimeout(() => { try { res.end(); } catch(_){} }, 5000);
+    setTimeout(() => { try { res.end(); } catch (_) {} }, 100);
     return;
   }
   alertWorker.addClient(res, req);
@@ -218,22 +216,25 @@ app.get('/', (req, res) => {
 
 // ── Error handlers ────────────────────────────────────────────────────────────
 app.use(multerErrorHandler);
-app.use((err, req, res, _next) => {
+app.use((err, req, res, next) => {
   logger.error({ event: 'express_error', message: err.message, path: req.path });
-  // Check if headers have already been sent to avoid "Cannot set headers after they are sent" error
-  if (!res.headersSent) {
-    res.status(500).json({ error: 'Erreur interne du serveur' });
-  }
+  if (res.headersSent) return next(err);
+  res.status(500).json({ error: 'Erreur interne du serveur' });
 });
 
 // ── Background init (non-blocking) ───────────────────────────────────────────
 // Runs AFTER the app is exported so Vercel can handle requests immediately.
-// Migrations only run on non-Vercel OR on first cold start via lazy flag.
+// Serverless cold starts skip background work and avoid opening DB connections.
 let _initialized = false;
 
 async function initialize() {
   if (_initialized) return;
   _initialized = true;
+
+  if (IS_VERCEL) {
+    logger.info({ event: 'background_jobs_disabled', platform: 'vercel' }, '[STARTUP]');
+    return;
+  }
 
   try {
     await testConnection();
@@ -243,46 +244,36 @@ async function initialize() {
     return; // Don't run migrations if DB unreachable
   }
 
-  // Skip migrations on Vercel (they run per cold-start = too slow + timeout risk)
-  // Run them manually once via: node scripts/setup/run-migrations.js
-  if (!IS_VERCEL) {
-    await runMigrations().catch(e => logger.error({ event: 'migration_failed', error: e.message }));
-  } else {
-    logger.info({ event: 'migrations_skipped', reason: 'vercel_serverless' }, '[VERCEL] Migrations skipped — run manually');
-  }
+  await runMigrations().catch(e => logger.error({ event: 'migration_failed', error: e.message }));
 
   await startCacheService().catch(() => {});
   setAlertWorker(alertWorker);
 
-  if (!IS_VERCEL) {
-    await startAlertEngine().catch(e => logger.error({ event: 'alertEngineStartFailed', message: e.message }));
-    startRetentionScheduler().catch?.(() => {});
-    await startWatcher().catch(e => logger.error({ event: 'watcherStartFailed', message: e.message }));
-    const logsDir = (process.env.WATCH_DIRS || './logs').split(',')[0].trim();
-    try { if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true }); } catch (_) {}
+  await startAlertEngine().catch(e => logger.error({ event: 'alertEngineStartFailed', message: e.message }));
+  startRetentionScheduler().catch?.(() => {});
+  await startWatcher().catch(e => logger.error({ event: 'watcherStartFailed', message: e.message }));
+  const logsDir = (process.env.WATCH_DIRS || './logs').split(',')[0].trim();
+  try { if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true }); } catch (_) {}
 
-    // Listen (persistent server only)
-    const PORT_NUM = parseInt(process.env.PORT || '3001', 10);
-    const server = app.listen(PORT_NUM, () => {
-      server.timeout = 300000;
-      server.keepAliveTimeout = 310000;
-      server.headersTimeout = 320000;
-      logger.info({ event: 'server_started', port: PORT_NUM }, `[LogSystem] Running on http://localhost:${PORT_NUM}`);
-    });
+  // Listen (persistent server only)
+  const PORT_NUM = parseInt(process.env.PORT || '3001', 10);
+  const server = app.listen(PORT_NUM, () => {
+    server.timeout = 300000;
+    server.keepAliveTimeout = 310000;
+    server.headersTimeout = 320000;
+    logger.info({ event: 'server_started', port: PORT_NUM }, `[LogSystem] Running on http://localhost:${PORT_NUM}`);
+  });
 
-    const shutdown = (signal) => {
-      logger.info(`[${signal}] Shutting down...`);
-      alertWorker.closeAll();
-      stopWatcher();
-      stopAlertEngine();
-      server.close(() => process.exit(0));
-      setTimeout(() => process.exit(1), 10000);
-    };
-    process.on('SIGTERM', () => shutdown('SIGTERM'));
-    process.on('SIGINT', () => shutdown('SIGINT'));
-  } else {
-    logger.info({ event: 'background_jobs_disabled', platform: 'vercel' }, '[STARTUP]');
-  }
+  const shutdown = (signal) => {
+    logger.info(`[${signal}] Shutting down...`);
+    alertWorker.closeAll();
+    stopWatcher();
+    stopAlertEngine();
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(1), 10000);
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
 // Start initialization (non-blocking — app already exported below)
