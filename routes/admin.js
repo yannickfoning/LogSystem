@@ -483,11 +483,16 @@ router.get("/audit", async (req, res) => {
     }
 
     const offset = (pageVal - 1) * limitVal;
+    
+    // Ensure limitVal and offset are valid integers
+    const safeLimit = isNaN(limitVal) || limitVal < 1 ? 50 : limitVal;
+    const safeOffset = isNaN(offset) || offset < 0 ? 0 : offset;
+    
     const [countRows] = await pool.execute(countSql, countParams);
     const total = countRows[0].total;
 
     sql += " ORDER BY created_at DESC LIMIT ? OFFSET ?";
-    params.push(limitVal, offset);
+    params.push(safeLimit, safeOffset);
 
     const [rows] = await pool.execute(sql, params);
 

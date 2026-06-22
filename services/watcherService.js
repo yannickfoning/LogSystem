@@ -32,12 +32,18 @@ async function enqueueFileProcessing(filePath, fn) {
 }
 
 function getDirs() {
+  const IS_VERCEL = !!(process.env.VERCEL || process.env.VERCEL_ENV || process.env.NOW_REGION);
   const dirs = (process.env.WATCH_DIRS || './logs').split(',').map(d => d.trim()).filter(Boolean);
-  for (const d of dirs) {
-    if (!fs.existsSync(d)) {
-      fs.mkdirSync(d, { recursive: true });
+  
+  // Only attempt directory creation on non-Vercel environments
+  if (!IS_VERCEL) {
+    for (const d of dirs) {
+      if (!fs.existsSync(d)) {
+        fs.mkdirSync(d, { recursive: true });
+      }
     }
   }
+  
   return dirs;
 }
 
@@ -413,6 +419,21 @@ export function stopWatcher() {
 }
 
 export function getWatcherStatus() {
+  const IS_VERCEL = !!(process.env.VERCEL || process.env.VERCEL_ENV || process.env.NOW_REGION);
+  
+  // On Vercel, file watching is not supported
+  if (IS_VERCEL) {
+    return {
+      running: false,
+      watched_files: 0,
+      dirs: [],
+      unmapped_dirs: 0,
+      inflight: 0,
+      platform: 'vercel',
+      message: 'File watching not supported on serverless platforms'
+    };
+  }
+  
   const dirs = getDirs();
   const mappedDirs = Object.keys(dirOwners || {});
   const resolvedDirs = dirs.map(d => path.resolve(d));
@@ -423,7 +444,8 @@ export function getWatcherStatus() {
     watched_files: fileOffsets.size,
     dirs,
     unmapped_dirs: unmappedCount,
-    inflight: inflightProcesses.size
+    inflight: inflightProcesses.size,
+    platform: 'standard'
   };
 }
 
