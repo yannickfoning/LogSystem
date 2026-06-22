@@ -66,7 +66,12 @@ function buildSslConfig() {
 }
 
 const sslConfig = buildSslConfig();
-const isServerless = !!(process.env.VERCEL || process.env.VERCEL_ENV || process.env.NOW_REGION);
+
+// On Vercel serverless: each lambda gets a fresh pool
+// Aiven free tier = 25 max connections
+// With DB_CONNECTION_LIMIT=2: 12 concurrent lambdas max before exhaustion
+const isVercelEnv = !!(process.env.VERCEL || process.env.VERCEL_ENV);
+const defaultConnLimit = isVercelEnv ? 2 : 10; // 2 per lambda on Vercel
 
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
@@ -75,32 +80,30 @@ const dbConfig = {
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'logsystem',
   waitForConnections: true,
-  connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || (isServerless ? '2' : '10'), 10),
-  queueLimit: parseInt(process.env.DB_QUEUE_LIMIT || (isServerless ? '25' : '0'), 10),
+  connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || String(defaultConnLimit), 10),
+  queueLimit: 10,
+  connectTimeout: 10000,
   ssl: sslConfig,
-  enableKeepAlive: true,
-  keepAliveInitialDelay: 0,
 };
 
 const pool = mysql.createPool(dbConfig);
 
-if (!isServerless || process.env.DB_CONNECT_ON_STARTUP === 'true') {
-  pool.getConnection()
-    .then(connection => {
-      logger.info({
-        event: 'db_connected',
-        env: process.env.NODE_ENV,
-        database: `${dbConfig.user}@${dbConfig.host}/${dbConfig.database}`,
-        ssl: sslConfig ? `enabled (rejectUnauthorized=${sslConfig.rejectUnauthorized}, ca=${!!sslConfig.ca})` : 'disabled'
-      }, '[DB] MySQL connection pool initialized successfully.');
-      connection.release();
-    })
-    .catch(err => {
-      logger.error({ event: 'db_connection_error', error: err.message, code: err.code }, '[DB] Failed to connect to MySQL. Check DB_HOST, DB_USER, DB_PASSWORD, DB_SSL env vars.');
-    });
-} else {
-  logger.info({ event: 'db_pool_lazy', platform: 'vercel' }, '[DB] MySQL pool initialized lazily.');
-}
+// Test connexion au démarrage — sans process.exit (incompatible Vercel serverless)
+pool.getConnection()
+  .then(connection => {
+    logger.info({
+      event: 'db_connected',
+      env: process.env.NODE_ENV,
+      database: `${dbConfig.user}@${dbConfig.host}/${dbConfig.database}`,
+      ssl: sslConfig ? `enabled (rejectUnauthorized=${sslConfig.rejectUnauthorized}, ca=${!!sslConfig.ca})` : 'disabled'
+    }, '[DB] MySQL connection pool initialized successfully.');
+    connection.release();
+  })
+  .catch(err => {
+    // Ne pas appeler process.exit() — sur Vercel cela tuerait la lambda pour toutes les requêtes
+    // L'erreur sera visible dans les logs et chaque requête DB retournera une erreur 500
+    logger.error({ event: 'db_connection_error', error: err.message, code: err.code }, '[DB] Failed to connect to MySQL. Check DB_HOST, DB_USER, DB_PASSWORD, DB_SSL env vars.');
+  });
 
 export default pool;
 

@@ -11,6 +11,7 @@ import {
 import {
   validateBody,
   alertRuleSchema,
+  alertUpdateSchema,
   createUserSchema,
   updateUserSchema,
   resetPasswordSchema,
@@ -28,8 +29,8 @@ router.get("/users", async (req, res) => {
       "SELECT id, email, display_name, role, is_active, last_login, created_at FROM users ORDER BY created_at DESC",
     );
     res.json(rows);
-  } catch (_e) {
-    if (!res.headersSent) res.status(500).json({ error: "Erreur serveur" });
+  } catch (e) {
+    res.status(500).json({ error: "Erreur serveur" });
   }
 });
 
@@ -62,8 +63,8 @@ router.post("/users", validateBody(createUserSchema), async (req, res) => {
     });
 
     res.json({ success: true, id: result.insertId });
-  } catch (_e) {
-    if (!res.headersSent) res.status(500).json({ error: "Erreur serveur" });
+  } catch (e) {
+    res.status(500).json({ error: "Erreur serveur" });
   }
 });
 
@@ -120,8 +121,8 @@ router.put("/users/:id", validateBody(updateUserSchema), async (req, res) => {
     });
 
     res.json({ success: true });
-  } catch (_e) {
-    if (!res.headersSent) res.status(500).json({ error: "Erreur serveur" });
+  } catch (e) {
+    res.status(500).json({ error: "Erreur serveur" });
   }
 });
 
@@ -162,8 +163,8 @@ router.delete("/users/:id", async (req, res) => {
     });
 
     res.json({ success: true });
-  } catch (_e) {
-    if (!res.headersSent) res.status(500).json({ error: "Erreur serveur" });
+  } catch (e) {
+    res.status(500).json({ error: "Erreur serveur" });
   }
 });
 
@@ -192,7 +193,7 @@ router.post(
       });
 
       res.json({ success: true });
-    } catch (_e) {
+    } catch (e) {
       res.status(500).json({ error: "Erreur serveur" });
     }
   },
@@ -207,8 +208,8 @@ router.get("/alert-rules", async (req, res) => {
       [req.session.user.id],
     );
     res.json(rows);
-  } catch (_e) {
-    if (!res.headersSent) res.status(500).json({ error: "Erreur serveur" });
+  } catch (e) {
+    res.status(500).json({ error: "Erreur serveur" });
   }
 });
 
@@ -251,8 +252,8 @@ router.post("/alert-rules", validateBody(alertRuleSchema), async (req, res) => {
     });
 
     res.json({ success: true, id: result.insertId });
-  } catch (_e) {
-    if (!res.headersSent) res.status(500).json({ error: "Erreur serveur" });
+  } catch (e) {
+    res.status(500).json({ error: "Erreur serveur" });
   }
 });
 
@@ -321,8 +322,8 @@ router.put("/alert-rules/:id", async (req, res) => {
       return res.status(404).json({ error: "Règle non trouvée" });
 
     res.json({ success: true });
-  } catch (_e) {
-    if (!res.headersSent) res.status(500).json({ error: "Erreur serveur" });
+  } catch (e) {
+    res.status(500).json({ error: "Erreur serveur" });
   }
 });
 
@@ -355,8 +356,8 @@ router.delete("/alert-rules/:id", async (req, res) => {
     });
 
     res.json({ success: true });
-  } catch (_e) {
-    if (!res.headersSent) res.status(500).json({ error: "Erreur serveur" });
+  } catch (e) {
+    res.status(500).json({ error: "Erreur serveur" });
   }
 });
 
@@ -483,18 +484,13 @@ router.get("/audit", async (req, res) => {
     }
 
     const offset = (pageVal - 1) * limitVal;
-    
-    // Ensure limitVal and offset are valid integers
-    const safeLimit = isNaN(limitVal) || limitVal < 1 ? 50 : limitVal;
-    const safeOffset = isNaN(offset) || offset < 0 ? 0 : offset;
-    
     const [countRows] = await pool.execute(countSql, countParams);
     const total = countRows[0].total;
 
-    sql += " ORDER BY created_at DESC LIMIT ? OFFSET ?";
-    params.push(safeLimit, safeOffset);
+    // pool.query() — mysql2 execute() doesn't support LIMIT ? OFFSET ? in prepared stmts
+    sql += ` ORDER BY created_at DESC LIMIT ${limitVal} OFFSET ${offset}`;
 
-    const [rows] = await pool.execute(sql, params);
+    const [rows] = await pool.query(sql, params);
 
     res.json({
       data: rows,
@@ -518,8 +514,8 @@ router.get("/retention/stats", async (req, res) => {
     const user = req.session.user;
     const stats = await getRetentionStats(user.id);
     res.json(stats);
-  } catch (_e) {
-    if (!res.headersSent) res.status(500).json({ error: "Erreur serveur" });
+  } catch (e) {
+    res.status(500).json({ error: "Erreur serveur" });
   }
 });
 
@@ -536,8 +532,8 @@ router.post("/retention/run", async (req, res) => {
       ipAddress: req.ip,
     });
     res.json(result);
-  } catch (_e) {
-    if (!res.headersSent) res.status(500).json({ error: "Erreur serveur" });
+  } catch (e) {
+    res.status(500).json({ error: "Erreur serveur" });
   }
 });
 
@@ -571,8 +567,8 @@ router.post("/purge", validateBody(purgeSchema), async (req, res) => {
     });
 
     res.json({ deleted: result.affectedRows });
-  } catch (_e) {
-    if (!res.headersSent) res.status(500).json({ error: "Erreur serveur" });
+  } catch (e) {
+    res.status(500).json({ error: "Erreur serveur" });
   }
 });
 
@@ -613,9 +609,12 @@ router.get("/system-stats", async (req, res) => {
       "SELECT COUNT(*) as cnt FROM logs"
     );
 
-    const [openErrorGroups] = await pool.execute(
-      'SELECT COUNT(*) as cnt FROM error_groups WHERE status = "open"'
-    );
+    let openErrorGroups = [{ cnt: 0 }];
+    try {
+      [openErrorGroups] = await pool.execute(
+        "SELECT COUNT(*) as cnt FROM error_groups WHERE status = 'open'"
+      );
+    } catch (_) { /* table may not exist yet */ }
 
     res.json({
       totalUsers: users[0].cnt,
@@ -664,7 +663,7 @@ router.get("/system-status", async (req, res) => {
         connected: Boolean(cache.connected),
         memoryUsedMb: cache.memoryUsedMb || null,
       };
-    } catch (_err) {
+    } catch (err) {
       status.redis = { connected: false, error: 'Cache disabled' };
     }
 
@@ -679,7 +678,7 @@ router.get("/system-status", async (req, res) => {
         totalGb: (totalMem / 1024 / 1024 / 1024).toFixed(1),
         warning: usedPct > 90,
       };
-    } catch (_err) {
+    } catch (err) {
       status.disk = { usage: 'N/A' };
     }
 

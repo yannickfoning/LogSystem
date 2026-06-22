@@ -14,6 +14,7 @@ router.use(searchLimiter);
  * Recherche enrichie avec filtres avancés :
  * - query: texte libre (FULLTEXT search)
  * - level: DEBUG|INFO|WARNING|ERROR|CRITICAL|FATAL
+ * - error_type: type d'erreur (NullPointerException, ECONNREFUSED, etc.)
  * - service: filtre par service
  * - module: filtre par module
  * - source_server: filtre par serveur source
@@ -32,15 +33,12 @@ router.get('/', async (req, res) => {
     const {
       query = '',
       level = null,
+      error_type = null,
       service = null,
       module = null,
       source_server = null,
       target_user = null,
       fingerprint = null,
-      source_system = null,
-      main_service = null,
-      hostname = null,
-      log_origin = null,
       from_timestamp = null,
       to_timestamp = null,
       from_imported_at = null,
@@ -74,15 +72,25 @@ router.get('/', async (req, res) => {
     // FIX #6: Fallback automatique sur LIKE pour les termes courts (< 4 caractères)
     if (query && query.trim().length > 0) {
       const trimmedQuery = query.trim();
-      whereConditions.push('(message LIKE ? OR normalized_message LIKE ?)');
-      const like = '%' + trimmedQuery + '%';
-      params.push(like, like);
+      if (trimmedQuery.length < 4) {
+        whereConditions.push('(message LIKE ? OR normalized_message LIKE ?)');
+        const like = '%' + trimmedQuery + '%';
+        params.push(like, like);
+      } else {
+        whereConditions.push('MATCH(message, normalized_message) AGAINST(? IN BOOLEAN MODE)');
+        params.push(trimmedQuery);
+      }
     }
 
     // Filtres métadonnées
     if (level) {
       whereConditions.push('log_level = ?');
       params.push(level.toUpperCase());
+    }
+
+    if (error_type) {
+      whereConditions.push('error_type = ?');
+      params.push(error_type);
     }
 
     if (service) {
@@ -100,26 +108,6 @@ router.get('/', async (req, res) => {
       params.push(source_server);
     }
 
-    if (source_system) {
-      whereConditions.push('(source_system = ? OR source = ?)');
-      params.push(source_system, source_system);
-    }
-
-    if (main_service) {
-      whereConditions.push('(main_service = ? OR service = ?)');
-      params.push(main_service, main_service);
-    }
-
-    if (hostname) {
-      whereConditions.push('(hostname = ? OR source_server = ?)');
-      params.push(hostname, hostname);
-    }
-
-    if (log_origin) {
-      whereConditions.push('log_origin LIKE ?');
-      params.push('%' + log_origin + '%');
-    }
-
     if (target_user) {
       whereConditions.push('target_user = ?');
       params.push(target_user);
@@ -133,13 +121,13 @@ router.get('/', async (req, res) => {
     // Filtres timestamps (P-05: Index composite user_ts, user_level_ts, etc.)
     if (from_timestamp) {
       const ts = normalizeTimestamp(from_timestamp);
-      whereConditions.push('COALESCE(event_timestamp, timestamp) >= ?');
+      whereConditions.push('timestamp >= ?');
       params.push(ts);
     }
 
     if (to_timestamp) {
       const ts = normalizeTimestamp(to_timestamp);
-      whereConditions.push('COALESCE(event_timestamp, timestamp) <= ?');
+      whereConditions.push('timestamp <= ?');
       params.push(ts);
     }
 
@@ -158,7 +146,7 @@ router.get('/', async (req, res) => {
     const whereClause = whereConditions.join(' AND ');
 
     // Compter le total
-    const [countResult] = await pool.execute(
+    const [countResult] = await pool.query(
       `SELECT COUNT(*) as total FROM logs WHERE ${whereClause}`,
       params
     );
@@ -172,46 +160,52 @@ router.get('/', async (req, res) => {
     }
 
     // Fetch logs avec pagination
-    const [logs] = await pool.execute(
+    // pool.query() used instead of execute() — mysql2 prepared statements don't support LIMIT ? OFFSET ?
+    const [logs] = await pool.query(
       `SELECT 
-        id, timestamp, event_timestamp, created_time, imported_at, log_level, source, source_server,
-        source_system, main_service, hostname, log_origin, service,
+        id, timestamp, created_time, imported_at, log_level, source, source_server, service, 
         message, normalized_message, event_type, fingerprint, module, error_type,
         stack_trace, target_user, log_user, log_source, file_name, import_job_id,
         parser_format, timestamp_inferred, classification_confidence
        FROM logs 
        WHERE ${whereClause}
-       ORDER BY COALESCE(event_timestamp, timestamp) DESC
-       LIMIT ? OFFSET ?`,
-      [...params, limitNum, offsetNum]
+       ORDER BY timestamp DESC
+       LIMIT ${limitNum} OFFSET ${offsetNum}`,
+      params
     );
 
     // Calculer les facets (dimensions disponibles pour raffiner la recherche)
-    const [facets] = await pool.execute(
+    const [facets] = await pool.query(
       `SELECT 
-        log_level as label, COUNT(*) as count
+        log_level, COUNT(*) as count
        FROM logs 
        WHERE ${whereClause}
        GROUP BY log_level
        UNION ALL
-       SELECT CONCAT('service:', service) as label, COUNT(*) as count
+       SELECT CONCAT('error_type:', COALESCE(error_type, 'unknown')), COUNT(*) 
+       FROM logs 
+       WHERE ${whereClause} AND error_type IS NOT NULL
+       GROUP BY error_type
+       UNION ALL
+       SELECT CONCAT('service:', service), COUNT(*) 
        FROM logs 
        WHERE ${whereClause} AND service IS NOT NULL
        GROUP BY service
        UNION ALL
-       SELECT CONCAT('module:', module) as label, COUNT(*) as count
+       SELECT CONCAT('module:', module), COUNT(*) 
        FROM logs 
        WHERE ${whereClause} AND module IS NOT NULL
        GROUP BY module
        LIMIT 50`,
-      [...params, ...params, ...params]
+      params
     );
 
     // Format facets
     const facetMap = {};
     for (const row of facets) {
-      const key = row.label;
-      const count = row.count;
+      const key = row.log_level || row['CONCAT(\'error_type:\', COALESCE(error_type, \'unknown\'))'] ||
+                  row['CONCAT(\'service:\', service)'] || row['CONCAT(\'module:\', module)'];
+      const count = row.count || row['COUNT(*)'];
       if (key) facetMap[key] = count;
     }
 
@@ -228,7 +222,7 @@ router.get('/', async (req, res) => {
     });
   } catch (e) {
     logger.error({ event: 'search_error', error: e.message }, '[API]');
-    if (!res.headersSent) res.status(500).json({ error: 'Erreur lors de la recherche' });
+    res.status(500).json({ error: 'Erreur lors de la recherche' });
   }
 });
 
@@ -316,7 +310,7 @@ router.get('/error-directory', async (req, res) => {
     });
   } catch (e) {
     logger.error({ event: 'error_directory_error', error: e.message }, '[API]');
-    if (!res.headersSent) res.status(500).json({ error: 'Erreur lors de la récupération du répertoire des erreurs' });
+    res.status(500).json({ error: 'Erreur lors de la récupération du répertoire des erreurs' });
   }
 });
 
@@ -338,7 +332,7 @@ router.get('/trends', async (req, res) => {
     const [byLevel] = await pool.execute(
       `SELECT log_level, COUNT(*) as count
        FROM logs 
-       WHERE COALESCE(event_timestamp, timestamp) >= DATE_SUB(NOW(), INTERVAL ? HOUR) ${scope.sql || ''}
+       WHERE imported_at >= DATE_SUB(NOW(), INTERVAL ? HOUR) ${scope.sql || ''}
        GROUP BY log_level
        ORDER BY FIELD(log_level, 'FATAL', 'CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG')`,
       [windowHours, ...(scope.params || [])]
@@ -351,11 +345,11 @@ router.get('/trends', async (req, res) => {
         MAX(error_type) as error_type, 
         MAX(event_type) as event_type, 
         COUNT(*) as count, 
-        MAX(COALESCE(event_timestamp, timestamp)) as lastSeen,
+        MAX(timestamp) as lastSeen,
         MAX(message) as message,
-        MAX(main_service) as source
+        MAX(service) as source
        FROM logs 
-       WHERE COALESCE(event_timestamp, timestamp) >= DATE_SUB(NOW(), INTERVAL ? HOUR) 
+       WHERE imported_at >= DATE_SUB(NOW(), INTERVAL ? HOUR) 
          AND log_level IN ('ERROR', 'CRITICAL', 'FATAL') ${scope.sql || ''}
        GROUP BY fingerprint
        ORDER BY count DESC
@@ -365,11 +359,11 @@ router.get('/trends', async (req, res) => {
 
     // Top services
     const [topServices] = await pool.execute(
-      `SELECT main_service as service, COUNT(*) as count, 
+      `SELECT service, COUNT(*) as count, 
               COUNT(CASE WHEN log_level IN ('ERROR', 'CRITICAL', 'FATAL') THEN 1 END) as error_count
        FROM logs 
-       WHERE COALESCE(event_timestamp, timestamp) >= DATE_SUB(NOW(), INTERVAL ? HOUR) AND main_service IS NOT NULL ${scope.sql || ''}
-       GROUP BY main_service
+       WHERE imported_at >= DATE_SUB(NOW(), INTERVAL ? HOUR) AND service IS NOT NULL ${scope.sql || ''}
+       GROUP BY service
        ORDER BY count DESC
        LIMIT 10`,
       [windowHours, ...(scope.params || [])]
@@ -380,31 +374,19 @@ router.get('/trends', async (req, res) => {
       `SELECT module, COUNT(*) as count, 
               COUNT(CASE WHEN log_level IN ('ERROR', 'CRITICAL', 'FATAL') THEN 1 END) as error_count
        FROM logs 
-       WHERE COALESCE(event_timestamp, timestamp) >= DATE_SUB(NOW(), INTERVAL ? HOUR) AND module IS NOT NULL ${scope.sql || ''}
+       WHERE imported_at >= DATE_SUB(NOW(), INTERVAL ? HOUR) AND module IS NOT NULL ${scope.sql || ''}
        GROUP BY module
        ORDER BY count DESC
        LIMIT 10`,
       [windowHours, ...(scope.params || [])]
     );
 
-    // Event trends by log event time
+    // Ingestion throughput (basé sur imported_at pour voir les imports récents)
     const [hourly] = await pool.execute(
       `SELECT 
-        DATE_FORMAT(COALESCE(event_timestamp, timestamp), '%Y-%m-%d %H:00') as date, 
+        DATE_FORMAT(imported_at, '%Y-%m-%d %H:00') as date, 
         COUNT(*) as count,
         COUNT(CASE WHEN log_level IN ('ERROR', 'CRITICAL', 'FATAL') THEN 1 END) as errorCount
-       FROM logs 
-       WHERE COALESCE(event_timestamp, timestamp) >= DATE_SUB(NOW(), INTERVAL ? HOUR) ${scope.sql || ''}
-       GROUP BY date
-       ORDER BY date DESC`,
-      [windowHours, ...(scope.params || [])]
-    );
-
-    // Import throughput (separate from event time)
-    const [importHourly] = await pool.execute(
-      `SELECT 
-        DATE_FORMAT(imported_at, '%Y-%m-%d %H:00') as date, 
-        COUNT(*) as count
        FROM logs 
        WHERE imported_at >= DATE_SUB(NOW(), INTERVAL ? HOUR) ${scope.sql || ''}
        GROUP BY date
@@ -418,12 +400,11 @@ router.get('/trends', async (req, res) => {
       topErrors: topErrors,
       topServices: topServices,
       topModules: topModules,
-      trends: hourly,
-      importTrends: importHourly,
+      trends: hourly
     });
   } catch (e) {
     logger.error({ event: 'trends_error', error: e.message }, '[API]');
-    if (!res.headersSent) res.status(500).json({ error: 'Erreur lors du calcul des tendances' });
+    res.status(500).json({ error: 'Erreur lors du calcul des tendances' });
   }
 });
 
@@ -431,7 +412,7 @@ router.get('/trends', async (req, res) => {
  * GET /api/search/metadata
  * 
  * Récupère les vocabulaires uniques pour les filtres (autocomplete)
- * - services, modules, sources, utilisateurs
+ * - services, modules, sources, error_types, utilisateurs
  */
 router.get('/metadata', async (req, res) => {
   try {
@@ -448,22 +429,12 @@ router.get('/metadata', async (req, res) => {
     );
 
     const [sources] = await pool.execute(
-      `SELECT DISTINCT source_system FROM logs WHERE source_system IS NOT NULL ${scope.sql || ''} LIMIT 100`,
-      scope.params || []
-    );
-
-    const [mainServices] = await pool.execute(
-      `SELECT DISTINCT main_service FROM logs WHERE main_service IS NOT NULL ${scope.sql || ''} LIMIT 100`,
-      scope.params || []
-    );
-
-    const [hostnames] = await pool.execute(
-      `SELECT DISTINCT hostname FROM logs WHERE hostname IS NOT NULL ${scope.sql || ''} LIMIT 100`,
-      scope.params || []
-    );
-
-    const [sourceServers] = await pool.execute(
       `SELECT DISTINCT source_server FROM logs WHERE source_server IS NOT NULL ${scope.sql || ''} LIMIT 100`,
+      scope.params || []
+    );
+
+    const [errorTypes] = await pool.execute(
+      `SELECT DISTINCT error_type FROM logs WHERE error_type IS NOT NULL ${scope.sql || ''} LIMIT 100`,
       scope.params || []
     );
 
@@ -475,15 +446,13 @@ router.get('/metadata', async (req, res) => {
     res.json({
       services: services.map(r => r.service).filter(Boolean),
       modules: modules.map(r => r.module).filter(Boolean),
-      sources: sources.map(r => r.source_system).filter(Boolean),
-      source_servers: sourceServers.map(r => r.source_server).filter(Boolean),
-      main_services: mainServices.map(r => r.main_service).filter(Boolean),
-      hostnames: hostnames.map(r => r.hostname).filter(Boolean),
+      sources: sources.map(r => r.source_server).filter(Boolean),
+      error_types: errorTypes.map(r => r.error_type).filter(Boolean),
       target_users: users.map(r => r.target_user).filter(Boolean)
     });
   } catch (e) {
     logger.error({ event: 'metadata_error', error: e.message }, '[API]');
-    if (!res.headersSent) res.status(500).json({ error: 'Erreur lors de la récupération des métadonnées' });
+    res.status(500).json({ error: 'Erreur lors de la récupération des métadonnées' });
   }
 });
 
