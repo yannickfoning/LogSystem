@@ -461,16 +461,31 @@
       return api.get(url).then(function(d) {
         if (!d || !d.labels) return;
         trendsState.lastPayload = d;
-        var canvas = document.getElementById('trends-chart');
+        var wrapper = document.getElementById('trends-wrapper');
+        var canvas  = document.getElementById('trends-chart');
+
+        // Remove any "no data" message without destroying the canvas
+        var prev = wrapper.querySelector('.trends-empty');
+        if (prev) prev.remove();
+
         var hasAny = ['INFO','WARNING','ERROR','CRITICAL','FATAL','DEBUG'].some(function(k){
           return ((d.series||{})[k]||[]).some(function(v){ return Number(v)>0; });
         });
+
         if (trendsChart) { trendsChart.destroy(); trendsChart = null; }
+
         if (!hasAny) {
-          var w = document.getElementById('trends-wrapper');
-          w.innerHTML = '<div class="trends-empty" style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted,#888);font-size:13px;">Aucune donnée pour cette période</div>';
+          // Show message but keep canvas in DOM (hidden) so next load can reuse it
+          canvas.style.display = 'none';
+          var msg = document.createElement('div');
+          msg.className = 'trends-empty';
+          msg.style.cssText = 'display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted,#888);font-size:13px;';
+          msg.textContent = 'Aucune donnée pour cette période';
+          wrapper.appendChild(msg);
           return;
         }
+
+        canvas.style.display = '';
         trendsChart = renderTrendsTo(canvas, d, false);
       }).catch(function(e){ if (window.toast) window.toast.error('Erreur de chargement des tendances'); });
     }
@@ -848,13 +863,30 @@ function showLogDetail(logId){
         .finally(function(){ setRefreshing(false); });
     };
 
-    // ── Alertes temps réel via polling (SSE désactivé — incompatible Vercel serverless)
-    // Le SSE consommerait une connexion MySQL par lambda → épuisement pool Aiven
+    // ── Alertes temps réel — polling pur (SSE désactivé sur Vercel) ──
+    // SSE /api/alerts/stream garde la lambda ouverte 300s puis épuise le pool MySQL.
+    // On remplace par du polling REST toutes les 20s, bien plus fiable en serverless.
     var sseStatusEl = document.getElementById('status-sse');
-    function connectSSE(){
-      if (sseStatusEl) sseStatusEl.textContent = '🟡 Polling 30s';
-      // Polling toutes les 30s remplace le SSE
+    var _lastAlertId = 0;
+    function pollAlerts() {
+      api.get('/api/dashboard/alerts?limit=15&status=new').then(function(d) {
+        var alerts = Array.isArray(d) ? d : (d && d.alerts ? d.alerts : []);
+        if (!alerts.length) return;
+        // Detect new alerts since last poll
+        var newAlerts = alerts.filter(function(a) { return a.id > _lastAlertId; });
+        if (newAlerts.length && _lastAlertId > 0) {
+          newAlerts.forEach(function(a) {
+            if (window.toast) toast.warning('🔔 ' + (a.message || 'Nouvelle alerte'));
+          });
+        }
+        var maxId = Math.max.apply(null, alerts.map(function(a){ return a.id || 0; }));
+        if (maxId > _lastAlertId) _lastAlertId = maxId;
+        loadAlerts();
+        loadSummary();
+      }).catch(function(){});
     }
+    setInterval(function(){ if(!document.hidden) pollAlerts(); }, 20000);
+    if (sseStatusEl) sseStatusEl.textContent = '🟡 Polling';
 
     // ── Auto-refresh ──
     var autoRefreshTimer = null;
@@ -871,7 +903,7 @@ function showLogDetail(logId){
     if (btnRefresh) btnRefresh.addEventListener('click', refreshAll);
     // -- Init --
     refreshAll();
-    connectSSE();
+    // SSE remplacé par pollAlerts (setInterval 20s défini ci-dessus)
 
     startAutoRefresh();
 

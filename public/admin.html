@@ -412,72 +412,31 @@
       var sseHeartbeat = Date.now();
       var ssePollingMode = false;
       var zombieCheck = null;
+      // SSE remplacé par polling pur — SSE cause des reconnexions en boucle sur Vercel
+      // (chaque connexion consomme une lambda × pool MySQL → épuisement des connexions Aiven)
+      var _lastAdminAlertId = 0;
       function connectSSE() {
-        if (ssePollingMode) return;
-        if (es) {
-          try { es.close(); } catch (_) {}
-          es = null;
-        }
-        if (zombieCheck) clearInterval(zombieCheck);
-        es = new EventSource('/api/alerts/stream');
-        sseHeartbeat = Date.now();
-
-        zombieCheck = setInterval(() => {
-          if (ssePollingMode) return;
-          if (Date.now() - sseHeartbeat > 120000) {
-            clearInterval(zombieCheck);
-            try { es.close(); } catch (_) {}
-            connectSSE();
-          }
-        }, 30000);
-
-        es.addEventListener('connected', function(e) {
-          sseHeartbeat = Date.now();
-          var data = {};
-          try { data = JSON.parse(e.data || '{}'); } catch (_err) {}
-          if (data.mode === 'polling') {
-            ssePollingMode = true;
-            if (zombieCheck) clearInterval(zombieCheck);
-            try { es.close(); } catch (_) {}
-            return;
-          }
-          sseRetryDelay = 1000;
-        });
-        es.addEventListener('alert', function(e) {
-          sseHeartbeat = Date.now();
-          var a = JSON.parse(e.data);
-          if (a.event_type === 'log' || a.event_type === 'log_batch') return;
-          playAdminSound();
-          updateAdminBadge(++adminUnreadAlerts);
-          window.toast.warning(a.message);
-          var severity = a.severity || 'medium';
-          showAdminNotification('Admin Alert: ' + a.message, {
-            body: 'Severity: ' + severity,
-            tag: 'admin-alert-' + a.id
-          });
-          loadSystem();
-        });
-        es.addEventListener('heartbeat', function() {
-          sseHeartbeat = Date.now();
-        });
-        es.onerror = function() {
-          if (ssePollingMode) return;
-          try { es.close(); } catch (_) {}
-          fetch('/api/auth/me', { credentials: 'same-origin' })
-            .then(function(r) {
-              if (r.status === 401) {
-                window.location.href = '/login.html';
-                return;
-              }
-              setTimeout(connectSSE, sseRetryDelay);
-              sseRetryDelay = Math.min(sseRetryDelay * 2, 30000);
-            })
-            .catch(function() {
-              setTimeout(connectSSE, sseRetryDelay);
-              sseRetryDelay = Math.min(sseRetryDelay * 2, 30000);
-            });
-        };
+        // No-op: SSE désactivé. Le polling ci-dessous prend le relais.
       }
+      function pollAdminAlerts() {
+        api.get('/api/dashboard/alerts?limit=10&status=new').then(function(d) {
+          var alerts = Array.isArray(d) ? d : (d && d.alerts ? d.alerts : []);
+          if (!alerts.length) return;
+          var newAlerts = alerts.filter(function(a) { return a.id > _lastAdminAlertId; });
+          if (newAlerts.length && _lastAdminAlertId > 0) {
+            newAlerts.forEach(function(a) {
+              playAdminSound && playAdminSound();
+              adminUnreadAlerts++;
+              updateAdminBadge && updateAdminBadge(adminUnreadAlerts);
+              window.toast && window.toast.warning('🔔 ' + (a.message || 'Nouvelle alerte'));
+            });
+            loadSystem();
+          }
+          var maxId = Math.max.apply(null, alerts.map(function(a) { return a.id || 0; }));
+          if (maxId > _lastAdminAlertId) _lastAdminAlertId = maxId;
+        }).catch(function() {});
+      }
+      setInterval(function() { if (!document.hidden) pollAdminAlerts(); }, 20000);
 
 
       // USERS

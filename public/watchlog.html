@@ -567,25 +567,36 @@
 
     function updateLevelChart() {
       const chart = document.getElementById('levelChart');
+      if (!chart) return;
       const max = Math.max(...Object.values(STATE.metrics.levelCount), 1);
+      // Ensure the container has a defined height for percentage bars to work
+      chart.style.cssText = 'display:flex;align-items:flex-end;gap:4px;height:80px;width:100%;';
       chart.innerHTML = Object.entries(STATE.metrics.levelCount).map(([level, count]) => {
-        const height = (count / max) * 100;
-        return `
-          <div style="flex: 1;">
-            <div class="level-bar" style="height: ${height}%; background: ${LEVEL_COLORS[level]};"></div>
-            <div class="level-label">${level} (${count})</div>
-          </div>
-        `;
+        const height = Math.max(Math.round((count / max) * 100), count > 0 ? 2 : 0);
+        const color  = LEVEL_COLORS[level] || '#6b7280';
+        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+          <div style="width:100%;height:${height}%;background:${color};border-radius:3px 3px 0 0;min-height:${count>0?'3px':'0'};transition:height 0.3s"></div>
+          <div style="font-size:8px;color:var(--text2,#888);white-space:nowrap">${level.slice(0,3)}</div>
+          <div style="font-size:8px;color:${color};font-weight:600">${count}</div>
+        </div>`;
       }).join('');
     }
 
     function updateServiceList() {
       var list = document.getElementById('serviceList');
       if (!list) return;
-      var services = Array.from(STATE.metrics.services || []);
-      if (!services.length) { list.innerHTML = '<li style="color:var(--text2);font-size:12px">Aucun service</li>'; return; }
-      list.innerHTML = services.slice(0, 10).map(function(s) {
-        return '<li style="font-size:12px;padding:3px 0;color:var(--text1)">' + esc(s) + '</li>';
+      // STATE.metrics.services is a Map<serviceName, count>
+      var entries = Array.from(STATE.metrics.services.entries || STATE.metrics.services || []);
+      if (!entries.length) { list.innerHTML = '<li style="color:var(--text2);font-size:12px">Aucun service</li>'; return; }
+      // Sort by count descending
+      entries.sort(function(a, b) { return (b[1] || 0) - (a[1] || 0); });
+      list.innerHTML = entries.slice(0, 10).map(function(entry) {
+        var svcName  = Array.isArray(entry) ? entry[0] : entry;
+        var svcCount = Array.isArray(entry) ? entry[1] : '';
+        return '<li style="font-size:12px;padding:3px 0;color:var(--text1);display:flex;justify-content:space-between">'
+          + '<span>' + esc(String(svcName)) + '</span>'
+          + (svcCount ? '<span style="color:var(--text2)">' + svcCount + '</span>' : '')
+          + '</li>';
       }).join('');
     }
     function updateUI() {
@@ -632,10 +643,20 @@
 
     document.getElementById('btnExport').addEventListener('click', () => {
       if (!STATE.buffer.length) { alert(window.i18n ? window.i18n.t('watchlog.export.empty') : 'Aucun log à exporter.'); return; }
-      var header = 'Horodatage,Niveau,Service,Message\n';
+      var q = function(s){ return '"' + String(s||'').replace(/"/g,'""').replace(/[\r\n]/g,' ') + '"'; };
+      var cols = ['ID','Horodatage','Niveau','Source','Service','Utilisateur','Type événement','Message'];
+      var header = cols.map(q).join(',') + '\n';
       var rows = STATE.buffer.map(function(l) {
-        var q = function(s){ return '"' + String(s||'').replace(/"/g,'""') + '"'; };
-        return [q(l.timestamp), q(l.log_level), q(l.service||''), q(l.message||'')].join(',');
+        return [
+          q(l.id || ''),
+          q(l.timestamp ? new Date(l.timestamp).toLocaleString('fr-FR') : ''),
+          q(l.log_level || ''),
+          q(l.source || l.log_source || ''),
+          q(l.service || ''),
+          q(l.log_user || l.target_user || ''),
+          q(l.event_type || ''),
+          q(l.message || '')
+        ].join(',');
       }).join('\n');
       var blob = new Blob(['\uFEFF' + header + rows], { type: 'text/csv;charset=utf-8' });
       var a = document.createElement('a');
@@ -725,17 +746,40 @@
 
     const LEVEL_SEV = { DEBUG:'#6366f1', INFO:'#0ea5e9', WARNING:'#f59e0b', ERROR:'#ef4444', CRITICAL:'#7c3aed', FATAL:'#991b1b' };
 
+    // Track highest log ID we've seen to poll only deltas
+    let _lastSeenLogId = 0;
+
     function loadRecentLogs() {
-      const twentyFourHoursAgo = new Date(Date.now() - TWENTY_FOUR_HOURS_MS).toISOString().slice(0,19);
-      // Load recent logs by import time (not log timestamp) so imported logs always appear
+      // Initial load: get 100 most recent logs ordered by id DESC
       return api.get('/api/logs?limit=100&sort=id&order=desc').then(function(resp) {
         const rows = resp && resp.data ? resp.data : (Array.isArray(resp) ? resp : []);
         replaceBufferWithLogs(rows);
+        if (rows.length) {
+          _lastSeenLogId = Math.max(...rows.map(r => r.id || 0));
+        }
       }).catch(function(err) {
           if (window.toast) window.toast.warning('Impossible de charger les logs récents');
           console.warn('[WatchLog] Failed to load recent logs:', err && (err.error || err.message || err));
       });
     }
+
+    function pollNewLogs() {
+      // Poll for logs newer than last seen ID (delta polling)
+      if (STATE.paused) return;
+      const url = _lastSeenLogId
+        ? '/api/logs?limit=50&sort=id&order=asc&after_id=' + _lastSeenLogId
+        : '/api/logs?limit=50&sort=id&order=desc';
+      api.get(url).then(function(resp) {
+        const rows = resp && resp.data ? resp.data : (Array.isArray(resp) ? resp : []);
+        if (!rows.length) return;
+        addLogEntries(rows);
+        const maxId = Math.max(...rows.map(r => r.id || 0));
+        if (maxId > _lastSeenLogId) _lastSeenLogId = maxId;
+      }).catch(function() {});
+    }
+
+    // Poll for new logs every 15 seconds
+    setInterval(pollNewLogs, 15000);
 
     function loadHourlyTrends() {
       api.get('/api/dashboard/hourly').then(function(rows) {
@@ -780,10 +824,9 @@
       }).catch(function() {});
     }
 
-    // Polling remplace SSE — Vercel serverless incompatible avec connexions persistantes
-    setInterval(loadRecentLogs, 15000);     // Rafraîchir le flux de logs toutes les 15s
-    setInterval(loadHourlyTrends, 30000);   // Tendances horaires toutes les 30s
-    setInterval(loadRecentAlerts, 30000);   // Alertes toutes les 30s
+    // Refresh trends every 30s
+    setInterval(loadHourlyTrends, 30000);
+    setInterval(loadRecentAlerts, 15000);
 
     window.addEventListener('load', () => {
       mountIcons();

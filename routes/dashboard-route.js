@@ -102,7 +102,7 @@ router.get('/summary', async (req, res) => {
      * importedTodayCount: logs imported today (ingestion activity).
      */
     const todayStr = new Date().toISOString().slice(0, 10);
-    const eventTsCol = 'COALESCE(timestamp, imported_at)';
+    const eventTsCol = 'COALESCE(event_timestamp, timestamp)';
     const [today] = await pool.execute(
       `SELECT COUNT(*) as cnt FROM logs WHERE ${eventTsCol} >= ?` + scope.sql,
       [todayStr + ' 00:00:00', ...scope.params]
@@ -129,7 +129,7 @@ router.get('/summary', async (req, res) => {
       scope.params
     );
     const [sourceCount] = await pool.execute(
-      'SELECT COUNT(DISTINCT COALESCE(log_source, source, source_server)) as cnt FROM logs WHERE COALESCE(log_source, source, source_server) IS NOT NULL AND COALESCE(log_source, source, source_server) != \'\'' + scope.sql,
+      'SELECT COUNT(DISTINCT COALESCE(source_system, source)) as cnt FROM logs WHERE COALESCE(source_system, source) IS NOT NULL AND COALESCE(source_system, source) != \'\'' + scope.sql,
       scope.params
     );
     const [levelRows] = await pool.execute(
@@ -228,14 +228,18 @@ router.get('/trends', async (req, res) => {
       const seriesData = {};
       levels.forEach(l => { seriesData[l] = new Array(24).fill(0); });
       const scope = userScope(req);
-      // Use imported_at for intraday — logs have historical timestamps but recent imported_at
+      // Use imported_at first so recently-imported logs always appear,
+      // fall back to event timestamp if imported_at is NULL.
+      const hourCol = 'COALESCE(imported_at, timestamp)';
       const [rows] = await pool.execute(
-        `SELECT HOUR(imported_at) AS hour, log_level, COUNT(*) AS cnt
+        `SELECT HOUR(${hourCol}) AS hour, log_level, COUNT(*) AS cnt
          FROM logs
-         WHERE imported_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)${scope.sql}
-         GROUP BY HOUR(imported_at), log_level
+         WHERE ${hourCol} >= ? AND ${hourCol} <= ?${scope.sql}
+         GROUP BY HOUR(${hourCol}), log_level
          ORDER BY hour ASC`,
-        [...scope.params]
+        [startDate.toISOString().slice(0, 19).replace('T', ' '),
+         endDate.toISOString().slice(0, 19).replace('T', ' '),
+         ...scope.params]
       );
       for (const row of rows) {
         const idx = Number(row.hour);
@@ -266,7 +270,7 @@ router.get('/trends', async (req, res) => {
     // Requête optimisée avec dates de début/fin explicites
     // Use event_timestamp when available, fallback to timestamp, then imported_at
     const scope = userScope(req);
-    const timestampCol = 'COALESCE(timestamp, imported_at)';
+    const timestampCol = 'COALESCE(event_timestamp, timestamp, imported_at)';
     const [rows] = await pool.execute(
       `SELECT DATE_FORMAT(${timestampCol}, '%Y-%m-%d') AS day,
               log_level,
@@ -470,7 +474,7 @@ router.get('/today', async (req, res) => {
   try {
     const scope = userScope(req);
     const alertFilter = alertScope(req);
-    const timestampCol = 'COALESCE(timestamp, imported_at)';
+    const timestampCol = 'COALESCE(event_timestamp, timestamp, imported_at)';
     const start = new Date();
     start.setHours(0, 0, 0, 0);
     const end = new Date();
