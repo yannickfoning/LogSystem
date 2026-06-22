@@ -170,10 +170,12 @@ router.get('/summary', async (req, res) => {
       critical_count: Number(criticalCount[0].cnt),
     };
 
-    for (const row of levelRows) {
-      const key = 'level_' + String(row.log_level || '').toLowerCase();
-      data[key] = Number(row.cnt);
-    }
+    // Ensure all level fields are present, even if count is 0
+    const allLevels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL', 'FATAL'];
+    allLevels.forEach(level => {
+      const key = 'level_' + level.toLowerCase();
+      data[key] = Number(levels[level] || 0);
+    });
 
     // P-09: Cache the result with 30s TTL
     await setCachedDashboard(userId, data);
@@ -263,13 +265,15 @@ router.get('/trends', async (req, res) => {
     levels.forEach(l => { seriesData[l] = new Array(dates.length).fill(0); });
 
     // Requête optimisée avec dates de début/fin explicites
+    // Use event_timestamp when available, fallback to timestamp, then imported_at
     const scope = userScope(req);
+    const timestampCol = 'COALESCE(event_timestamp, timestamp, imported_at)';
     const [rows] = await pool.execute(
-      `SELECT DATE_FORMAT(imported_at, '%Y-%m-%d') AS day,
+      `SELECT DATE_FORMAT(${timestampCol}, '%Y-%m-%d') AS day,
               log_level,
               COUNT(*) AS cnt
        FROM logs
-       WHERE imported_at >= ? AND imported_at <= ?${scope.sql}
+       WHERE ${timestampCol} >= ? AND ${timestampCol} <= ?${scope.sql}
        GROUP BY day, log_level
        ORDER BY day ASC`,
       [startDate.toISOString().slice(0, 19).replace('T', ' '), 
@@ -298,7 +302,7 @@ router.get('/trends', async (req, res) => {
               COUNT(DISTINCT service) as unique_services,
               COUNT(DISTINCT source) as unique_sources
        FROM logs
-       WHERE imported_at >= ? AND imported_at <= ?${scope.sql}`,
+       WHERE ${timestampCol} >= ? AND ${timestampCol} <= ?${scope.sql}`,
       [startDate.toISOString().slice(0, 19).replace('T', ' '), 
        endDate.toISOString().slice(0, 19).replace('T', ' '), 
        ...scope.params]
@@ -307,7 +311,7 @@ router.get('/trends', async (req, res) => {
     const [topFingerprints] = await pool.execute(
       `SELECT fingerprint, COUNT(*) as cnt
        FROM logs
-       WHERE timestamp >= ? AND timestamp <= ? AND fingerprint IS NOT NULL${scope.sql}
+       WHERE ${timestampCol} >= ? AND ${timestampCol} <= ? AND fingerprint IS NOT NULL${scope.sql}
        GROUP BY fingerprint
        ORDER BY cnt DESC
        LIMIT 5`,
@@ -467,6 +471,7 @@ router.get('/today', async (req, res) => {
   try {
     const scope = userScope(req);
     const alertFilter = alertScope(req);
+    const timestampCol = 'COALESCE(event_timestamp, timestamp, imported_at)';
     const start = new Date();
     start.setHours(0, 0, 0, 0);
     const end = new Date();
@@ -478,7 +483,7 @@ router.get('/today', async (req, res) => {
               SUM(CASE WHEN log_level IN ('ERROR', 'CRITICAL', 'FATAL') THEN 1 ELSE 0 END) as error_count,
               COUNT(DISTINCT user_id) as active_users
        FROM logs
-       WHERE imported_at >= ? AND imported_at <= ?${scope.sql}`,
+       WHERE ${timestampCol} >= ? AND ${timestampCol} <= ?${scope.sql}`,
       [startSql, endSql, ...scope.params]
     );
 

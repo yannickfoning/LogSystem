@@ -679,6 +679,11 @@
             return '<tr><td>'+fmtDT(r.created_at)+'</td><td>'+esc(r.user_email)+'</td><td><span class="badge badge-info">'+esc(r.action)+'</span></td><td>'+esc(r.resource_type)+'</td><td class="text-truncate">'+esc(r.details)+'</td><td>'+esc(r.ip_address)+'</td></tr>';
           }).join('');
           document.getElementById('audit-pagination').innerHTML = paginationHtml(auditPage, resp.pagination.pages);
+        }).catch(function(err) {
+          var tb = document.getElementById('audit-body');
+          if (tb) tb.innerHTML = '<tr><td colspan="6" class="no-data">Erreur chargement audit: ' + esc(err.error || err.message || 'Erreur serveur') + '</td></tr>';
+          document.getElementById('audit-pagination').innerHTML = '';
+          if (window.toast) window.toast.error(err.error || 'Erreur chargement audit');
         });
       }
 
@@ -731,12 +736,12 @@
 
       // SYSTEM
       function loadSystem() {
-        Promise.all([
+        Promise.allSettled([
           api.get('/api/admin/system-stats'),
           api.get('/api/admin/system-status')
         ]).then(function(results) {
-          var s = results[0];
-          var st = results[1];
+          var s = results[0].status === 'fulfilled' ? results[0].value : {};
+          var st = results[1].status === 'fulfilled' ? results[1].value : {};
           var dbOk = st.database && st.database.connected;
           var redisOk = st.redis && st.redis.connected;
           document.getElementById('system-stats').innerHTML =

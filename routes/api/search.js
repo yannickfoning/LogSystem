@@ -74,14 +74,9 @@ router.get('/', async (req, res) => {
     // FIX #6: Fallback automatique sur LIKE pour les termes courts (< 4 caractères)
     if (query && query.trim().length > 0) {
       const trimmedQuery = query.trim();
-      if (trimmedQuery.length < 4) {
-        whereConditions.push('(message LIKE ? OR normalized_message LIKE ?)');
-        const like = '%' + trimmedQuery + '%';
-        params.push(like, like);
-      } else {
-        whereConditions.push('MATCH(message, normalized_message) AGAINST(? IN BOOLEAN MODE)');
-        params.push(trimmedQuery);
-      }
+      whereConditions.push('(message LIKE ? OR normalized_message LIKE ?)');
+      const like = '%' + trimmedQuery + '%';
+      params.push(like, like);
     }
 
     // Filtres métadonnées
@@ -106,18 +101,18 @@ router.get('/', async (req, res) => {
     }
 
     if (source_system) {
-      whereConditions.push('source_system = ?');
-      params.push(source_system);
+      whereConditions.push('(source_system = ? OR source = ?)');
+      params.push(source_system, source_system);
     }
 
     if (main_service) {
-      whereConditions.push('main_service = ?');
-      params.push(main_service);
+      whereConditions.push('(main_service = ? OR service = ?)');
+      params.push(main_service, main_service);
     }
 
     if (hostname) {
-      whereConditions.push('hostname = ?');
-      params.push(hostname);
+      whereConditions.push('(hostname = ? OR source_server = ?)');
+      params.push(hostname, hostname);
     }
 
     if (log_origin) {
@@ -194,29 +189,29 @@ router.get('/', async (req, res) => {
     // Calculer les facets (dimensions disponibles pour raffiner la recherche)
     const [facets] = await pool.execute(
       `SELECT 
-        log_level, COUNT(*) as count
+        log_level as label, COUNT(*) as count
        FROM logs 
        WHERE ${whereClause}
        GROUP BY log_level
        UNION ALL
-       SELECT CONCAT('service:', service), COUNT(*) 
+       SELECT CONCAT('service:', service) as label, COUNT(*) as count
        FROM logs 
        WHERE ${whereClause} AND service IS NOT NULL
        GROUP BY service
        UNION ALL
-       SELECT CONCAT('module:', module), COUNT(*) 
+       SELECT CONCAT('module:', module) as label, COUNT(*) as count
        FROM logs 
        WHERE ${whereClause} AND module IS NOT NULL
        GROUP BY module
        LIMIT 50`,
-      params
+      [...params, ...params, ...params]
     );
 
     // Format facets
     const facetMap = {};
     for (const row of facets) {
-      const key = row.log_level || row['CONCAT(\'service:\', service)'] || row['CONCAT(\'module:\', module)'];
-      const count = row.count || row['COUNT(*)'];
+      const key = row.label;
+      const count = row.count;
       if (key) facetMap[key] = count;
     }
 

@@ -324,7 +324,7 @@
           if (!window._watchPollInterval) {
             window._watchPollInterval = setInterval(function() {
               api.get('/api/logs/watch/stats').then(function(stats) {
-                if (stats) updateStats(stats);
+                if (stats) updateMetricsFromStats(stats);
               }).catch(function(){});
               // Also reload logs
               if (typeof loadLogs === 'function') loadLogs();
@@ -355,7 +355,7 @@
       statsSource.addEventListener('stats_update', function(e) {
         try {
           var data = JSON.parse(e.data);
-          if (data.stats) updateMetricsFromStats(data.stats);
+          if (data.stats) updateMetricsFromStats(data);
         } catch (err) { console.warn('[WatchLog] Stats parse error:', err); }
       });
 
@@ -408,26 +408,51 @@
     // AMÉLIORATION 4: Update metrics from watch stats
     function updateMetricsFromStats(stats) {
       if (!stats) return;
+      const payload = stats.stats ? stats : { stats: stats };
+      const statRow = payload.stats || {};
 
       // Backend compat : watcherService renvoie stats.total_logs / error_count / critical_count / fatal_count / services
-      const total = Number(stats.total_logs || 0);
-      const errors = Number(stats.error_count || 0);
-      const critical = Number(stats.critical_count || 0);
-      const fatal = Number(stats.fatal_count || 0);
-      const services = Number(stats.services || 0);
+      const total = Number(statRow.total_logs || 0);
+      const errors = Number(statRow.error_count || 0);
+      const critical = Number(statRow.critical_count || 0);
+      const fatal = Number(statRow.fatal_count || 0);
+      const services = Number(statRow.services || (payload.top_services || []).length || 0);
 
       document.getElementById('metricsErrors').textContent = errors + critical + fatal;
       document.getElementById('metricsServices').textContent = services;
 
       // logs_per_min (fourni par backend) sinon calcul fallback
-      const logsPerMin = stats.logs_per_min != null
-        ? Number(stats.logs_per_min)
+      const logsPerMin = statRow.logs_per_min != null
+        ? Number(statRow.logs_per_min)
         : (STATE.metrics.total / Math.max((Date.now() - STATE.sessionStartTime) / 60000, 0.0167));
 
       document.getElementById('metricsLogsPerMin').textContent = Math.round(logsPerMin) || 0;
 
       const errorRate = total > 0 ? Math.round(((errors + critical + fatal) / total) * 100) : 0;
       document.getElementById('metricsErrorRate').textContent = errorRate + '%';
+
+      const levels = payload.level_counts || statRow.level_counts;
+      if (levels) {
+        Object.keys(STATE.metrics.levelCount).forEach(function(level) {
+          STATE.metrics.levelCount[level] = Number(levels[level] || 0);
+        });
+      }
+
+      const hourly = payload.hourly_errors || statRow.hourly_errors;
+      if (Array.isArray(hourly) && hourly.length) {
+        STATE.metrics.hourlyErrors = hourly.slice(0, 24).map(function(v) { return Number(v || 0); });
+        while (STATE.metrics.hourlyErrors.length < 24) STATE.metrics.hourlyErrors.push(0);
+      }
+
+      if (Array.isArray(payload.top_services)) {
+        STATE.metrics.services = new Map(payload.top_services.map(function(row) {
+          return [row.service || 'unknown', Number(row.count || 0)];
+        }));
+      }
+
+      updateHeatmap();
+      updateLevelChart();
+      updateServiceList();
     }
 
     // AMÉLIORATION 4: Show anomaly alert
@@ -642,7 +667,7 @@
       var services = Array.from(STATE.metrics.services || []);
       if (!services.length) { list.innerHTML = '<li style="color:var(--text2);font-size:12px">Aucun service</li>'; return; }
       list.innerHTML = services.slice(0, 10).map(function(s) {
-        return '<li style="font-size:12px;padding:3px 0;color:var(--text1)">' + esc(s) + '</li>';
+        return '<li style="font-size:12px;padding:3px 0;color:var(--text1);display:flex;justify-content:space-between;gap:8px"><span>' + esc(s[0]) + '</span><strong>' + esc(s[1]) + '</strong></li>';
       }).join('');
     }
     function updateUI() {

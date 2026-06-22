@@ -8,6 +8,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '.env') });
 
 import crypto from 'crypto';
+import { trackSSEConnection, untrackSSEConnection } from './lib/sseConnectionTracker.js';
 import logger from './config/logger.js';
 import express from 'express';
 import session from 'express-session';
@@ -185,6 +186,19 @@ app.get('/api/watchdogs/status', requireAuth, (req, res) => {
   res.json(getWatcherStatus());
 });
 app.get('/api/alerts/stream', alertsStreamLimiter, requireAuth, (req, res) => {
+  const userId = req.session?.user?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Non authentifié' });
+  }
+
+  // Limit concurrent SSE connections per user to prevent connection spam
+  const currentConnections = trackSSEConnection(userId);
+  
+  // Max 2 concurrent connections per user (allows for multiple tabs but prevents abuse)
+  if (currentConnections > 2) {
+    untrackSSEConnection(userId);
+    return res.status(429).json({ error: 'Trop de connexions simultanées. Fermez certains onglets.' });
+  }
   const isVercel = !!(process.env.VERCEL || process.env.VERCEL_ENV);
   if (isVercel) {
     // On Vercel serverless, SSE times out after 10-300s causing constant reconnections.
@@ -197,10 +211,25 @@ app.get('/api/alerts/stream', alertsStreamLimiter, requireAuth, (req, res) => {
     // Send one event then close — client will reconnect via polling fallback
     res.write('event: connected\ndata: {"mode":"polling","reason":"vercel_serverless"}\n\n');
     // Close after 5s to avoid timeout errors in logs
-    setTimeout(() => { try { res.end(); } catch(_){} }, 5000);
+    setTimeout(() => { 
+      try { 
+        res.end(); 
+        untrackSSEConnection(userId);
+      } catch(_){} 
+    }, 10000);
+    
+    // Clean up connection if client disconnects early
+    req.on('close', () => {
+      untrackSSEConnection(userId);
+    });
     return;
   }
   alertWorker.addClient(res, req);
+  
+  // Clean up connection when client disconnects
+  req.on('close', () => {
+    untrackSSEConnection(userId);
+  });
 });
 
 app.get('/health', (req, res) => {

@@ -461,7 +461,13 @@
       return api.get(url).then(function(d) {
         if (!d || !d.labels) return;
         trendsState.lastPayload = d;
+        var wrapper = document.getElementById('trends-wrapper');
         var canvas = document.getElementById('trends-chart');
+        if (!canvas && wrapper) {
+          wrapper.innerHTML = '<canvas id="trends-chart" role="img" aria-label="Graphique des tendances de logs">Aucune donnee disponible.</canvas>';
+          canvas = document.getElementById('trends-chart');
+        }
+        if (!canvas) return;
         var hasAny = ['INFO','WARNING','ERROR','CRITICAL','FATAL','DEBUG'].some(function(k){
           return ((d.series||{})[k]||[]).some(function(v){ return Number(v)>0; });
         });

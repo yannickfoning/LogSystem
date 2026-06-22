@@ -555,17 +555,58 @@ export async function getWatchStats(userId) {
       [userId]
     );
 
+    const [topServices] = await conn.query(
+      `SELECT COALESCE(main_service, service, 'unknown') as service,
+              COUNT(*) as count,
+              COUNT(CASE WHEN log_level IN ('ERROR', 'CRITICAL', 'FATAL') THEN 1 END) as error_count
+       FROM logs
+       WHERE user_id = ? AND imported_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+       GROUP BY COALESCE(main_service, service, 'unknown')
+       ORDER BY count DESC
+       LIMIT 10`,
+      [userId]
+    );
+
+    const [hourlyErrors] = await conn.query(
+      `SELECT HOUR(COALESCE(event_timestamp, timestamp, imported_at)) as hour, COUNT(*) as count
+       FROM logs
+       WHERE user_id = ?
+         AND COALESCE(event_timestamp, timestamp, imported_at) >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+         AND log_level IN ('ERROR', 'CRITICAL', 'FATAL')
+       GROUP BY hour`,
+      [userId]
+    );
+
     // logs_per_min (pour compat front WatchLog)
     const total = stats[0]?.total_logs ?? 0;
     const logs_per_min = total > 0 ? total / 60 : 0;
+    const statRow = stats[0] || {};
+    const level_counts = {
+      DEBUG: Number(statRow.debug_count || 0),
+      INFO: Number(statRow.info_count || 0),
+      WARNING: Number(statRow.warning_count || 0),
+      ERROR: Number(statRow.error_count || 0),
+      CRITICAL: Number(statRow.critical_count || 0),
+      FATAL: Number(statRow.fatal_count || 0)
+    };
+    const hourly_errors = new Array(24).fill(0);
+    for (const row of hourlyErrors || []) {
+      const hour = Number(row.hour);
+      if (hour >= 0 && hour < 24) hourly_errors[hour] = Number(row.count || 0);
+    }
 
     return {
       stats: {
-        ...(stats[0] || {}),
-        logs_per_min
+        ...statRow,
+        logs_per_min,
+        level_counts,
+        hourly_errors
       },
       top_errors: topErrors || [],
-      throughput: throughput || []
+      top_services: topServices || [],
+      throughput: throughput || [],
+      level_counts,
+      hourly_errors
     };
   } catch (error) {
     logger.error({ event: 'stats_error', error: error.message }, '[WATCHER]');
