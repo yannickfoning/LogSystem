@@ -746,8 +746,33 @@
 
     const LEVEL_SEV = { DEBUG:'#6366f1', INFO:'#0ea5e9', WARNING:'#f59e0b', ERROR:'#ef4444', CRITICAL:'#7c3aed', FATAL:'#991b1b' };
 
-    // Track highest log ID we've seen to poll only deltas
+    // ─── SOLUTION VERCEL WATCHLOG: Polling Intelligent Adaptatif ───────────────
+    // Sur Vercel serverless, le file watching est impossible. Cette solution utilise:
+    // 1. Delta polling (après last seen ID) pour minimiser les requêtes
+    // 2. Adaptation dynamique de l'intervalle selon l'activité
+    // 3. Détection automatique de l'environnement Vercel
+    // 4. Fallback sur mode dégradé si erreurs répétées
+    
     let _lastSeenLogId = 0;
+    let _pollInterval = 15000; // 15s par défaut
+    let _pollTimer = null;
+    let _consecutiveErrors = 0;
+    let _isVercelEnv = false;
+    let _lastActivityTime = Date.now();
+
+    // Détection environnement Vercel
+    function detectEnvironment() {
+      _isVercelEnv = window.location.hostname.includes('.vercel.app') || 
+                     window.location.hostname === 'localhost' && window.location.port === '3000';
+      console.info('[WatchLog] Environment detected:', _isVercelEnv ? 'Vercel serverless' : 'Standard');
+      
+      // Adapter l'intervalle selon l'environnement
+      if (_isVercelEnv) {
+        _pollInterval = 10000; // 10s sur Vercel (plus réactif)
+      } else {
+        _pollInterval = 5000; // 5s en standard (SSE disponible)
+      }
+    }
 
     function loadRecentLogs() {
       // Initial load: get 100 most recent logs ordered by id DESC
@@ -757,8 +782,12 @@
         if (rows.length) {
           _lastSeenLogId = Math.max(...rows.map(r => r.id || 0));
         }
+        _consecutiveErrors = 0; // Reset error counter on success
       }).catch(function(err) {
-          if (window.toast) window.toast.warning('Impossible de charger les logs récents');
+          _consecutiveErrors++;
+          if (window.toast && _consecutiveErrors > 3) {
+            window.toast.warning('Impossible de charger les logs récents');
+          }
           console.warn('[WatchLog] Failed to load recent logs:', err && (err.error || err.message || err));
       });
     }
@@ -766,20 +795,71 @@
     function pollNewLogs() {
       // Poll for logs newer than last seen ID (delta polling)
       if (STATE.paused) return;
+      
       const url = _lastSeenLogId
         ? '/api/logs?limit=50&sort=id&order=asc&after_id=' + _lastSeenLogId
         : '/api/logs?limit=50&sort=id&order=desc';
+        
       api.get(url).then(function(resp) {
         const rows = resp && resp.data ? resp.data : (Array.isArray(resp) ? resp : []);
-        if (!rows.length) return;
-        addLogEntries(rows);
-        const maxId = Math.max(...rows.map(r => r.id || 0));
-        if (maxId > _lastSeenLogId) _lastSeenLogId = maxId;
-      }).catch(function() {});
+        
+        if (!rows.length) {
+          // Pas de nouveaux logs: augmenter l'intervalle progressivement
+          _pollInterval = Math.min(_pollInterval * 1.2, 60000); // Max 60s
+        } else {
+          // Nouveaux logs: réduire l'intervalle pour plus de réactivité
+          addLogEntries(rows);
+          const maxId = Math.max(...rows.map(r => r.id || 0));
+          if (maxId > _lastSeenLogId) {
+            _lastSeenLogId = maxId;
+            _lastActivityTime = Date.now();
+          }
+          _pollInterval = Math.max(_pollInterval * 0.8, 5000); // Min 5s
+        }
+        
+        _consecutiveErrors = 0;
+        scheduleNextPoll();
+      }).catch(function(err) {
+        _consecutiveErrors++;
+        console.warn('[WatchLog] Poll error:', err);
+        
+        // Mode dégradé après 5 erreurs consécutives
+        if (_consecutiveErrors >= 5) {
+          _pollInterval = Math.min(_pollInterval * 2, 120000); // Max 2min
+          if (window.toast) {
+            window.toast.warning('Mode dégradé: polling ralenti');
+          }
+        }
+        
+        scheduleNextPoll();
+      });
     }
 
-    // Poll for new logs every 15 seconds
-    setInterval(pollNewLogs, 15000);
+    function scheduleNextPoll() {
+      if (_pollTimer) clearTimeout(_pollTimer);
+      _pollTimer = setTimeout(pollNewLogs, _pollInterval);
+    }
+
+    function startPolling() {
+      detectEnvironment();
+      loadRecentLogs().then(function() {
+        scheduleNextPoll();
+      });
+      
+      // Afficher le statut de connexion
+      var indicator = document.querySelector('.status-indicator');
+      if (indicator) {
+        indicator.style.background = _isVercelEnv ? '#f59e0b' : '#10b981';
+        indicator.title = _isVercelEnv ? 'Mode polling (Vercel)' : 'Mode SSE (Standard)';
+      }
+    }
+
+    function stopPolling() {
+      if (_pollTimer) {
+        clearTimeout(_pollTimer);
+        _pollTimer = null;
+      }
+    }
 
     function loadHourlyTrends() {
       api.get('/api/dashboard/hourly').then(function(rows) {
@@ -824,21 +904,49 @@
       }).catch(function() {});
     }
 
-    // Refresh trends every 30s
-    setInterval(loadHourlyTrends, 30000);
-    setInterval(loadRecentAlerts, 15000);
+    // Refresh trends every 30s (adaptatif selon activité)
+    let _trendsTimer = null;
+    let _alertsTimer = null;
+    
+    function scheduleTrendsRefresh() {
+      if (_trendsTimer) clearTimeout(_trendsTimer);
+      const interval = _isVercelEnv ? 30000 : 15000; // 30s Vercel, 15s standard
+      _trendsTimer = setTimeout(function() {
+        loadHourlyTrends();
+        scheduleTrendsRefresh();
+      }, interval);
+    }
+    
+    function scheduleAlertsRefresh() {
+      if (_alertsTimer) clearTimeout(_alertsTimer);
+      const interval = _isVercelEnv ? 20000 : 10000; // 20s Vercel, 10s standard
+      _alertsTimer = setTimeout(function() {
+        loadRecentAlerts();
+        scheduleAlertsRefresh();
+      }, interval);
+    }
 
     window.addEventListener('load', () => {
       mountIcons();
-      initSSE();
-      initStatsSSE();   // stats + anomalies via /api/logs/watch/stream
-      loadRecentLogs();
+      initSSE(); // SSE désactivé sur Vercel, fallback auto
+      initStatsSSE(); // stats + anomalies via /api/logs/watch/stream (polling sur Vercel)
+      
+      // Démarrer le polling intelligent
+      startPolling();
+      
+      // Démarrer les refreshs adaptatifs
+      scheduleTrendsRefresh();
+      scheduleAlertsRefresh();
+      
       loadHourlyTrends();
       loadRecentAlerts();
       updateUI();
     });
 
     window.addEventListener('beforeunload', () => {
+      stopPolling();
+      if (_trendsTimer) clearTimeout(_trendsTimer);
+      if (_alertsTimer) clearTimeout(_alertsTimer);
       if (eventSource) eventSource.close();
       if (statsSource) statsSource.close();
     });

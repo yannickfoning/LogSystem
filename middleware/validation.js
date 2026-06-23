@@ -86,6 +86,19 @@ export const purgeSchema = z
     message: "Spécifiez au moins un critère de purge",
   });
 
+export const externalSourceSchema = z.object({
+  name: z.string().min(1).max(128),
+  description: z.string().max(500).optional(),
+  source_type: z.enum(["http_json", "http_lines", "webhook", "syslog"]),
+  endpoint_url: z.string().url().optional(),
+  service_name: z.string().max(128).optional(),
+  auth_token: z.string().max(256).optional(),
+  custom_headers: z.record(z.string()).optional(),
+  poll_interval: z.enum(["realtime", "frequent", "normal", "slow"]).optional(),
+  is_active: z.boolean().optional(),
+  user_id: z.number().int().positive().optional(),
+});
+
 // Validation middleware factory
 export function validateBody(schema) {
   return (req, res, next) => {

@@ -191,6 +191,8 @@ app.get('/api/watchdogs/status', requireAuth, (req, res) => {
 });
 app.get('/api/alerts/stream', alertsStreamLimiter, requireAuth, (req, res) => {
   const isVercel = !!(process.env.VERCEL || process.env.VERCEL_ENV);
+  const userId = req.session?.user?.id;
+  
   if (isVercel) {
     // On Vercel serverless, SSE times out after 10-300s causing constant reconnections.
     // Return a JSON response indicating polling mode instead.
@@ -205,11 +207,12 @@ app.get('/api/alerts/stream', alertsStreamLimiter, requireAuth, (req, res) => {
     setTimeout(() => { try { res.end(); } catch(_){} }, 5000);
     return;
   }
+  
   alertWorker.addClient(res, req);
   
   // Clean up connection when client disconnects
   req.on('close', () => {
-    untrackSSEConnection(userId);
+    if (userId) untrackSSEConnection(userId);
   });
 });
 

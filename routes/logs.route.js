@@ -282,7 +282,7 @@ router.get('/analysis/:fingerprint', async (req, res) => {
     const [affected] = await pool.execute(
       `SELECT DISTINCT module, target_user, source_server, service FROM logs
        WHERE fingerprint = ? ${scope.sql}
-       ORDER BY timestamp DESC LIMIT 50`,
+       LIMIT 50`,
       [fingerprint, ...scope.params]
     );
 
@@ -291,9 +291,12 @@ router.get('/analysis/:fingerprint', async (req, res) => {
     const servers = [...new Set(affected.map(a => a.source_server).filter(Boolean))];
     const services = [...new Set(affected.map(a => a.service).filter(Boolean))];
     const [samples] = await pool.execute(
-      `SELECT error_type, message, stack_trace, log_level, imported_at, created_time, source_server, service FROM logs
+      `SELECT error_type, message, stack_trace, log_level, imported_at, created_time,
+              source_server, service,
+              COALESCE(event_timestamp, timestamp, imported_at) AS ts
+       FROM logs
        WHERE fingerprint = ? ${scope.sql}
-       ORDER BY timestamp DESC LIMIT 1`,
+       ORDER BY ts DESC LIMIT 1`,
       [fingerprint, ...scope.params]
     );
 
