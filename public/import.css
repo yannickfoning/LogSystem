@@ -1,0 +1,39 @@
+/* ── Import page ─────────────────────────────────────────────────────── */
+.import-summary {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 16px;
+}
+.import-summary h4 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--text);
+}
+.import-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.import-stat { text-align: center; }
+.import-stat-value {
+  font-size: 22px;
+  font-weight: 700;
+}
+.import-stat-value.ok { color: var(--accent-green); }
+.import-stat-value.warn { color: var(--accent-amber); }
+.import-stat-value.bad { color: var(--accent-red); }
+.import-stat-value.primary { color: var(--primary); }
+.import-stat-label { font-size: 11px; color: var(--text2); }
+.import-skipped { font-size: 12px; color: var(--accent-red); margin: 8px 0 0; }
+
+@media (max-width: 480px) {
+  .import-page .form-row { grid-template-columns: 1fr; }
+  .import-page .drop-zone { min-height: 120px; padding: 24px 16px; }
+  .import-summary-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+  .import-page .drop-zone { min-height: 140px; }
+}

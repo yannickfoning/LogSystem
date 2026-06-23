@@ -1,6 +1,5 @@
-import crypto from 'crypto';
 import logger from '../config/logger.js';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { Router } from 'express';
 import pool from '../config/database.js';
 import { recordAudit } from '../middleware/audit.js';
@@ -30,10 +29,25 @@ router.post('/login', validateBody(loginSchema), async (req, res) => {
       return res.status(401).json({ error: 'Identifiants invalides' });
     }
 
-    await pool.execute(
-      'UPDATE users SET last_login = NOW() WHERE id = ?',
-      [user.id]
-    );
+    // [FIX-SEC-05] Premier utilisateur promu admin — atomisé avec transaction + FOR UPDATE
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      const [allUsers] = await conn.execute('SELECT COUNT(*) as total FROM users WHERE is_active = 1 FOR UPDATE');
+      const isFirstUser = allUsers[0].total === 1;
+      if (isFirstUser && user.role !== 'admin') {
+        await conn.execute('UPDATE users SET role = ? WHERE id = ?', ['admin', user.id]);
+        user.role = 'admin';
+        logger.info({ event: 'first_user_promoted_admin', userId: user.id, email: user.email }, '[AUTH] Premier utilisateur promu admin');
+      }
+      await conn.execute('UPDATE users SET last_login = NOW() WHERE id = ?', [user.id]);
+      await conn.commit();
+    } catch (txErr) {
+      await conn.rollback();
+      throw txErr;
+    } finally {
+      conn.release();
+    }
 
     await recordAudit({
       userId: user.id,
@@ -68,7 +82,8 @@ router.post('/login', validateBody(loginSchema), async (req, res) => {
       });
     });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur' });
+    logger.error({ event: 'login_error', error: e.message }, '[AUTH]');
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -126,7 +141,8 @@ router.put('/profile', validateBody(profileSchema), async (req, res) => {
     req.session.user.display_name = display_name || null;
     res.json({ success: true, display_name: display_name || null });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur' });
+    logger.error({ event: 'profile_update_error', error: e.message }, '[AUTH]');
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -157,6 +173,7 @@ router.put('/password', validateBody(passwordSchema), async (req, res) => {
 
     res.json({ success: true });
   } catch (e) {
+    logger.error({ event: 'password_change_error', error: e.message }, '[AUTH]');
     await recordAudit({
       userId: req.session.user?.id,
       userEmail: req.session.user?.email,
@@ -164,8 +181,7 @@ router.put('/password', validateBody(passwordSchema), async (req, res) => {
       resourceType: 'user',
       ipAddress: req.ip
     });
-    res.status(500).json({ error: 'Erreur serveur' });
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur' });
   }
 });
-
 export default router;

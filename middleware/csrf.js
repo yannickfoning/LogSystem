@@ -79,7 +79,7 @@ export function csrfValidation(req, res, next) {
     if (!match) {
       return res.status(403).json({ error: 'Token CSRF invalide' });
     }
-  } catch (e) {
+  } catch (_e) {
     return res.status(403).json({ error: 'Token CSRF invalide' });
   }
 

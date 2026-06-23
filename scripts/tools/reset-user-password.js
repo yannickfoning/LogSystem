@@ -1,9 +1,7 @@
+import '../../config/loadEnv.js';
 import mysql from 'mysql2/promise';
-import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import readline from 'readline';
-
-dotenv.config();
 
 const dbConfig = {
   host: process.env.DB_HOST || '127.0.0.1',

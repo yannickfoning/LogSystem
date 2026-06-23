@@ -10,6 +10,13 @@ let redis = null;
 let redisUnavailable = false; // FIX: flag séparé pour distinguer "pas encore connecté" vs "échec permanent"
 
 async function initRedis() {
+  // FIX: ne tenter la connexion que si Redis est explicitement configuré.
+  // Sans REDIS_URL/REDIS_HOST, on évite des tentatives répétées vers
+  // localhost:6379 (absent en production sur Render) qui polluent les logs.
+  if (!process.env.REDIS_URL && !process.env.REDIS_HOST) {
+    logger.info({ event: 'redis_not_configured' }, '[CACHE] Redis non configuré — mode dégradé (cache désactivé)');
+    return null;
+  }
   try {
     const { createClient } = await import('redis');
     const url = process.env.REDIS_URL || `redis://${process.env.REDIS_HOST || 'localhost'}:${process.env.REDIS_PORT || 6379}`;
@@ -45,8 +52,8 @@ async function initRedis() {
 
     await redis.connect();
     return redis;
-  } catch (e) {
-    logger.warn({ event: 'redis_not_available', error: e.message }, '[CACHE]');
+  } catch (_e) {
+    logger.warn({ event: 'redis_not_available', error: _e.message }, '[CACHE]');
     redis = null;
     return null;
   }
@@ -56,7 +63,8 @@ function isReady() {
   return redis !== null && !redisUnavailable && redis.isReady;
 }
 
-const CACHE_TTL = 30;
+const CACHE_TTL_STATS = 300; // 5 minutes for stats
+const _CACHE_TTL_COUNTERS = 60; // 1 minute for counters (reserved for future use)
 
 export async function getCachedDashboard(userId) {
   if (!isReady()) return null;
@@ -74,7 +82,8 @@ export async function setCachedDashboard(userId, data) {
   if (!isReady()) return false;
   try {
     const key = `dashboard:${userId}`;
-    await redis.setEx(key, CACHE_TTL, JSON.stringify(data));
+    // FIX #14: Use explicit TTL (300s for stats)
+    await redis.setEx(key, CACHE_TTL_STATS, JSON.stringify(data));
     return true;
   } catch (e) {
     logger.warn({ event: 'cache_set_error', error: e.message }, '[CACHE]');
@@ -101,4 +110,14 @@ export async function startCacheService() {
 
 export function getRedisClient() {
   return isReady() ? redis : null;
+}
+export async function getCacheStatus() {
+  try {
+    const client = getRedisClient();
+    if (!client) return { connected: false };
+    await client.ping();
+    return { connected: true };
+  } catch (_e) {
+    return { connected: false };
+  }
 }

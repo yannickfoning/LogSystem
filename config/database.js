@@ -1,84 +1,118 @@
 import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import logger from './logger.js';
+import fs from 'fs';
 
-// Ensure .env is loaded
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.join(__dirname, '../.env') });
+dotenv.config();
 
-// AMÉLIORATION Transverse: Optimized connection pool for 10k+ logs/sec
-// Increased connectionLimit and tuned parameters for high throughput
-const pool = mysql.createPool({
-  host: process.env.DB_HOST || '127.0.0.1',
-  port: parseInt(process.env.DB_PORT || '3306', 10),
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'log',
-  connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || '20', 10), // AMÉLIORATION: Increased from 10 to 20
-  waitForConnections: true,
-  queueLimit: 0,
-  charset: 'utf8mb4',
-  timezone: '+00:00',      // FIX TIMEZONE-01: Forcer UTC pour coherence avec toISOString()
-  namedPlaceholders: true,
-  maxPreparedStatements: 100,
-  enableKeepAlive: true,
-  keepAliveInitialDelay: 0
-});
+export function normalizeLevel(level) {
+  const l = String(level || 'INFO').toUpperCase();
+  const valid = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL', 'FATAL', 'SECURITY'];
+  return valid.includes(l) ? l : 'INFO';
+}
 
-// PERF-05: Connection pool monitoring with stats
-let poolStats = {
-  activeConnections: 0,
-  queuedRequests: 0,
-  totalAcquired: 0,
-  totalReleased: 0
-};
+export function levelSeverity(level) {
+  const map = { 'DEBUG': 1, 'INFO': 2, 'WARNING': 3, 'ERROR': 4, 'CRITICAL': 5, 'FATAL': 6, 'SECURITY': 7 };
+  return map[normalizeLevel(level)] || 0;
+}
 
-pool.on('acquire', (conn) => {
-  poolStats.activeConnections++;
-  poolStats.totalAcquired++;
-  // Uncomment for debug: console.debug('[DB POOL] Connection acquired:', conn.threadId, 'Active:', poolStats.activeConnections);
-});
+// Lecture sécurisée du CA Aiven — ne crashe pas si le fichier est absent
+function readCaFile() {
+  // Support CA inline (base64) via env var — utile sur Vercel où on ne peut pas
+  // uploader de fichier. Mettre le contenu du ca.pem en base64 dans DB_SSL_CA_BASE64.
+  const caBase64 = process.env.DB_SSL_CA_BASE64;
+  if (caBase64) {
+    try {
+      return Buffer.from(caBase64, 'base64');
+    } catch (err) {
+      console.warn('[DB] Failed to decode DB_SSL_CA_BASE64:', err.message);
+    }
+  }
 
-pool.on('release', (conn) => {
-  poolStats.activeConnections--;
-  poolStats.totalReleased++;
-});
-
-export async function testConnection() {
-  const conn = await pool.getConnection();
+  const caPath = process.env.DB_SSL_CA_PATH;
+  if (!caPath) return undefined;
   try {
-    await conn.ping();
-    logger.info({ event: 'db_connection_success', poolStats }, '[DB] MySQL connection successful');
-  } finally {
-    conn.release();
+    return fs.readFileSync(caPath);
+  } catch (err) {
+    const msg = `[DB] Cannot read SSL CA file (${caPath}): ${err.message}`;
+    try { logger.warn({ event: 'ssl_ca_read_error', path: caPath, error: err.message }, msg); }
+    catch { console.warn(msg); }
+    return undefined;
   }
 }
 
-// Export pool stats for monitoring
-export function getPoolStats() {
-  return { ...poolStats };
+function buildSslConfig() {
+  const sslEnabled = process.env.DB_SSL === 'true';
+  if (!sslEnabled) return undefined;
+
+  const ca = readCaFile();
+
+  // Sur Aiven : le certificat est auto-signé par Aiven CA.
+  // Si DB_SSL_CA_BASE64 ou DB_SSL_CA_PATH est fourni → on valide avec ce CA (sécurisé).
+  // Sinon → rejectUnauthorized=false (nécessaire sur Vercel sans accès fichier).
+  // DB_SSL_REJECT_UNAUTHORIZED peut forcer le comportement dans les deux sens.
+  let rejectUnauthorized;
+  if (process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true') {
+    rejectUnauthorized = true;
+  } else if (process.env.DB_SSL_REJECT_UNAUTHORIZED === 'false') {
+    rejectUnauthorized = false;
+  } else {
+    // Par défaut : false si pas de CA fourni (Aiven sans fichier CA = Vercel)
+    //             true si CA fourni (plus sécurisé)
+    rejectUnauthorized = !!ca;
+  }
+
+  return { ca, rejectUnauthorized };
 }
 
-// BUG-04 FIX: CRITICAL était mappé sur ERROR — préserver la distinction ENUM
-export function normalizeLevel(raw) {
-  if (!raw) return 'INFO';
-  const s = raw.toString().toUpperCase().trim();
-  if (['DEBUG', 'DBG', 'TRACE'].includes(s)) return 'DEBUG';
-  if (s === 'WARN' || s === 'WARNING') return 'WARNING';
-  if (s === 'CRITICAL') return 'CRITICAL'; // Distinct from ERROR
-  if (['ERR', 'ERROR'].includes(s)) return 'ERROR';
-  if (s === 'FATAL') return 'FATAL';
-  return 'INFO';
-}
+const sslConfig = buildSslConfig();
 
-// BUG-04 FIX: Mettre à jour severityOrder pour inclure CRITICAL entre ERROR et FATAL
-const severityOrder = { DEBUG: 1, INFO: 2, WARNING: 3, ERROR: 4, CRITICAL: 5, FATAL: 6 };
+// On Vercel serverless: each lambda gets a fresh pool
+// Aiven free tier = 25 max connections
+// With DB_CONNECTION_LIMIT=2: 12 concurrent lambdas max before exhaustion
+const isVercelEnv = !!(process.env.VERCEL || process.env.VERCEL_ENV);
+const defaultConnLimit = isVercelEnv ? 2 : 10; // 2 per lambda on Vercel
 
-export function levelSeverity(level) {
-  return severityOrder[level] || 0;
-}
+const dbConfig = {
+  host: process.env.DB_HOST || 'localhost',
+  port: parseInt(process.env.DB_PORT || '3306', 10),
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME || 'logsystem',
+  waitForConnections: true,
+  connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || String(defaultConnLimit), 10),
+  queueLimit: 10,
+  connectTimeout: 10000,
+  ssl: sslConfig,
+};
+
+const pool = mysql.createPool(dbConfig);
+
+// Test connexion au démarrage — sans process.exit (incompatible Vercel serverless)
+pool.getConnection()
+  .then(connection => {
+    logger.info({
+      event: 'db_connected',
+      env: process.env.NODE_ENV,
+      database: `${dbConfig.user}@${dbConfig.host}/${dbConfig.database}`,
+      ssl: sslConfig ? `enabled (rejectUnauthorized=${sslConfig.rejectUnauthorized}, ca=${!!sslConfig.ca})` : 'disabled'
+    }, '[DB] MySQL connection pool initialized successfully.');
+    connection.release();
+  })
+  .catch(err => {
+    // Ne pas appeler process.exit() — sur Vercel cela tuerait la lambda pour toutes les requêtes
+    // L'erreur sera visible dans les logs et chaque requête DB retournera une erreur 500
+    logger.error({ event: 'db_connection_error', error: err.message, code: err.code }, '[DB] Failed to connect to MySQL. Check DB_HOST, DB_USER, DB_PASSWORD, DB_SSL env vars.');
+  });
 
 export default pool;
+
+export async function testConnection() {
+  const conn = await pool.getConnection();
+  conn.release();
+  return true;
+}
+
+export function buildSslOptions() {
+  return sslConfig;
+}

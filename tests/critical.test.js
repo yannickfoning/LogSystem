@@ -12,8 +12,15 @@ import { levelSeverity, normalizeLevel } from '../lib/levels.js';
 import { detectFormat, parseLogContent } from '../lib/processing/universalParser.js';
 import { detectEncoding, convertToUtf8 } from '../lib/processing/encodingDetector.js';
 import { isArchive, detectArchiveType } from '../lib/processing/archiveHandler.js';
+import { enrichLogMetadata, detectSourceSystem, detectMainService } from '../lib/processing/logMetadata.js';
 
 describe('Log Processing', () => {
+  afterAll(async () => {
+    // Close the MySQL pool so `npm test` exits cleanly instead of hanging
+    // on an open connection once the suite finishes.
+    await pool.end().catch(() => {});
+  });
+
   describe('normalizeMessage', () => {
     it('should remove UUIDs', () => {
       const msg = 'User 550e8400-e29b-41d4-a716-446655440000 logged in';
@@ -107,6 +114,34 @@ describe('Log Processing', () => {
       expect(normalizeLevel('unknown')).toBe('INFO');
     });
   });
+
+  describe('logMetadata', () => {
+    it('should detect nginx source from format', () => {
+      expect(detectSourceSystem({ parser_format: 'nginx' })).toBe('Nginx');
+    });
+
+    it('should detect firewall from message', () => {
+      expect(detectSourceSystem({ message: 'Fortinet firewall blocked connection' })).toBe('Fortinet');
+    });
+
+    it('should detect main service from auth message', () => {
+      expect(detectMainService({ message: 'User login failed' }, 'authentication')).toBe('Authentication');
+    });
+
+    it('should enrich log with event_timestamp and metadata', () => {
+      const enriched = enrichLogMetadata({
+        timestamp: '2026-05-18 14:32:10',
+        message: 'GET /api/users 401',
+        parser_format: 'nginx',
+        source_server: 'web01',
+      }, { source_type: 'import', filename: 'access.log' });
+      expect(enriched.event_timestamp).toBe('2026-05-18 14:32:10');
+      expect(enriched.source_system).toBe('Nginx');
+      expect(enriched.main_service).toBe('Web Server');
+      expect(enriched.hostname).toBe('web01');
+      expect(enriched.log_origin).toContain('import');
+    });
+  });
 });
 
 describe('Format Detection', () => {
@@ -186,6 +221,11 @@ describe('Archive Detection', () => {
     expect(type).toBe('targz');
   });
 
+  it('should detect RAR by extension', () => {
+    const type = detectArchiveType('logs.rar');
+    expect(type).toBe('rar');
+  });
+
   it('should detect ZIP by magic bytes', () => {
     const magic = Buffer.from([0x50, 0x4B, 0x03, 0x04]);
     const type = detectArchiveType('unknown', magic);
@@ -197,6 +237,16 @@ describe('Archive Detection', () => {
     const type = detectArchiveType('unknown', magic);
     expect(type).toBe('gzip');
   });
+
+  it('should detect RAR by magic bytes', () => {
+    const magic = Buffer.from([0x52, 0x61, 0x72, 0x21]);
+    const type = detectArchiveType('unknown', magic);
+    expect(type).toBe('rar');
+  });
+
+  it('should classify RAR files as archives', () => {
+    expect(isArchive('logs.rar')).toBe(true);
+  });
 });
 
 describe('Database Constraints', () => {
@@ -204,7 +254,7 @@ describe('Database Constraints', () => {
     // Test database connection
     try {
       await pool.execute('SELECT 1');
-    } catch (e) {
+    } catch (_e) {
       console.warn('[TEST] Database not available, skipping DB tests');
     }
   });

@@ -1,0 +1,76 @@
+/* ── Admin page ──────────────────────────────────────────────────────── */
+.role-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.role-badge.admin { background: rgba(239, 68, 68, 0.15); color: var(--accent-red); }
+.role-badge.analyst { background: rgba(79, 142, 247, 0.15); color: var(--accent-blue); }
+.role-badge.user { background: rgba(128, 128, 128, 0.15); color: var(--text2); }
+
+.status-indicator-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.status-indicator-dot.active { background: var(--accent-green); }
+.status-indicator-dot.inactive { background: var(--accent-red); }
+
+.retention-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.retention-actions { margin-top: 8px; }
+.current-account { font-size: 12px; color: var(--text2); }
+
+.admin-table-users { min-width: 720px; }
+.admin-table-rules { min-width: 640px; }
+.admin-table-audit { min-width: 800px; }
+
+@media (max-width: 768px) {
+  .tabs {
+    flex-direction: column;
+    border-bottom: none;
+    gap: 4px;
+  }
+  .tab-btn {
+    width: 100%;
+    text-align: left;
+    border-bottom: none;
+    border-left: 3px solid transparent;
+    border-radius: 8px;
+    padding: 12px 16px;
+  }
+  .tab-btn.active {
+    border-left-color: var(--primary);
+    background: rgba(79, 142, 247, 0.08);
+    border-bottom-color: transparent;
+  }
+  .admin-table-users .col-id,
+  .admin-table-audit .col-ip { display: none; }
+}
+
+@media (max-width: 480px) {
+  .admin-table-users .col-last-login,
+  .admin-table-audit .col-resource { display: none; }
+}
+
+@media (max-width: 320px) {
+  .modal-overlay .modal {
+    width: 100%;
+    max-width: 100%;
+    max-height: 100vh;
+    height: 100vh;
+    border-radius: 0;
+    margin: 0;
+  }
+}

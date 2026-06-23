@@ -1,0 +1,53 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "server.js",
+      "use": "@vercel/node",
+      "config": {
+        "maxLambdaSize": "50mb",
+        "includeFiles": [
+          "lib/assets/**",
+          "node_modules/node-unrar-js/dist/js/unrar.wasm",
+          "node_modules/node-unrar-js/js/unrar.wasm",
+          "node_modules/7zip-bin/**"
+        ]
+      }
+    },
+    {
+      "src": "public/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "server.js"
+    },
+    {
+      "src": "/health",
+      "dest": "server.js"
+    },
+    {
+      "src": "/alerts/stream",
+      "dest": "server.js"
+    },
+    {
+      "src": "/(.*\\.(html|css|js|svg|png|jpg|ico|webp|woff2?|ttf|eot|txt))",
+      "dest": "/public/$1"
+    },
+    {
+      "src": "/",
+      "dest": "server.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "server.js"
+    }
+  ],
+  "functions": {
+    "server.js": {
+      "maxDuration": 300
+    }
+  }
+}

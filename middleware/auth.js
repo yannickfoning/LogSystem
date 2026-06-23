@@ -1,4 +1,4 @@
-import pool from '../config/database.js';
+import pool from "../config/database.js";
 
 const SESSION_VERSION_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
@@ -12,8 +12,8 @@ async function checkSessionVersion(req) {
 
   try {
     const [rows] = await pool.execute(
-      'SELECT session_version FROM users WHERE id = ? AND is_active = 1',
-      [user.id]
+      "SELECT session_version FROM users WHERE id = ? AND is_active = 1",
+      [user.id],
     );
     if (!rows.length || rows[0].session_version !== user.session_version) {
       return false; // version révoquée ou utilisateur désactivé
@@ -27,54 +27,58 @@ async function checkSessionVersion(req) {
 
 export async function requireAuth(req, res, next) {
   if (!req.session || !req.session.user) {
-    return res.status(401).json({ error: 'Authentification requise' });
+    return res.status(401).json({ error: "Authentification requise" });
   }
   const valid = await checkSessionVersion(req);
   if (!valid) {
     req.session.destroy(() => {});
-    return res.status(401).json({ error: 'Session révoquée. Veuillez vous reconnecter.' });
+    return res
+      .status(401)
+      .json({ error: "Session révoquée. Veuillez vous reconnecter." });
   }
   next();
 }
 
 export async function requireAdmin(req, res, next) {
   if (!req.session || !req.session.user) {
-    return res.status(401).json({ error: 'Authentification requise' });
+    return res.status(401).json({ error: "Authentification requise" });
   }
   const valid = await checkSessionVersion(req);
   if (!valid) {
     req.session.destroy(() => {});
-    return res.status(401).json({ error: 'Session révoquée. Veuillez vous reconnecter.' });
+    return res
+      .status(401)
+      .json({ error: "Session révoquée. Veuillez vous reconnecter." });
   }
-  if (req.session.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Accès refusé. Rôle admin requis.' });
+  if (req.session.user.role !== "admin") {
+    return res.status(403).json({ error: "Accès refusé. Rôle admin requis." });
   }
   next();
 }
 
 export async function requireAuthPage(req, res, next) {
   if (!req.session || !req.session.user) {
-    return res.redirect('/login.html');
+    return res.redirect("/login.html");
   }
   const valid = await checkSessionVersion(req);
   if (!valid) {
     req.session.destroy(() => {});
-    return res.redirect('/login.html');
+    return res.redirect("/login.html");
   }
   next();
 }
 
 export async function requireAdminPage(req, res, next) {
   if (!req.session || !req.session.user) {
-    return res.redirect('/login.html');
+    return res.redirect("/login.html");
   }
   const valid = await checkSessionVersion(req);
   if (!valid) {
     req.session.destroy(() => {});
-    return res.redirect('/login.html');
+    return res.redirect("/login.html");
   }
-  if (req.session.user.role !== 'admin') {
-    return res.redirect('/dashboard.html');
+  if (req.session.user.role !== "admin") {
+    return res.redirect("/dashboard.html");
   }
   next();
 }
@@ -82,7 +86,14 @@ export async function requireAdminPage(req, res, next) {
 export function userScope(req) {
   const user = req.session?.user;
   if (!user) {
-    return { sql: ' AND 1=0', params: [] }; // S-01: fail-closed when no user
+    return { sql: " AND 1=0", params: [] }; // S-01: fail-closed when no user
   }
-  return { sql: ' AND user_id = ?', params: [user.id] };
+
+  // NOTE: Admin/analyst should still be scoped by user_id if your DB uses integer user_id.
+  // This prevents MySQL type mismatch when session user.id is stored as string.
+  if (user.role === "admin") {
+    return { sql: "", params: [] }; // Admins can see everything
+  }
+
+  return { sql: " AND user_id = ?", params: [parseInt(user.id, 10)] };
 }

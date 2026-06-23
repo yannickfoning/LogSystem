@@ -2,9 +2,113 @@ import { Router } from 'express';
 import pool from '../../config/database.js';
 import { requireAuth, userScope } from '../../middleware/auth.js';
 import logger from '../../config/logger.js';
+import { searchLimiter } from '../../lib/rateLimiter.js';
 
 const router = Router();
 router.use(requireAuth);
+router.use(searchLimiter);
+
+const LOG_SEARCH_SELECT = `
+  id, timestamp, event_timestamp, imported_at, log_level, source, source_server, service,
+  message, normalized_message, event_type, fingerprint, module, error_type,
+  stack_trace, target_user, log_user,
+  COALESCE(log_source, source) AS log_source,
+  COALESCE(source_system, log_source, source) AS source_system,
+  COALESCE(main_service, service) AS main_service,
+  COALESCE(hostname, source_server) AS hostname,
+  file_name, import_job_id, parser_format, timestamp_inferred, classification_confidence, created_time
+`.replace(/\s+/g, ' ').trim();
+
+const LOG_SEARCH_SELECT_MIN = `
+  id, timestamp, imported_at, log_level, source, source_server, service,
+  message, normalized_message, event_type, fingerprint, module, error_type,
+  stack_trace, target_user, log_user, file_name, import_job_id
+`.replace(/\s+/g, ' ').trim();
+
+function appendTextSearch(whereConditions, params, query) {
+  const trimmedQuery = query.trim();
+  if (trimmedQuery.length < 4) {
+    whereConditions.push('(message LIKE ? OR normalized_message LIKE ?)');
+    const like = '%' + trimmedQuery + '%';
+    params.push(like, like);
+    return;
+  }
+  whereConditions.push('MATCH(message, normalized_message) AGAINST(? IN BOOLEAN MODE)');
+  params.push(trimmedQuery);
+}
+
+function applySearchFallback(whereClause, params) {
+  let fbWhere = whereClause;
+  let fbParams = [...params];
+  if (fbWhere.includes('MATCH(message, normalized_message)')) {
+    fbWhere = fbWhere.replace(
+      'MATCH(message, normalized_message) AGAINST(? IN BOOLEAN MODE)',
+      '(message LIKE ? OR normalized_message LIKE ?)'
+    );
+    const q = fbParams.pop();
+    fbParams.push('%' + q + '%', '%' + q + '%');
+  }
+  return { fbWhere, fbParams };
+}
+
+function isSearchSchemaError(err) {
+  return /Unknown column|FULLTEXT/i.test(err?.message || '');
+}
+
+async function runCountQuery(whereClause, params) {
+  try {
+    const [countResult] = await pool.query(
+      `SELECT COUNT(*) as total FROM logs WHERE ${whereClause}`,
+      params
+    );
+    return countResult[0]?.total || 0;
+  } catch (e) {
+    if (!isSearchSchemaError(e)) throw e;
+    const { fbWhere, fbParams } = applySearchFallback(whereClause, params);
+    const [countResult] = await pool.query(
+      `SELECT COUNT(*) as total FROM logs WHERE ${fbWhere}`,
+      fbParams
+    );
+    return countResult[0]?.total || 0;
+  }
+}
+
+async function runFacetQuery(sql, params, whereClause) {
+  try {
+    const [rows] = await pool.query(sql, params);
+    return rows;
+  } catch (e) {
+    if (!isSearchSchemaError(e)) throw e;
+    const { fbWhere, fbParams } = applySearchFallback(whereClause, params);
+    const fbSql = sql.replace(whereClause, fbWhere);
+    const [rows] = await pool.query(fbSql, fbParams);
+    return rows;
+  }
+}
+
+async function runLogsSearch(whereClause, params, limitNum, offsetNum) {
+  const orderBy = 'COALESCE(event_timestamp, timestamp, imported_at) DESC';
+  const fullSql = `SELECT ${LOG_SEARCH_SELECT} FROM logs WHERE ${whereClause} ORDER BY ${orderBy} LIMIT ${limitNum} OFFSET ${offsetNum}`;
+  try {
+    const [logs] = await pool.query(fullSql, params);
+    return logs;
+  } catch (e) {
+    if (!isSearchSchemaError(e)) throw e;
+    logger.warn({ event: 'search_fallback', error: e.message }, '[API]');
+    const { fbWhere, fbParams } = applySearchFallback(whereClause, params);
+    const [logs] = await pool.query(
+      `SELECT ${LOG_SEARCH_SELECT_MIN} FROM logs WHERE ${fbWhere} ORDER BY timestamp DESC LIMIT ${limitNum} OFFSET ${offsetNum}`,
+      fbParams
+    );
+    return logs.map(row => ({
+      ...row,
+      log_source: row.source,
+      source_system: row.source,
+      main_service: row.service,
+      hostname: row.source_server
+    }));
+  }
+}
 
 /**
  * GET /api/search
@@ -35,10 +139,15 @@ router.get('/', async (req, res) => {
       service = null,
       module = null,
       source_server = null,
+      source_system = null,
+      main_service = null,
+      hostname = null,
       target_user = null,
       fingerprint = null,
       from_timestamp = null,
       to_timestamp = null,
+      from_imported_at = null,
+      to_imported_at = null,
       limit = 50,
       offset = 0
     } = req.query;
@@ -46,19 +155,27 @@ router.get('/', async (req, res) => {
     const limitNum = Math.min(parseInt(limit) || 50, 1000);
     const offsetNum = Math.max(parseInt(offset) || 0, 0);
 
+    if (query && query.length > 500) {
+      return res.status(400).json({ error: 'Longueur mot-clé: 1-500 caractères' });
+    }
+
+    if (from_timestamp && to_timestamp && new Date(from_timestamp) > new Date(to_timestamp)) {
+      return res.status(400).json({ error: 'Date de fin doit être après date de début' });
+    }
+
     let whereConditions = ['1=1'];
     let params = [];
 
     // AMÉLIORATION 1: User scope (S-03 & S-07 multi-tenant)
+    // FIX #9: Normalized scope handling - userScope now returns '' for admin, ' AND user_id = ?' for users
     if (scope.sql) {
-      whereConditions.push(scope.sql.replace(/AND\s*/, ''));
+      whereConditions.push(scope.sql.trim().replace(/^AND\s+/i, ''));
       params.push(...scope.params);
     }
 
-    // Filtres texte avec FULLTEXT (P-03)
+    // Filtres texte avec FULLTEXT (P-03) + fallback LIKE
     if (query && query.trim().length > 0) {
-      whereConditions.push('MATCH(message, normalized_message) AGAINST(? IN BOOLEAN MODE)');
-      params.push(query.trim());
+      appendTextSearch(whereConditions, params, query);
     }
 
     // Filtres métadonnées
@@ -75,6 +192,9 @@ router.get('/', async (req, res) => {
     if (service) {
       whereConditions.push('service = ?');
       params.push(service);
+    } else if (main_service) {
+      whereConditions.push('service = ?');
+      params.push(main_service);
     }
 
     if (module) {
@@ -85,6 +205,14 @@ router.get('/', async (req, res) => {
     if (source_server) {
       whereConditions.push('source_server = ?');
       params.push(source_server);
+    } else if (hostname) {
+      whereConditions.push('source_server = ?');
+      params.push(hostname);
+    }
+
+    if (source_system) {
+      whereConditions.push('source = ?');
+      params.push(source_system);
     }
 
     if (target_user) {
@@ -110,66 +238,65 @@ router.get('/', async (req, res) => {
       params.push(ts);
     }
 
-    const whereClause = whereConditions.join(' AND ');
-
-    // Compter le total
-    const [countResult] = await pool.execute(
-      `SELECT COUNT(*) as total FROM logs WHERE ${whereClause}`,
-      params
-    );
-    const totalCount = countResult[0]?.total || 0;
-
-    // Fetch logs avec pagination
-    const [logs] = await pool.execute(
-      `SELECT 
-        id, timestamp, created_time, log_level, source, source_server, service, 
-        message, normalized_message, event_type, fingerprint, module, error_type,
-        stack_trace, target_user, parser_format, timestamp_inferred, 
-        classification_confidence
-       FROM logs 
-       WHERE ${whereClause}
-       ORDER BY timestamp DESC
-       LIMIT ? OFFSET ?`,
-      [...params, limitNum, offsetNum]
-    );
-
-    // Calculer les facets (dimensions disponibles pour raffiner la recherche)
-    const [facets] = await pool.execute(
-      `SELECT 
-        log_level, COUNT(*) as count
-       FROM logs 
-       WHERE ${whereClause}
-       GROUP BY log_level
-       UNION ALL
-       SELECT CONCAT('error_type:', COALESCE(error_type, 'unknown')), COUNT(*) 
-       FROM logs 
-       WHERE ${whereClause} AND error_type IS NOT NULL
-       GROUP BY error_type
-       UNION ALL
-       SELECT CONCAT('service:', service), COUNT(*) 
-       FROM logs 
-       WHERE ${whereClause} AND service IS NOT NULL
-       GROUP BY service
-       UNION ALL
-       SELECT CONCAT('module:', module), COUNT(*) 
-       FROM logs 
-       WHERE ${whereClause} AND module IS NOT NULL
-       GROUP BY module
-       LIMIT 50`,
-      params
-    );
-
-    // Format facets
-    const facetMap = {};
-    for (const row of facets) {
-      const key = row.log_level || row['CONCAT(\'error_type:\', COALESCE(error_type, \'unknown\'))'] ||
-                  row['CONCAT(\'service:\', service)'] || row['CONCAT(\'module:\', module)'];
-      const count = row.count || row['COUNT(*)'];
-      if (key) facetMap[key] = count;
+    if (from_imported_at) {
+      const ts = normalizeTimestamp(from_imported_at);
+      whereConditions.push('imported_at >= ?');
+      params.push(ts);
     }
 
+    if (to_imported_at) {
+      const ts = normalizeTimestamp(to_imported_at);
+      whereConditions.push('imported_at <= ?');
+      params.push(ts);
+    }
+
+    const whereClause = whereConditions.join(' AND ');
+
+    const totalCount = await runCountQuery(whereClause, params);
+
+    if (totalCount > 10000) {
+      return res.status(422).json({
+        error: 'Trop de résultats (10K max). Affinez votre recherche.',
+        count: totalCount,
+      });
+    }
+
+    const logs = await runLogsSearch(whereClause, params, limitNum, offsetNum);
+
+    const facetsLevel = await runFacetQuery(
+      `SELECT log_level AS facet_key, COUNT(*) AS cnt FROM logs WHERE ${whereClause} GROUP BY log_level`,
+      params,
+      whereClause
+    );
+    const facetsEType = await runFacetQuery(
+      `SELECT CONCAT('error_type:', error_type) AS facet_key, COUNT(*) AS cnt
+       FROM logs WHERE ${whereClause} AND error_type IS NOT NULL GROUP BY error_type LIMIT 20`,
+      params,
+      whereClause
+    );
+    const facetsSvc = await runFacetQuery(
+      `SELECT CONCAT('service:', service) AS facet_key, COUNT(*) AS cnt
+       FROM logs WHERE ${whereClause} AND service IS NOT NULL GROUP BY service LIMIT 20`,
+      params,
+      whereClause
+    );
+    const facetsMod = await runFacetQuery(
+      `SELECT CONCAT('module:', module) AS facet_key, COUNT(*) AS cnt
+       FROM logs WHERE ${whereClause} AND module IS NOT NULL GROUP BY module LIMIT 20`,
+      params,
+      whereClause
+    );
+    const facetMap = {};
+    for (const row of [...facetsLevel, ...facetsEType, ...facetsSvc, ...facetsMod]) {
+      if (row.facet_key) facetMap[row.facet_key] = Number(row.cnt);
+    }
+
+    // [FIX-20] Masquer stack_trace pour les utilisateurs non-admins — peut contenir des chemins système internes
+    const isAdmin = req.session?.user?.role === 'admin';
+    const sanitizedLogs = isAdmin ? logs : logs.map(log => ({ ...log, stack_trace: undefined }));
+
     res.json({
-      logs,
+      logs: sanitizedLogs,
       total_count: totalCount,
       limit: limitNum,
       offset: offsetNum,
@@ -203,7 +330,7 @@ router.get('/error-directory', async (req, res) => {
     let params = [];
 
     if (scope.sql) {
-      whereConditions.push(scope.sql.replace(/AND\s*/, ''));
+      whereConditions.push(scope.sql.trim().replace(/^AND\s+/i, ''));
       params.push(...scope.params);
     }
 
@@ -238,12 +365,13 @@ router.get('/error-directory', async (req, res) => {
     const enriched = [];
     for (const group of groups) {
       // Logs récents pour ce fingerprint
+      const logScope = scope.sql ? `AND ${scope.sql.replace('AND', '')}` : '';
       const [recentLogs] = await pool.execute(
         `SELECT id, timestamp, message, log_level FROM logs 
-         WHERE fingerprint = ? AND user_id = ? 
+         WHERE fingerprint = ? ${logScope}
          ORDER BY timestamp DESC 
          LIMIT 3`,
-        [group.fingerprint, req.session.user.id]
+        [group.fingerprint, ...(scope.params || [])]
       );
 
       enriched.push({
@@ -280,13 +408,13 @@ router.get('/trends', async (req, res) => {
   try {
     const scope = userScope(req);
     const { window_hours = 24 } = req.query;
-    const windowHours = Math.min(parseInt(window_hours) || 24, 720); // max 30 jours
+    const windowHours = Math.min(parseInt(window_hours) || 24, 8760); // Augmenté à 1 an pour historique
 
     // Compter les logs par niveau sur la fenêtre
     const [byLevel] = await pool.execute(
       `SELECT log_level, COUNT(*) as count
        FROM logs 
-       WHERE timestamp >= DATE_SUB(NOW(), INTERVAL ? HOUR) ${scope.sql || ''}
+       WHERE imported_at >= DATE_SUB(NOW(), INTERVAL ? HOUR) ${scope.sql || ''}
        GROUP BY log_level
        ORDER BY FIELD(log_level, 'FATAL', 'CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG')`,
       [windowHours, ...(scope.params || [])]
@@ -294,9 +422,16 @@ router.get('/trends', async (req, res) => {
 
     // Top 10 erreurs par occurrence
     const [topErrors] = await pool.execute(
-      `SELECT fingerprint, error_type, event_type, COUNT(*) as count, MAX(timestamp) as last_seen
+      `SELECT 
+        fingerprint, 
+        MAX(error_type) as error_type, 
+        MAX(event_type) as event_type, 
+        COUNT(*) as count, 
+        MAX(timestamp) as lastSeen,
+        MAX(message) as message,
+        MAX(service) as source
        FROM logs 
-       WHERE timestamp >= DATE_SUB(NOW(), INTERVAL ? HOUR) 
+       WHERE imported_at >= DATE_SUB(NOW(), INTERVAL ? HOUR) 
          AND log_level IN ('ERROR', 'CRITICAL', 'FATAL') ${scope.sql || ''}
        GROUP BY fingerprint
        ORDER BY count DESC
@@ -309,7 +444,7 @@ router.get('/trends', async (req, res) => {
       `SELECT service, COUNT(*) as count, 
               COUNT(CASE WHEN log_level IN ('ERROR', 'CRITICAL', 'FATAL') THEN 1 END) as error_count
        FROM logs 
-       WHERE timestamp >= DATE_SUB(NOW(), INTERVAL ? HOUR) AND service IS NOT NULL ${scope.sql || ''}
+       WHERE imported_at >= DATE_SUB(NOW(), INTERVAL ? HOUR) AND service IS NOT NULL ${scope.sql || ''}
        GROUP BY service
        ORDER BY count DESC
        LIMIT 10`,
@@ -321,30 +456,33 @@ router.get('/trends', async (req, res) => {
       `SELECT module, COUNT(*) as count, 
               COUNT(CASE WHEN log_level IN ('ERROR', 'CRITICAL', 'FATAL') THEN 1 END) as error_count
        FROM logs 
-       WHERE timestamp >= DATE_SUB(NOW(), INTERVAL ? HOUR) AND module IS NOT NULL ${scope.sql || ''}
+       WHERE imported_at >= DATE_SUB(NOW(), INTERVAL ? HOUR) AND module IS NOT NULL ${scope.sql || ''}
        GROUP BY module
        ORDER BY count DESC
        LIMIT 10`,
       [windowHours, ...(scope.params || [])]
     );
 
-    // Hourly throughput (dernières 24h)
+    // Ingestion throughput (basé sur imported_at pour voir les imports récents)
     const [hourly] = await pool.execute(
-      `SELECT DATE_FORMAT(timestamp, '%Y-%m-%d %H:00') as hour, COUNT(*) as count
+      `SELECT 
+        DATE_FORMAT(imported_at, '%Y-%m-%d %H:00') as date, 
+        COUNT(*) as count,
+        COUNT(CASE WHEN log_level IN ('ERROR', 'CRITICAL', 'FATAL') THEN 1 END) as errorCount
        FROM logs 
-       WHERE timestamp >= DATE_SUB(NOW(), INTERVAL 24 HOUR) ${scope.sql || ''}
-       GROUP BY DATE_FORMAT(timestamp, '%Y-%m-%d %H:00')
-       ORDER BY hour DESC`,
-      scope.params || []
+       WHERE imported_at >= DATE_SUB(NOW(), INTERVAL ? HOUR) ${scope.sql || ''}
+       GROUP BY date
+       ORDER BY date DESC`,
+      [windowHours, ...(scope.params || [])]
     );
 
     res.json({
       window_hours: windowHours,
-      by_level: byLevel,
-      top_errors: topErrors,
-      top_services: topServices,
-      top_modules: topModules,
-      hourly_throughput: hourly
+      byLevel: byLevel,
+      topErrors: topErrors,
+      topServices: topServices,
+      topModules: topModules,
+      trends: hourly
     });
   } catch (e) {
     logger.error({ event: 'trends_error', error: e.message }, '[API]');
@@ -407,6 +545,13 @@ function normalizeTimestamp(ts) {
   // UNIX timestamp (10-13 digits)
   if (/^\d{10,13}$/.test(str)) {
     return new Date(parseInt(str) * (str.length === 10 ? 1000 : 1)).toISOString().slice(0, 19).replace('T', ' ');
+  }
+  
+  // FIX #7: Format DD/MM/YYYY HH:mm:ss ou DD/MM/YYYY (format français)
+  const frMatch = str.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}:\d{2}(?::\d{2})?))?/);
+  if (frMatch) {
+    const time = frMatch[4] || '00:00:00';
+    return `${frMatch[3]}-${frMatch[2]}-${frMatch[1]} ${time}`;
   }
   
   // ISO 8601 already valid

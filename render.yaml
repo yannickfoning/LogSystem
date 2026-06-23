@@ -1,0 +1,64 @@
+services:
+  - type: web
+    name: logsystem
+    env: node
+    region: frankfurt
+    plan: starter
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Aiven MySQL Configuration
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: DB_SSL
+        value: "true"
+      - key: DB_SSL_CA_PATH
+        sync: false
+      - key: DB_SSL_REJECT_UNAUTHORIZED
+        value: "true"
+      # Application Configuration
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: CSRF_SECRET
+        generateValue: true
+      - key: BCRYPT_ROUNDS
+        value: "12"
+      - key: RETENTION_CRON_HOUR
+        value: "3"
+      - key: IMPORT_BATCH_SIZE
+        value: "500"
+      - key: ALERT_EVAL_INTERVAL
+        value: "60000"
+      - key: UPLOAD_MAX_SIZE
+        value: "524288000"
+      - key: IMPORT_MAX_SIZE
+        value: "524288000"
+      - key: APP_VERSION
+        value: "6.0.0"
+      # Redis (Render Key Value) — cache du dashboard
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: logsystem-cache
+          property: connectionString
+
+  # Render Key Value instance (Redis-compatible) — cache uniquement,
+  # pas de données critiques : le plan free suffit (25 Mo, pas de persistance disque).
+  - type: keyvalue
+    name: logsystem-cache
+    region: frankfurt
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []   # connexions internes uniquement, via le réseau privé Render

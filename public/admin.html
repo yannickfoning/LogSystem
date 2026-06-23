@@ -2,22 +2,25 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title data-i18n="app.title">LogSystem - Administration</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>LogSystem — Administration</title>
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/css/responsive.css">
+  <link rel="stylesheet" href="/admin.css">
 </head>
 <body>
   <nav class="navbar">
     <div class="brand">
-      <img src="/image/coleps.png" alt="Coleps"
-           style="height:36px;width:auto;object-fit:contain;border-radius:4px;">
+      <img src="/image/coleps.png" alt="Coleps" class="brand-logo-img">
       <span>LogSystem</span>
     </div>
-    <ul class="nav-links">
+    <button class="hamburger" id="hamburger-btn" aria-label="Menu" aria-expanded="false"><span></span><span></span><span></span></button>
+    <ul class="nav-links" id="nav-links">
       <li><a href="/dashboard.html" data-i18n="nav.dashboard">Tableau de bord</a></li>
       <li><a href="/search.html" data-i18n="nav.search">Recherche</a></li>
       <li><a href="/import.html" data-i18n="nav.import">Import</a></li>
-      <li><a href="/admin.html" class="active" data-i18n="nav.admin">Administration</a></li>
+      <li><a href="/watchlog.html" data-i18n="nav.watchlog">Watch Log</a></li>
+      <li><a href="/admin.html" aria-current="page" data-i18n="nav.admin">Administration</a></li>
     </ul>
     <div class="nav-right">
       <a href="#" id="lang-toggle" class="lang-toggle-link">EN</a>
@@ -26,7 +29,7 @@
     </div>
   </nav>
 
-  <div class="page-container">
+  <main class="page-container" role="main">
     <h1 class="page-title" data-i18n="admin.title">Administration</h1>
 
     <div class="tabs">
@@ -37,7 +40,7 @@
       <button class="tab-btn" data-tab="system" data-i18n="admin.system">Système</button>
     </div>
 
-    <!-- ─── USERS TAB ─────────────────────────────────── -->
+    <!-- USERS TAB -->
     <div class="tab-content active" id="tab-users">
       <div class="flex justify-between mb-16">
         <span class="text-muted" id="users-count"></span>
@@ -45,10 +48,10 @@
       </div>
       <div class="card">
         <div class="table-wrapper">
-          <table>
+          <table class="admin-table-users">
             <thead>
               <tr>
-                <th data-i18n="common.id">ID</th>
+                <th class="col-id" data-i18n="common.id">ID</th>
                 <th data-i18n="admin.email">Email</th>
                 <th data-i18n="admin.display_name">Nom affiché</th>
                 <th data-i18n="admin.role">Rôle</th>
@@ -57,13 +60,13 @@
                 <th data-i18n="common.actions">Actions</th>
               </tr>
             </thead>
-            <tbody id="users-body"></tbody>
+            <tbody id="users-body" aria-live="polite"></tbody>
           </table>
         </div>
       </div>
     </div>
 
-    <!-- ─── RULES TAB ──────────────────────────────────── -->
+    <!-- RULES TAB -->
     <div class="tab-content" id="tab-rules">
       <div class="flex justify-between mb-16">
         <span></span>
@@ -71,7 +74,7 @@
       </div>
       <div class="card">
         <div class="table-wrapper">
-          <table>
+          <table class="admin-table-rules">
             <thead>
               <tr>
                 <th data-i18n="admin.rule_name">Nom</th>
@@ -88,7 +91,7 @@
       </div>
     </div>
 
-    <!-- ─── AUDIT TAB ──────────────────────────────────── -->
+    <!-- AUDIT TAB -->
     <div class="tab-content" id="tab-audit">
       <div class="filter-bar mb-16">
         <div class="form-group">
@@ -113,25 +116,25 @@
       </div>
       <div class="card">
         <div class="table-wrapper">
-          <table>
+          <table class="admin-table-audit">
             <thead>
               <tr>
                 <th data-i18n="common.timestamp">Date</th>
                 <th data-i18n="admin.user">Utilisateur</th>
                 <th data-i18n="admin.action">Action</th>
-                <th data-i18n="admin.resource">Ressource</th>
+                <th class="col-resource" data-i18n="admin.resource">Ressource</th>
                 <th data-i18n="admin.details">Détails</th>
-                <th data-i18n="admin.ip">IP</th>
+                <th class="col-ip" data-i18n="admin.ip">IP</th>
               </tr>
             </thead>
-            <tbody id="audit-body"></tbody>
+            <tbody id="audit-body" aria-live="polite"></tbody>
           </table>
         </div>
         <div id="audit-pagination"></div>
       </div>
     </div>
 
-    <!-- ─── RETENTION TAB ──────────────────────────────── -->
+    <!-- RETENTION TAB -->
     <div class="tab-content" id="tab-retention">
       <div class="grid-2 mb-24">
         <div class="card">
@@ -140,7 +143,7 @@
         </div>
         <div class="card">
           <div class="card-header" data-i18n="admin.actions">Actions</div>
-          <div style="margin-top:8px">
+          <div class="retention-actions">
             <button class="btn btn-primary mb-16 w-full" id="btn-run-retention" data-i18n="admin.run_retention">Exécuter la rétention</button>
             <h4 class="section-subtitle" data-i18n="admin.purge">Purge manuelle</h4>
             <div class="form-group">
@@ -163,13 +166,13 @@
       </div>
     </div>
 
-    <!-- ─── SYSTEM TAB ─────────────────────────────────── -->
+    <!-- SYSTEM TAB -->
     <div class="tab-content" id="tab-system">
       <div class="kpi-grid" id="system-stats"></div>
     </div>
-  </div>
+  </main>
 
-  <!-- ─── USER MODAL ───────────────────────────────────── -->
+  <!-- USER MODAL -->
   <div class="modal-overlay" id="user-modal">
     <div class="modal">
       <div class="modal-header">
@@ -188,12 +191,13 @@
         </div>
         <div class="form-group">
           <label data-i18n="admin.password">Mot de passe</label>
-          <input type="password" id="uf-password" placeholder="8 caractères min.">
+          <input type="password" id="uf-password" placeholder="12 caractères min." minlength="12" autocomplete="new-password">
         </div>
         <div class="form-group">
           <label data-i18n="admin.role">Rôle</label>
           <select id="uf-role">
             <option value="user">User</option>
+            <option value="analyst">Analyst</option>
             <option value="admin">Admin</option>
           </select>
         </div>
@@ -205,7 +209,7 @@
     </div>
   </div>
 
-  <!-- ─── RULE MODAL ───────────────────────────────────── -->
+  <!-- RULE MODAL -->
   <div class="modal-overlay" id="rule-modal">
     <div class="modal">
       <div class="modal-header">
@@ -227,9 +231,10 @@
             <label data-i18n="admin.condition_type">Type de condition</label>
             <select id="rf-condition-type">
               <option value="level">Level</option>
-              <option value="count">Count</option>
-              <option value="fingerprint">Fingerprint</option>
-              <option value="threshold">Threshold</option>
+              <option value="count">Count / Rate</option>
+              <option value="fingerprint">Fingerprint / Pattern</option>
+              <option value="threshold">Threshold / Anomaly</option>
+              <option value="silence">Silence</option>
             </select>
           </div>
           <div class="form-group">
@@ -275,7 +280,7 @@
     </div>
   </div>
 
-  <!-- ─── RESET PWD MODAL ─────────────────────────────── -->
+  <!-- RESET PWD MODAL -->
   <div class="modal-overlay" id="pwd-modal">
     <div class="modal modal-narrow">
       <div class="modal-header">
@@ -286,7 +291,7 @@
         <input type="hidden" id="pf-id">
         <div class="form-group">
           <label data-i18n="admin.password">Nouveau mot de passe</label>
-          <input type="password" id="pf-password" required minlength="8">
+          <input type="password" id="pf-password" required minlength="12" autocomplete="new-password">
         </div>
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" id="pwd-modal-cancel" data-i18n="admin.cancel">Annuler</button>
@@ -301,13 +306,36 @@
   <script src="/api.js"></script>
   <script src="/i18n.js"></script>
   <script src="/app-common.js"></script>
+  <script src="/js/mobile-nav.js" defer></script>
   <script>
     (function() {
       if (!window.api) return;
       var myUserId = null;
       var auditPage = 1;
 
-      window.initApp().then(function(u) { myUserId = u.id; });
+      window.initApp().then(function(u) {
+        myUserId = u.id;
+        // Rediriger les non-admins vers le dashboard
+        if (u.role !== 'admin') {
+          window.location.href = '/dashboard.html';
+          return;
+        }
+        // Démarrer SSE et charger les données
+        connectSSE();
+        loadUsers();
+        loadRules();
+        setInterval(function() {
+          if (document.hidden) return;
+          loadUsers();
+          loadSystem();
+          var activeTab = document.querySelector('.tab-btn.active');
+          if (activeTab) {
+            var tab = activeTab.getAttribute('data-tab');
+            if (tab === 'audit') loadAudit();
+            if (tab === 'retention') loadRetention();
+          }
+        }, 60000);
+      });
 
       document.getElementById('logout-btn').addEventListener('click', function(e) {
         e.preventDefault();
@@ -328,7 +356,7 @@
         });
       });
 
-      // ─── Notifications & Sounds (Admin) ───────────
+      // Notifications & Sons (Admin)
       var adminUnreadAlerts = 0;
       var notificationAudio = new Audio('data:audio/wav;base64,UklGRiYAAABXQVZFZm10IBAAAAABAAEAQB8AAAB9AAACABAAZGF0YQIAAAAAAA==');
       
@@ -378,93 +406,68 @@
         Notification.requestPermission();
       }
       
-      // ─── SSE ALERTS ───────────────────────────────
+      // SSE ALERTS
       var es = null;
       var sseRetryDelay = 1000;
       var sseHeartbeat = Date.now();
+      var ssePollingMode = false;
+      var zombieCheck = null;
+      // SSE remplacé par polling pur — SSE cause des reconnexions en boucle sur Vercel
+      // (chaque connexion consomme une lambda × pool MySQL → épuisement des connexions Aiven)
+      var _lastAdminAlertId = 0;
       function connectSSE() {
-        if (es) {
-          try { es.close(); } catch (_) {}
-          es = null;
-        }
-        es = new EventSource('/api/alerts/stream');
-        sseHeartbeat = Date.now();
-        
-        // Zombie detection
-        var zombieCheck = setInterval(() => {
-          if (Date.now() - sseHeartbeat > 120000) {
-            clearInterval(zombieCheck);
-            try { es.close(); } catch (_) {}
-            connectSSE();
-          }
-        }, 30000);
-        
-        es.addEventListener('alert', function(e) {
-          sseHeartbeat = Date.now();
-          var a = JSON.parse(e.data);
-          if (a.event_type === 'log' || a.event_type === 'log_batch') return;
-          playAdminSound();
-          updateAdminBadge(++adminUnreadAlerts);
-          window.toast.warning(a.message);
-          var severity = a.severity || 'medium';
-          showAdminNotification('🚨 Admin Alert: ' + a.message, {
-            body: 'Severity: ' + severity,
-            tag: 'admin-alert-' + a.id
-          });
-          loadSystem();
-        });
-        es.addEventListener('heartbeat', function() {
-          sseHeartbeat = Date.now();
-        });
-        es.onerror = function() {
-          try { es.close(); } catch (_) {}
-          fetch('/api/auth/me', { credentials: 'same-origin' })
-            .then(function(r) {
-              if (r.status === 401) {
-                window.location.href = '/login.html';
-                return;
-              }
-              setTimeout(connectSSE, sseRetryDelay);
-              sseRetryDelay = Math.min(sseRetryDelay * 2, 30000);
-            })
-            .catch(function() {
-              setTimeout(connectSSE, sseRetryDelay);
-              sseRetryDelay = Math.min(sseRetryDelay * 2, 30000);
-            });
-        };
+        // No-op: SSE désactivé. Le polling ci-dessous prend le relais.
       }
-      connectSSE();
+      function pollAdminAlerts() {
+        api.get('/api/dashboard/alerts?limit=10&status=new').then(function(d) {
+          var alerts = Array.isArray(d) ? d : (d && d.alerts ? d.alerts : []);
+          if (!alerts.length) return;
+          var newAlerts = alerts.filter(function(a) { return a.id > _lastAdminAlertId; });
+          if (newAlerts.length && _lastAdminAlertId > 0) {
+            newAlerts.forEach(function(a) {
+              playAdminSound && playAdminSound();
+              adminUnreadAlerts++;
+              updateAdminBadge && updateAdminBadge(adminUnreadAlerts);
+              window.toast && window.toast.warning('🔔 ' + (a.message || 'Nouvelle alerte'));
+            });
+            loadSystem();
+          }
+          var maxId = Math.max.apply(null, alerts.map(function(a) { return a.id || 0; }));
+          if (maxId > _lastAdminAlertId) _lastAdminAlertId = maxId;
+        }).catch(function() {});
+      }
+      setInterval(function() { if (!document.hidden) pollAdminAlerts(); }, 20000);
 
-      setInterval(function() {
-        if (document.hidden) return;
-        loadUsers();
-        loadSystem();
-        if (document.querySelector('.tab-btn.active')) {
-          var tab = document.querySelector('.tab-btn.active').getAttribute('data-tab');
-          if (tab === 'audit') loadAudit();
-          if (tab === 'retention') loadRetention();
-        }
-      }, 60000);
 
-      // ─── USERS ────────────────────────────────────
+      // USERS
+      function roleBadge(role) {
+        var r = (role || 'user').toLowerCase();
+        return '<span class="role-badge ' + esc(r) + '">' + esc(role || 'user') + '</span>';
+      }
+
+      function statusIndicator(active) {
+        return '<span class="status-indicator-dot ' + (active ? 'active' : 'inactive') + '" aria-hidden="true"></span>' +
+          (active ? 'Actif' : 'Inactif');
+      }
+
       function loadUsers() {
         api.get('/api/admin/users').then(function(users) {
           document.getElementById('users-count').textContent = users.length + ' utilisateur(s)';
           var tb = document.getElementById('users-body');
           tb.innerHTML = users.map(function(u) {
-            var statusBadge = u.is_active ? '<span class="badge badge-status-resolved">Actif</span>' : '<span class="badge badge-status-open">Inactif</span>';
+            var statusBadge = statusIndicator(!!u.is_active);
             var actions = '';
             if (u.id !== myUserId) {
-              actions += '<button class="btn btn-xs btn-secondary act-edit-user" data-id="'+u.id+'" data-email="'+esc(u.email)+'" data-name="'+esc(u.display_name)+'" data-role="'+esc(u.role)+'">Edit</button> ';
+              actions += '<button class="btn btn-xs btn-secondary act-edit-user" data-id="'+u.id+'" data-email="'+escAttr(u.email)+'" data-name="'+escAttr(u.display_name)+'" data-role="'+escAttr(u.role)+'">Edit</button> ';
               actions += '<button class="btn btn-xs btn-secondary act-reset-pwd" data-id="'+u.id+'">Reset</button> ';
               actions += u.is_active
                 ? '<button class="btn btn-xs btn-secondary act-toggle-user" data-id="'+u.id+'" data-active="0">Désactiver</button> '
                 : '<button class="btn btn-xs btn-success act-toggle-user" data-id="'+u.id+'" data-active="1">Activer</button> ';
               actions += '<button class="btn btn-xs btn-danger act-delete-user" data-id="'+u.id+'">Supprimer</button>';
             } else {
-              actions = '<span style="font-size:12px;color:var(--text2)">(compte courant)</span>';
+              actions = '<span class="current-account">(compte courant)</span>';
             }
-            return '<tr><td>'+u.id+'</td><td>'+esc(u.email)+'</td><td>'+esc(u.display_name)+'</td><td><span class="badge badge-info">'+esc(u.role)+'</span></td><td>'+statusBadge+'</td><td>'+fmtDT(u.last_login)+'</td><td>'+actions+'</td></tr>';
+            return '<tr><td class="col-id">'+u.id+'</td><td>'+esc(u.email)+'</td><td>'+esc(u.display_name)+'</td><td>'+roleBadge(u.role)+'</td><td>'+statusBadge+'</td><td class="col-last-login">'+fmtDT(u.last_login)+'</td><td>'+actions+'</td></tr>';
           }).join('');
         });
       }
@@ -561,7 +564,7 @@
         m.addEventListener('click', function(e) { if (e.target === m) m.classList.remove('active'); });
       });
 
-      // ─── RULES ────────────────────────────────────
+      // RULES
       function loadRules() {
         api.get('/api/admin/alert-rules').then(function(rules) {
           var tb = document.getElementById('rules-body');
@@ -631,7 +634,7 @@
         }).catch(function(err) { window.toast.error(err.error || 'Erreur'); });
       });
 
-      // ─── AUDIT ────────────────────────────────────
+      // AUDIT
       function loadAudit() {
         var params = { page: auditPage, limit: 30 };
         var action = document.getElementById('audit-action').value;
@@ -652,6 +655,11 @@
             return '<tr><td>'+fmtDT(r.created_at)+'</td><td>'+esc(r.user_email)+'</td><td><span class="badge badge-info">'+esc(r.action)+'</span></td><td>'+esc(r.resource_type)+'</td><td class="text-truncate">'+esc(r.details)+'</td><td>'+esc(r.ip_address)+'</td></tr>';
           }).join('');
           document.getElementById('audit-pagination').innerHTML = paginationHtml(auditPage, resp.pagination.pages);
+        }).catch(function(err) {
+          var tb = document.getElementById('audit-body');
+          if (tb) tb.innerHTML = '<tr><td colspan="6" class="no-data">Erreur chargement audit: ' + esc(err.error || err.message || 'Erreur serveur') + '</td></tr>';
+          document.getElementById('audit-pagination').innerHTML = '';
+          if (window.toast) window.toast.error(err.error || 'Erreur chargement audit');
         });
       }
 
@@ -662,15 +670,15 @@
 
       document.getElementById('audit-search-btn').addEventListener('click', function() { auditPage = 1; loadAudit(); });
 
-      // ─── RETENTION ────────────────────────────────
+      // RETENTION
       function loadRetention() {
         api.get('/api/admin/retention/stats').then(function(stats) {
           var html = '';
           var levels = ['DEBUG','INFO','WARNING','ERROR','FATAL'];
           levels.forEach(function(l) {
             var s = stats.by_level[l] || {};
-            html += '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">';
-            html += '<span>'+badge(l)+' <span style="margin-left:8px;color:var(--text2)">'+s.days+'j</span></span>';
+            html += '<div class="retention-row">';
+            html += '<span>'+badge(l)+' <span class="text-muted" style="margin-left:8px">'+s.days+'j</span></span>';
             html += '<span>'+Number(s.retained||0).toLocaleString()+' / '+Number(s.total||0).toLocaleString()+'</span>';
             html += '</div>';
           });
@@ -683,7 +691,7 @@
         btn.disabled = true;
         btn.textContent = 'Rétention en cours...';
         api.post('/api/admin/retention/run').then(function(r) {
-          window.toast.success('Rétention terminée');
+          window.toast.success('Rétention termin?e');
           loadRetention();
         }).catch(function(err) { window.toast.error(err.error || 'Erreur'); })
         .finally(function() { btn.disabled = false; btn.textContent = 'Exécuter la rétention'; });
@@ -702,21 +710,29 @@
         }).catch(function(err) { window.toast.error(err.error || 'Erreur'); });
       });
 
-      // ─── SYSTEM ───────────────────────────────────
+      // SYSTEM
       function loadSystem() {
-        api.get('/api/admin/system-stats').then(function(s) {
+        Promise.allSettled([
+          api.get('/api/admin/system-stats'),
+          api.get('/api/admin/system-status')
+        ]).then(function(results) {
+          var s = results[0].status === 'fulfilled' ? results[0].value : {};
+          var st = results[1].status === 'fulfilled' ? results[1].value : {};
+          var dbOk = st.database && st.database.connected;
+          var redisOk = st.redis && st.redis.connected;
           document.getElementById('system-stats').innerHTML =
-            '<div class="kpi-card"><span class="kpi-label">Utilisateurs</span><span class="kpi-value blue">'+s.total_users+'</span></div>' +
-            '<div class="kpi-card"><span class="kpi-label">Taille BDD</span><span class="kpi-value green">'+s.db_size_mb+' Mo</span></div>' +
-            '<div class="kpi-card"><span class="kpi-label">Error Groups (open)</span><span class="kpi-value red">'+s.open_error_groups+'</span></div>' +
-            '<div class="kpi-card"><span class="kpi-label">Alertes non lues</span><span class="kpi-value orange">'+s.new_alerts+'</span></div>' +
-            '<div class="kpi-card"><span class="kpi-label">Total logs</span><span class="kpi-value blue">'+Number(s.total_logs).toLocaleString()+'</span></div>';
-        });
+            '<div class="kpi-card"><span class="kpi-label">Database</span><span class="kpi-value '+(dbOk?'green':'red')+'">'+(dbOk?'✓ Connected':'✗ Disconnected')+'</span></div>' +
+            '<div class="kpi-card"><span class="kpi-label">Redis Cache</span><span class="kpi-value '+(redisOk?'green':'amber')+'">'+(redisOk?'✓ Connected':'Cache disabled')+'</span></div>' +
+            '<div class="kpi-card"><span class="kpi-label">Disk / Memory</span><span class="kpi-value">'+(st.disk && st.disk.usage ? st.disk.usage : 'N/A')+'</span></div>' +
+            '<div class="kpi-card"><span class="kpi-label">Uptime</span><span class="kpi-value blue">'+(st.uptime||'—')+'</span></div>' +
+            '<div class="kpi-card"><span class="kpi-label">Version</span><span class="kpi-value">'+(st.version||'6.0.0')+'</span></div>' +
+            '<div class="kpi-card"><span class="kpi-label">Utilisateurs</span><span class="kpi-value blue">'+s.totalUsers+'</span></div>' +
+            '<div class="kpi-card"><span class="kpi-label">Taille BDD</span><span class="kpi-value green">'+s.dbSizeMb+' Mo</span></div>' +
+            '<div class="kpi-card"><span class="kpi-label">Total logs</span><span class="kpi-value blue">'+Number(s.totalLogs).toLocaleString()+'</span></div>';
+        }).catch(function(){ if(window.toast) window.toast.error('Erreur système'); });
       }
 
-      // Initial loads
-      loadUsers();
-      loadRules();
+
     })();
   </script>
 </body>

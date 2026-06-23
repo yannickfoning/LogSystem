@@ -1,28 +1,31 @@
-# TODO (LogSystem V4)
+# TODO.md
 
-## Étape A — Audit ciblé (fait / en cours)
-- [x] Lire schéma SQL (`db/schema.sql`) + indexation (`db/indexes.sql`).
-- [x] Lire routes critiques :
-  - [x] `routes/logs.js`
-  - [x] `routes/dashboard.js`
-- [x] Lire services critiques :
-  - [x] `workers/alertWorker.js`
-  - [x] `services/cacheService.js`
-  - [x] `middleware/auth.js`
-- [ ] Valider la multi-isolation côté lecture d’alertes (SSE + routes) : scénarios user/admin.
-- [x] Rechercher `innerHTML`/XSS et valider le rendu côté `public/*html` et `public/*js` (premier passage).
-- [ ] Rechercher les requêtes sans `userScope`/scoping (risque fuite multi-tenant).
+## Phase V6 - Audit fixes (Approuvé)
 
-- [ ] Faire un mini “threat model” CSRF/CSP/session + surfaces injection (imports, message logs, stack traces).
+### Phase 4 — timestamps enrichis
+- [x] Uniformiser `file_created_at` / `file_modified_at` dans `lib/processing/archiveHandler.js` pour **ZIP / TAR / TAR.GZ / GZ** (fs.stat sur fichiers extraits temp)
+
+- [x] Maintenir la récursion nested archives (détection archives dans le temp)
+
+- [x] Garantir que chaque item retourné contient toujours `file_created_at` & `file_modified_at` (même si null)
 
 
-## Étape B — Corrections & améliorations (à partir de l’audit)
-- [ ] Scoper strictement tout ce qui est diffusé (SSE, endpoints JSON) au tenant.
-- [ ] Sécuriser l’affichage front (escape HTML strict messages/stack).
-- [ ] Ajuster index/queries si des endpoints causent des scans (benchmark).
-- [ ] Renforcer anti-spam alerting (cooldown par fingerprint + limites).
+### Phase 5 — persistance
+- [ ] Vérifier que `routes/import.js` persiste bien `file_created_at` & `file_modified_at` dans `logs` (déjà présent)
 
-## Étape C — Livraison
-- [ ] Run `npm test`.
-- [ ] Démarrer serveur et vérifier : import, watchlog live, SSE alertes filtrées, search/pagination.
+### Phase 2 — responsive global dashboard
+- [x] Vérifier si le bloc responsive est déjà présent dans `public/dashboard.css`
+- [x] Sinon injecter le bloc à la fin du fichier
+
+
+### Phase 8 — anomalies z-score
+- [x] Créer `services/anomaliesService.js` avec `detectVolumeAnomalies(userId)` (Z-Score)
+
+- [x] Ajouter le wiring : appeler la détection depuis `services/alertEngine.js`
+
+
+### Verification
+- [ ] Appliquer migration V6 via `lib/database/migrationRunner.js`
+- [ ] Tester l’import sur un archive nested (zip -> tar.gz -> log) et vérifier les champs timestamps en DB
+- [ ] Lancer tests (vitest) si dispo
 

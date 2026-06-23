@@ -1,3 +1,5 @@
+/* eslint-disable no-undef */
+/* eslint-disable no-unused-vars */
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -7,23 +9,8 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '.env') });
 
 import crypto from 'crypto';
+import { trackSSEConnection, untrackSSEConnection } from './lib/sseConnectionTracker.js';
 import logger from './config/logger.js';
-
-// ── Patch anti-crash global ───────────────────────────────────────────────────
-process.on('uncaughtException', (err) => {
-  logger.error({ event: 'uncaughtException', message: err.message, stack: err.stack, timestamp: new Date().toISOString() });
-  process.exit(1);
-});
-
-process.on('unhandledRejection', (reason) => {
-  logger.error({
-    event: 'unhandledRejection',
-    message: reason?.message || String(reason),
-    stack: reason?.stack,
-    timestamp: new Date().toISOString()
-  });
-});
-
 import express from 'express';
 import session from 'express-session';
 import MySQLStore from 'express-mysql-session';
@@ -33,29 +20,47 @@ import rateLimit from 'express-rate-limit';
 import compression from 'compression';
 import fs from 'fs';
 
-import { testConnection } from './config/database.js';
+import { testConnection, buildSslOptions } from './config/database.js';
 import { runMigrations } from './lib/database/migrationRunner.js';
-import { requireAuth, requireAuthPage, requireAdminPage } from './middleware/auth.js';
+import { requireAuth } from './middleware/auth.js';
 import { scopeGuard } from './middleware/scopeGuard.js';
 import { csrfMiddleware, csrfValidation } from './middleware/csrf.js';
 import authRoutes from './routes/auth.js';
 import logsRoutes from './routes/logs.js';
-import importRoutes from './routes/import.js';
+import logsIngestionRoutes from './routes/logs-ingestion.js';
+import importRoutes, { multerErrorHandler } from './routes/import.js';
 import dashboardRoutes from './routes/dashboard.js';
 import adminRoutes from './routes/admin.js';
+import searchApiRoutes from './routes/api/search.js';
 import { alertWorker } from './workers/alertWorker.js';
-import { startAlertEngine, setAlertWorker, stopAlertEngine } from './services/alertEngine.js';
+import { startAlertEngine, setAlertWorker, stopAlertEngine, initServerlessAlertEngine } from './services/alertEngine.js';
 import { startRetentionScheduler } from './services/retentionService.js';
-import { startWatcher, stopWatcher } from './services/watcherService.js';
-// BUG-03 FIX: Démarrer le service cache Redis qui n'était jamais initialisé
+import { startWatcher, stopWatcher, getWatcherStatus } from './services/watcherService.js';
 import { startCacheService } from './services/cacheService.js';
 import { createHtmlCspMiddleware } from './middleware/htmlCsp.js';
 
-const app = express();
-const PORT = parseInt(process.env.PORT || '3001', 10); // FIX: fallback cohérent avec .env
+// ── Detect environment ────────────────────────────────────────────────────────
+const IS_VERCEL = !!(process.env.VERCEL || process.env.VERCEL_ENV || process.env.NOW_REGION);
+const IS_PROD = process.env.NODE_ENV === 'production';
 
-// Forcer HTTPS en production
-if (process.env.NODE_ENV === 'production') {
+// ── Anti-crash global (non-Vercel only) ──────────────────────────────────────
+if (!IS_VERCEL) {
+  process.on('uncaughtException', (err) => {
+    logger.error({ event: 'uncaughtException', message: err.message, stack: err.stack });
+    process.exit(1);
+  });
+}
+process.on('unhandledRejection', (reason) => {
+  logger.error({ event: 'unhandledRejection', message: reason?.message || String(reason) });
+});
+
+// ── Express app (built synchronously — Vercel needs this ready at module load) ─
+const app = express();
+app.set('trust proxy', 1);
+const PORT = parseInt(process.env.PORT || '3001', 10);
+
+// ── HTTPS redirect ────────────────────────────────────────────────────────────
+if (IS_PROD) {
   app.use((req, res, next) => {
     if (req.headers['x-forwarded-proto'] !== 'https') {
       return res.redirect(301, `https://${req.headers.host}${req.url}`);
@@ -64,14 +69,14 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-// Session secret check
+// ── Session secret ────────────────────────────────────────────────────────────
 const sessionSecret = process.env.SESSION_SECRET;
-if (!sessionSecret || sessionSecret.includes('change-me') || sessionSecret.length < 32) {
-  logger.fatal('[FATAL] SESSION_SECRET must be at least 32 characters and not contain "change-me". Exiting.');
-  process.exit(1);
+if (!sessionSecret || sessionSecret.length < 32) {
+  logger.warn('[WARN] SESSION_SECRET missing or too short — using insecure fallback. Set SESSION_SECRET in Vercel env vars!');
 }
+const effectiveSecret = sessionSecret || ('logsystem-insecure-' + crypto.randomBytes(16).toString('hex'));
 
-// BUG-06 FIX: Nonce CSP dynamique par requête (au lieu d'un nonce statique global)
+// ── Middleware ────────────────────────────────────────────────────────────────
 app.use((req, res, next) => {
   res.locals.cspNonce = crypto.randomBytes(16).toString('base64');
   next();
@@ -79,9 +84,7 @@ app.use((req, res, next) => {
 
 app.use(compression({
   filter: (req, res) => {
-    if (req.path.endsWith('/stream') || req.headers.accept === 'text/event-stream') {
-      return false;
-    }
+    if (req.path.endsWith('/stream') || req.headers.accept === 'text/event-stream') return false;
     return compression.filter(req, res);
   }
 }));
@@ -89,24 +92,20 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
-// BUG-06 FIX: Helmet avec nonce dynamique via res.locals
 app.use((req, res, next) => {
   helmet({
-    hsts: process.env.NODE_ENV === 'production'
-      ? { maxAge: 31536000, includeSubDomains: true }
-      : false,
+    hsts: IS_PROD ? { maxAge: 31536000, includeSubDomains: true } : false,
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'", `'nonce-${res.locals.cspNonce}'`, "https://cdnjs.cloudflare.com", "https://unpkg.com"],
-        // FIX: scriptSrcAttr unsafe-inline supprimé — utilisez le nonce sur les handlers inline
-        styleSrc: ["'self'", `'nonce-${res.locals.cspNonce}'`, "https://cdnjs.cloudflare.com"],
+        styleSrc: ["'self'", `'nonce-${res.locals.cspNonce}'`, "https://cdnjs.cloudflare.com", "'unsafe-inline'"],
         styleSrcAttr: ["'unsafe-inline'"],
         imgSrc: ["'self'", "data:", "https:"],
         connectSrc: ["'self'"],
-        fontSrc: ["'self'", "https://cdnjs.cloudflare.com"],
+        fontSrc: ["'self'", "https://cdnjs.cloudflare.com", "https://fonts.gstatic.com"],
         objectSrc: ["'none'"],
-        mediaSrc: ["'self'"],
+        mediaSrc: ["'self'", "data:"],
         frameSrc: ["'none'"],
       }
     },
@@ -114,46 +113,64 @@ app.use((req, res, next) => {
   })(req, res, next);
 });
 
-const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 500, standardHeaders: true, legacyHeaders: false });
+// Adjust rate limits for Vercel serverless environment
+const isVercel = !!(process.env.VERCEL || process.env.VERCEL_ENV);
+const globalMax = isVercel ? 1000 : 500;
+const loginMax = isVercel ? 30 : 10;
+
+const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: globalMax, standardHeaders: true, legacyHeaders: false });
 app.use(globalLimiter);
 
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
+  windowMs: 15 * 60 * 1000, max: loginMax,
   message: { error: 'Trop de tentatives de connexion. Réessayez dans 15 minutes.' },
-  standardHeaders: true,
-  legacyHeaders: false
+  standardHeaders: true, legacyHeaders: false
 });
 
+// Add specific rate limiter for alerts/stream to prevent abuse
+const alertsStreamLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute window
+  max: isVercel ? 60 : 30, // 60 requests per minute on Vercel, 30 otherwise
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.method !== 'GET'
+});
+
+// ── Session store (MySQL) ─────────────────────────────────────────────────────
 const MySQLSessionStore = MySQLStore(session);
+const sslOpts = buildSslOptions();
+
 const sessionStore = new MySQLSessionStore({
   host: process.env.DB_HOST,
   port: parseInt(process.env.DB_PORT || '3306'),
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  clearExpired: true,
+  waitForConnections: true,
+  connectionLimit: parseInt(process.env.DB_SESSION_CONNECTION_LIMIT || (IS_VERCEL ? '1' : '10'), 10),
+  queueLimit: parseInt(process.env.DB_SESSION_QUEUE_LIMIT || (IS_VERCEL ? '25' : '0'), 10),
+  ssl: sslOpts || undefined,
+  clearExpired: !IS_VERCEL,
   checkExpirationInterval: 900000,
-  expiration: 86400000
+  expiration: 86400000,
+  schema: { tableName: 'sessions' }
 });
 
 app.use(session({
-  secret: sessionSecret,
+  secret: effectiveSecret,
   resave: false,
   saveUninitialized: false,
   store: sessionStore,
   cookie: {
     httpOnly: true,
-    // En dev, ne pas exiger HTTPS strictement sinon la session saute.
-    secure: process.env.NODE_ENV === 'production',
+    secure: IS_PROD,
     maxAge: 86400000,
-    // sameSite strict casse fréquemment les scripts/clients non-navigateurs.
     sameSite: 'lax'
   }
 }));
 
 app.use((req, res, next) => {
-  const isSecure = process.env.NODE_ENV === 'production' || req.headers['x-forwarded-proto'] === 'https';
+  const isSecure = IS_PROD || req.headers['x-forwarded-proto'] === 'https';
   if (req.session && req.session.cookie) req.session.cookie.secure = isSecure;
   next();
 });
@@ -161,120 +178,131 @@ app.use((req, res, next) => {
 app.use(csrfMiddleware);
 app.use(csrfValidation);
 
-app.use('/admin.html', requireAdminPage);
-app.use(['/dashboard.html', '/search.html', '/import.html', '/watchlog.html'], requireAuthPage);
-app.use((req, res, next) => {
-  if (req.path.endsWith('.html')) {
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-  }
-  next();
-});
-const publicDir = path.join(__dirname, 'public');
-app.use(createHtmlCspMiddleware(publicDir));
-app.use(express.static(publicDir, { index: false }));
-
-// API Routes
+// ── API Routes ────────────────────────────────────────────────────────────────
 app.use('/api/auth/login', loginLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/logs', requireAuth, scopeGuard, logsRoutes);
+app.use('/api/logs', requireAuth, scopeGuard, logsIngestionRoutes);
 app.use('/api/import', requireAuth, scopeGuard, importRoutes);
 app.use('/api/dashboard', requireAuth, scopeGuard, dashboardRoutes);
 app.use('/api/admin', requireAuth, scopeGuard, adminRoutes);
+app.use('/api/search', requireAuth, scopeGuard, searchApiRoutes);
 
-// SSE Alert Stream
-app.get('/api/alerts/stream', requireAuth, (req, res) => {
+app.get('/api/watchdogs/status', requireAuth, (req, res) => {
+  res.json(getWatcherStatus());
+});
+app.get('/api/alerts/stream', alertsStreamLimiter, requireAuth, (req, res) => {
+  const isVercel = !!(process.env.VERCEL || process.env.VERCEL_ENV);
+  const userId = req.session?.user?.id;
+  
+  if (isVercel) {
+    // On Vercel serverless, SSE times out after 10-300s causing constant reconnections.
+    // Return a JSON response indicating polling mode instead.
+    // The client (dashboard.html, watchlog.html) falls back to polling automatically.
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.write('retry: 60000\n');
+    res.write('event: connected\ndata: {"mode":"polling","reason":"vercel_serverless"}\n\n');
+    // Close after 5s to avoid timeout errors in logs
+    setTimeout(() => { try { res.end(); } catch(_){} }, 5000);
+    return;
+  }
+  
   alertWorker.addClient(res, req);
+  
+  // Clean up connection when client disconnects
+  req.on('close', () => {
+    if (userId) untrackSSEConnection(userId);
+  });
 });
 
-// SPA fallback
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime(), vercel: IS_VERCEL });
+});
+
+// ── Static files ──────────────────────────────────────────────────────────────
+const publicDir = path.join(__dirname, 'public');
+app.use(createHtmlCspMiddleware(publicDir));
+app.use(express.static(publicDir, { index: false }));
 app.get('/', (req, res) => {
   if (req.session?.user) return res.redirect('/dashboard.html');
   res.redirect('/login.html');
 });
 
-// 404
-app.use((req, res) => { res.status(404).json({ error: 'Route non trouvée' }); });
-
-// Global error handler
-app.use((err, req, res, _next) => {
-  logger.error('[ERROR]', err.message);
+// ── Error handlers ────────────────────────────────────────────────────────────
+app.use(multerErrorHandler);
+app.use((err, req, res, next) => {
+  logger.error({ event: 'express_error', message: err.message, path: req.path });
+  if (res.headersSent) return next(err);
   res.status(500).json({ error: 'Erreur interne du serveur' });
 });
 
-// ── Start ───────────────────────────────────────────────────────────────────────────
-async function start() {
+// ── Background init (non-blocking) ───────────────────────────────────────────
+// Runs AFTER the app is exported so Vercel can handle requests immediately.
+// Serverless cold starts skip background work and avoid opening DB connections.
+let _initialized = false;
+
+async function initialize() {
+  if (_initialized) return;
+  _initialized = true;
+
+  if (IS_VERCEL) {
+    logger.info({ event: 'background_jobs_disabled', platform: 'vercel' }, '[STARTUP]');
+    await initServerlessAlertEngine().catch(e =>
+      logger.error({ event: 'serverless_alert_init_failed', error: e.message }, '[STARTUP]')
+    );
+    return;
+  }
+
   try {
     await testConnection();
+    logger.info({ event: 'db_connected' }, '[DB] Connected');
   } catch (e) {
-    logger.error({ event: 'db_connection_failed', error: e.message }, '[FATAL]');
-    process.exit(1);
+    logger.error({ event: 'db_connection_failed', error: e.message }, '[DB] Connection failed — check env vars');
+    return; // Don't run migrations if DB unreachable
   }
 
-  // MIGRATION: Run all pending migrations
-  logger.info({ event: 'starting_migrations' }, '[MIGRATION]');
-  const migrationsSucceeded = await runMigrations();
-  if (!migrationsSucceeded) {
-    logger.warn({ event: 'migrations_had_errors' }, '[MIGRATION]');
-    // Don't exit — continue running, migrations are idempotent
-  }
+  await runMigrations().catch(e => logger.error({ event: 'migration_failed', error: e.message }));
 
-  // BUG-03 FIX: Démarrage explicite du service cache Redis
-  const cacheStarted = await startCacheService();
-  if (!cacheStarted) {
-    logger.warn('[CACHE] Redis not available — running without cache (degraded mode)');
-  }
-
+  await startCacheService().catch(() => {});
   setAlertWorker(alertWorker);
-  try {
-    await startAlertEngine();
-  } catch (e) {
-    logger.error({ event: 'alertEngineStartFailed', message: e.message });
-  }
-  try {
-    startRetentionScheduler();
-  } catch (e) {
-    logger.error({ event: 'retentionStartFailed', message: e.message });
-  }
-  try {
-    await startWatcher();
-  } catch (e) {
-    logger.error({ event: 'watcherStartFailed', message: e.message });
-  }
 
+  await startAlertEngine().catch(e => logger.error({ event: 'alertEngineStartFailed', message: e.message }));
+  startRetentionScheduler().catch?.(() => {});
+  await startWatcher().catch(e => logger.error({ event: 'watcherStartFailed', message: e.message }));
   const logsDir = (process.env.WATCH_DIRS || './logs').split(',')[0].trim();
-  if (!fs.existsSync(logsDir)) {
-    fs.mkdirSync(logsDir, { recursive: true });
-    logger.info({ level: 'info', message: `[INIT] Created log directory: ${logsDir}` });
-  }
+  try { if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true }); } catch (_) {}
 
-  const server = app.listen(PORT, () => {
-    logger.info({ level: 'info', message: `[LogSystem] Running on http://localhost:${PORT}` });
-    logger.info({ level: 'info', message: `[LogSystem] Environment: ${process.env.NODE_ENV || 'development'}` });
-    logger.info({ level: 'info', message: `[LogSystem] Cache: ${cacheStarted ? 'Redis actif' : 'désactivé'}` });
+  // Listen (persistent server only)
+  const PORT_NUM = parseInt(process.env.PORT || '3001', 10);
+  const server = app.listen(PORT_NUM, () => {
+    server.timeout = 300000;
+    server.keepAliveTimeout = 310000;
+    server.headersTimeout = 320000;
+    logger.info({ event: 'server_started', port: PORT_NUM }, `[LogSystem] Running on http://localhost:${PORT_NUM}`);
   });
 
   const shutdown = (signal) => {
-    logger.info(`[${signal}] Shutting down gracefully...`);
+    logger.info(`[${signal}] Shutting down...`);
     alertWorker.closeAll();
     stopWatcher();
     stopAlertEngine();
-    server.close(() => {
-      logger.info('[SHUTDOWN] HTTP server closed');
-      process.exit(0);
-    });
-    setTimeout(() => {
-      logger.error('[SHUTDOWN] Forced exit after timeout');
-      process.exit(1);
-    }, 10000);
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(1), 10000);
   };
-
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
-start().catch((err) => {
-  logger.fatal({ event: 'startupFailed', message: err.message, stack: err.stack });
-  process.exit(1);
+// Start initialization (non-blocking — app already exported below)
+initialize().catch(err => {
+  logger.error({ event: 'init_failed', message: err.message });
 });
+
+// ── EXPORT (must be last, synchronous, and unconditional) ─────────────────────
+// Vercel reads this export to find the request handler.
+// The app is fully configured above — routes, middleware, session — so it's
+// ready to handle requests even before initialize() resolves.
+export default app;

@@ -1,218 +1,518 @@
 <!DOCTYPE html>
 <html lang="fr">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title data-i18n="app.title">LogSystem - Import</title>
-  <link rel="stylesheet" href="/styles.css">
-</head>
-<body>
-  <nav class="navbar">
-    <div class="brand">
-      <img src="/image/coleps.png" alt="Coleps"
-           style="height:36px;width:auto;object-fit:contain;border-radius:4px;">
-      <span>LogSystem</span>
-    </div>
-    <ul class="nav-links">
-      <li><a href="/dashboard.html" data-i18n="nav.dashboard">Tableau de bord</a></li>
-      <li><a href="/search.html" data-i18n="nav.search">Recherche</a></li>
-      <li><a href="/import.html" class="active" data-i18n="nav.import">Import</a></li>
-      <li><a href="/admin.html" id="admin-link" data-i18n="nav.admin">Administration</a></li>
-    </ul>
-    <div class="nav-right">
-      <a href="#" id="lang-toggle" class="lang-toggle-link">EN</a>
-      <span class="user-info" id="user-info"></span>
-      <a href="#" id="logout-btn" class="btn btn-xs btn-secondary" data-i18n="nav.logout">Déconnexion</a>
-    </div>
-  </nav>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+        <title>LogSystem — Import</title>
+        <link rel="stylesheet" href="/styles.css">
+        <link rel="stylesheet" href="/css/responsive.css">
+  <link rel="stylesheet" href="/import.css">
+    </head>
+    <body>
+        <nav class="navbar">
+            <div class="brand">
+                <img
+                    src="/image/coleps.png"
+                    alt="Coleps"
+                    class="brand-logo-img"
+                />
+                <span>LogSystem</span>
+            </div>
+            <button
+                class="hamburger"
+                id="hamburger-btn"
+                aria-label="Menu"
+                aria-expanded="false"
+            >
+                <span></span><span></span><span></span>
+            </button>
+            <ul class="nav-links" id="nav-links">
+                <li>
+                    <a href="/dashboard.html" data-i18n="nav.dashboard"
+                        >Tableau de bord</a
+                    >
+                </li>
+                <li>
+                    <a href="/search.html" data-i18n="nav.search">Recherche</a>
+                </li>
+                <li>
+                    <a href="/import.html" aria-current="page" data-i18n="nav.import"
+                        >Import</a
+                    >
+                </li>
+                <li>
+                    <a href="/watchlog.html" data-i18n="nav.watchlog">Watch Log</a>
+                </li>
+                <li>
+                    <a href="/admin.html" id="admin-link" data-i18n="nav.admin"
+                        >Administration</a
+                    >
+                </li>
+            </ul>
+            <div class="nav-right">
+                <a href="#" id="lang-toggle" class="lang-toggle-link">EN</a>
+                <span class="user-info" id="user-info"></span>
+                <a
+                    href="#"
+                    id="logout-btn"
+                    class="btn btn-xs btn-secondary"
+                    data-i18n="nav.logout"
+                    >Déconnexion</a
+                >
+            </div>
+        </nav>
 
-  <div class="page-container">
-    <h1 class="page-title" data-i18n="import.title">Import de logs</h1>
+        <main class="page-container import-page" role="main">
+            <h1 class="page-title" data-i18n="import.title">Import de logs</h1>
 
-    <div class="card mb-24">
-      <div class="drop-zone" id="drop-zone">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        <p data-i18n="import.drop">Glissez un fichier ici ou cliquez pour sélectionner</p>
-        <p class="text-hint" data-i18n="import.formats">Formats acceptés : .log, .txt, .json, .jsonl, .csv, .xml, .zip, .gz (max 50 Mo)</p>
-        <input type="file" class="file-input" id="file-input" accept=".log,.txt,.json,.jsonl,.csv,.xml,.zip,.gz,.gzip,.tar,.tgz">
-      </div>
+            <div class="card mb-24">
+                <div class="drop-zone" id="drop-zone">
+                    <svg
+                        width="48"
+                        height="48"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                    <p data-i18n="import.drop">
+                        Glissez un fichier ici ou cliquez pour sélectionner
+                    </p>
+                    <p class="text-hint" data-i18n="import.formats">
+                        Formats supportés : .log, .txt, .json, .jsonl, .csv,
+                        .xml, .zip, .gz, .tar, .rar, <strong>.7z</strong> (max 100 Mo)
+                    </p>
+                    <input
+                        type="file"
+                        class="file-input"
+                        id="file-input"
+                        accept=".log,.txt,.json,.jsonl,.csv,.xml,.zip,.gz,.gzip,.tar,.tgz,.rar,.7z"
+                    />
+                </div>
 
-      <div class="form-row mt-16">
-        <div class="form-group">
-          <label data-i18n="import.source">Source (optionnel)</label>
-          <input type="text" id="import-source" data-i18n-placeholder="import.source.placeholder" placeholder="ex: production">
-        </div>
-        <div class="form-group">
-          <label data-i18n="import.service">Service (optionnel)</label>
-          <input type="text" id="import-service" data-i18n-placeholder="import.service.placeholder" placeholder="ex: api-gateway">
-        </div>
-      </div>
+                <div class="form-row mt-16">
+                    <div class="form-group">
+                        <label data-i18n="import.source"
+                            >Source (optionnel)</label
+                        >
+                        <input
+                            type="text"
+                            id="import-source"
+                            data-i18n-placeholder="import.source.placeholder"
+                            placeholder="ex: production"
+                        />
+                    </div>
+                    <div class="form-group">
+                        <label data-i18n="import.service"
+                            >Service (optionnel)</label
+                        >
+                        <input
+                            type="text"
+                            id="import-service"
+                            data-i18n-placeholder="import.service.placeholder"
+                            placeholder="ex: api-gateway"
+                        />
+                    </div>
+                </div>
 
-      <div id="progress-section" class="mt-16 is-hidden">
-        <div class="flex items-center justify-between mb-16">
-          <span class="text-muted" id="progress-text" data-i18n="import.processing">Traitement en cours...</span>
-          <span class="text-muted font-semibold" id="progress-pct">0%</span>
-        </div>
-        <div class="progress-bar">
-          <div class="progress-fill" id="progress-fill"></div>
-        </div>
-        <p class="text-hint mt-8" id="progress-detail"></p>
-      </div>
+                <div class="form-row mt-16">
+                    <div class="form-group">
+                        <label>Format des dates dans le fichier</label>
+                        <select id="date-locale" name="locale">
+                            <option value="fr" selected>
+                                Français (JJ/MM/AAAA)
+                            </option>
+                            <option value="us">Américain (MM/JJ/AAAA)</option>
+                            <option value="iso">ISO 8601 (AAAA-MM-JJ)</option>
+                        </select>
+                    </div>
+                </div>
 
-      <div class="mt-16">
-        <button class="btn btn-primary" id="upload-btn" disabled data-i18n="import.upload">Importer</button>
-      </div>
-    </div>
+                <div id="progress-section" class="mt-16 is-hidden">
+                    <div class="flex items-center justify-between mb-16">
+                        <span
+                            class="text-muted"
+                            id="progress-text"
+                            data-i18n="import.processing"
+                            >Traitement en cours...</span
+                        >
+                        <span class="text-muted font-semibold" id="progress-pct"
+                            >0%</span
+                        >
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                    <p class="text-hint mt-8" id="progress-detail"></p>
+                </div>
 
-    <div class="card">
-      <div class="card-header" data-i18n="import.recent">Imports récents</div>
-      <div class="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th data-i18n="import.file">Fichier</th>
-              <th data-i18n="common.status">Statut</th>
-              <th data-i18n="import.lines">Lignes</th>
-              <th data-i18n="import.errors">Erreurs</th>
-              <th data-i18n="common.timestamp">Date</th>
-            </tr>
-          </thead>
-          <tbody id="jobs-body"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
+                <div class="mt-16">
+                    <button
+                        class="btn btn-primary"
+                        id="upload-btn"
+                        disabled
+                        data-i18n="import.upload"
+                    >
+                        Importer
+                    </button>
+                </div>
+            </div>
 
-  <div class="toast-container"></div>
+            <div class="card">
+                <div class="card-header" data-i18n="import.recent">
+                    Imports récents
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th data-i18n="import.file">Fichier</th>
+                                <th data-i18n="common.status">Statut</th>
+                                <th data-i18n="import.lines">Lignes</th>
+                                <th data-i18n="import.errors">Erreurs</th>
+                                <th data-i18n="common.timestamp">Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="jobs-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
 
-  <div class="toast-container"></div>
+        <div class="toast-container"></div>
 
-  <script src="/api.js"></script>
-  <script src="/i18n.js"></script>
-  <script src="/app-common.js"></script>
-  <script>
-    (function() {
-      if (!window.api) return;
-      var selectedFile = null;
-      var currentJobId = null;
-      var pollTimer = null;
+        <script src="/api.js"></script>
+        <script src="/i18n.js"></script>
+        <script src="/app-common.js"></script>
+        <script src="/js/mobile-nav.js" defer></script>
+        <script>
+            (function () {
+                if (!window.api) return;
+                var selectedFile = null;
+                var currentJobId = null;
+                var pollTimer = null;
 
-      document.getElementById('logout-btn').addEventListener('click', function(e) {
-        e.preventDefault();
-        window.logout();
-      });
+                document
+                    .getElementById("logout-btn")
+                    .addEventListener("click", function (e) {
+                        e.preventDefault();
+                        window.logout();
+                    });
 
-      var dropZone = document.getElementById('drop-zone');
-      var fileInput = document.getElementById('file-input');
-      var uploadBtn = document.getElementById('upload-btn');
+                var dropZone = document.getElementById("drop-zone");
+                var fileInput = document.getElementById("file-input");
+                var uploadBtn = document.getElementById("upload-btn");
 
-      dropZone.addEventListener('click', function() { fileInput.click(); });
-      dropZone.addEventListener('dragover', function(e) { e.preventDefault(); dropZone.classList.add('dragover'); });
-      dropZone.addEventListener('dragleave', function() { dropZone.classList.remove('dragover'); });
-      dropZone.addEventListener('drop', function(e) {
-        e.preventDefault();
-        dropZone.classList.remove('dragover');
-        if (e.dataTransfer.files.length) {
-          selectFile(e.dataTransfer.files[0]);
-        }
-      });
-      fileInput.addEventListener('change', function() {
-        if (fileInput.files.length) selectFile(fileInput.files[0]);
-      });
+                dropZone.addEventListener("click", function () {
+                    fileInput.click();
+                });
+                dropZone.addEventListener("dragover", function (e) {
+                    e.preventDefault();
+                    dropZone.classList.add("dragover");
+                });
+                dropZone.addEventListener("dragleave", function () {
+                    dropZone.classList.remove("dragover");
+                });
+                dropZone.addEventListener("drop", function (e) {
+                    e.preventDefault();
+                    dropZone.classList.remove("dragover");
+                    if (e.dataTransfer.files.length) {
+                        selectFile(e.dataTransfer.files[0]);
+                    }
+                });
+                fileInput.addEventListener("change", function () {
+                    if (fileInput.files.length) selectFile(fileInput.files[0]);
+                });
 
-      function selectFile(file) {
-        var ext = file.name.split('.').pop().toLowerCase();
-        if (!['log','txt','json','jsonl','csv','xml','zip','gz','gzip','tar','tgz'].includes(ext)) {
-          window.toast.error(window.i18n ? window.i18n.t('import.unsupported') : 'Format non supporté');
-          return;
-        }
-        selectedFile = file;
-        dropZone.querySelector('p').textContent = file.name + ' (' + (file.size / 1024 / 1024).toFixed(2) + ' Mo)';
-        uploadBtn.disabled = false;
-      }
+                function selectFile(file) {
+                    var ext = file.name.split(".").pop().toLowerCase();
+                    if (
+                        ![
+                            "log",
+                            "txt",
+                            "json",
+                            "jsonl",
+                            "csv",
+                            "xml",
+                            "zip",
+                            "gz",
+                            "gzip",
+                            "tar",
+                            "tgz",
+                            "rar",
+                            "7z",
+                        ].includes(ext)
+                    ) {
+                        window.toast.error(
+                            window.i18n
+                                ? window.i18n.t("import.unsupported")
+                                : "Format non supporté",
+                        );
+                        return;
+                    }
+                    selectedFile = file;
+                    dropZone.querySelector("p").textContent =
+                        file.name +
+                        " (" +
+                        (file.size / 1024 / 1024).toFixed(2) +
+                        " Mo)";
+                    uploadBtn.disabled = false;
+                }
 
-      uploadBtn.addEventListener('click', async function() {
-        if (!selectedFile) return;
-        uploadBtn.disabled = true;
-        uploadBtn.innerHTML = '<span class="spinner"></span> ' + (window.i18n ? window.i18n.t('import.uploading') : 'Import...');
+                uploadBtn.addEventListener("click", async function () {
+                    if (!selectedFile) return;
+                    uploadBtn.disabled = true;
+                    uploadBtn.innerHTML =
+                        '<span class="spinner"></span> ' +
+                        (window.i18n
+                            ? window.i18n.t("import.uploading")
+                            : "Import...");
 
-        var formData = new FormData();
-        formData.append('file', selectedFile);
-        var source = document.getElementById('import-source').value;
-        var service = document.getElementById('import-service').value;
-        if (source) formData.append('source', source);
-        if (service) formData.append('service', service);
+                    var formData = new FormData();
+                    formData.append("file", selectedFile);
+                    var source = document.getElementById("import-source").value;
+                    var service =
+                        document.getElementById("import-service").value;
+                    var locale = document.getElementById("date-locale").value; // FIX 4b
+                    if (source) formData.append("source", source);
+                    if (service) formData.append("service", service);
+                    formData.append("locale", locale); // FIX 4b
 
-        try {
-          var result = await api.upload('/api/import/upload', formData);
-          currentJobId = result.job_id;
-          document.getElementById('progress-section').classList.remove('is-hidden');
-          window.toast.success('Import démarré : ' + selectedFile.name);
-          startPolling();
-        } catch (err) {
-          window.toast.error(err.error || 'Erreur lors de l\'upload');
-          uploadBtn.disabled = false;
-          uploadBtn.textContent = 'Importer';
-        }
-      });
+                    try {
+                        var result = await api.upload(
+                            "/api/import/upload",
+                            formData,
+                        );
+                        currentJobId = result.job_id;
+                        document
+                            .getElementById("progress-section")
+                            .classList.remove("is-hidden");
+                        window.toast.success(
+                            "Import démarré : " + selectedFile.name,
+                        );
+                        startPolling();
+                    } catch (err) {
+                        window.toast.error(
+                            err.error || "Erreur lors de l'upload",
+                        );
+                        uploadBtn.disabled = false;
+                        uploadBtn.textContent = "Importer";
+                    }
+                });
 
-      function startPolling() {
-        if (pollTimer) clearInterval(pollTimer);
-        pollTimer = setInterval(function() {
-          if (!currentJobId) { clearInterval(pollTimer); return; }
-          api.get('/api/import/jobs/' + currentJobId).then(function(job) {
-            var total = job.total_lines || 1;
-            var processed = job.processed_lines || 0;
-            var pct = Math.round((processed / total) * 100);
-            document.getElementById('progress-fill').style.width = pct + '%';
-            document.getElementById('progress-pct').textContent = pct + '%';
-            document.getElementById('progress-detail').textContent = processed + ' / ' + total + ' lignes, ' + job.error_count + ' erreurs';
+                function startPolling() {
+                    if (pollTimer) clearInterval(pollTimer);
+                    pollTimer = setInterval(function () {
+                        if (!currentJobId) {
+                            clearInterval(pollTimer);
+                            return;
+                        }
+                        api.get("/api/import/jobs/" + currentJobId)
+                            .then(function (job) {
+                                var total = job.total_lines || 1;
+                                var processed = job.processed_lines || 0;
+                                var pct = Math.round((processed / total) * 100);
+                                document.getElementById(
+                                    "progress-fill",
+                                ).style.width = pct + "%";
+                                document.getElementById(
+                                    "progress-pct",
+                                ).textContent = pct + "%";
+                                document.getElementById(
+                                    "progress-detail",
+                                ).textContent =
+                                    processed +
+                                    " / " +
+                                    total +
+                                    " lignes, " +
+                                    job.error_count +
+                                    " erreurs";
 
-            if (job.status === 'completed') {
-              clearInterval(pollTimer);
-              document.getElementById('progress-text').textContent = 'Import terminé !';
-              document.getElementById('progress-fill').style.width = '100%';
-              document.getElementById('progress-pct').textContent = '100%';
-              window.toast.success('Import terminé avec succès');
-              uploadBtn.disabled = false;
-              uploadBtn.textContent = 'Importer';
-              selectedFile = null;
-              currentJobId = null;
-              loadJobs();
-            } else if (job.status === 'failed') {
-              clearInterval(pollTimer);
-              document.getElementById('progress-text').textContent = 'Import échoué';
-              window.toast.error('Import échoué : ' + (job.error_message || 'Erreur inconnue'));
-              uploadBtn.disabled = false;
-              uploadBtn.textContent = 'Importer';
-              currentJobId = null;
-              loadJobs();
-            }
-          }).catch(function(err) {
-            clearInterval(pollTimer);
-            document.getElementById('progress-text').textContent = 'Erreur de polling import';
-            window.toast.error(err.error || 'Erreur de communication avec le serveur');
-            uploadBtn.disabled = false;
-            uploadBtn.textContent = 'Importer';
-            currentJobId = null;
-            loadJobs();
-          });
-        }, 1500);
-      }
+                                if (job.status === "completed") {
+                                    clearInterval(pollTimer);
+                                    document.getElementById(
+                                        "progress-text",
+                                    ).textContent = "Import terminé !";
+                                    document.getElementById(
+                                        "progress-fill",
+                                    ).style.width = "100%";
+                                    document.getElementById(
+                                        "progress-pct",
+                                    ).textContent = "100%";
 
-      function loadJobs() {
-        api.get('/api/import/jobs').then(function(jobs) {
-          var tb = document.getElementById('jobs-body');
-          if (!jobs.length) { tb.innerHTML = '<tr><td colspan="5" class="no-data" data-i18n="import.no_jobs">Aucun import</td></tr>'; return; }
-          tb.innerHTML = jobs.map(function(j) {
-            var statusCls = j.status === 'completed' ? 'badge-status-resolved' : j.status === 'failed' ? 'badge-status-open' : j.status === 'processing' ? 'badge-status-new' : '';
-            return '<tr><td>'+esc(j.filename)+'</td><td><span class="badge '+statusCls+'">'+j.status+'</span></td><td>'+j.processed_lines+' / '+j.total_lines+'</td><td>'+j.error_count+'</td><td>'+fmtDT(j.created_at)+'</td></tr>';
-          }).join('');
-        });
-      }
+                                    // FIX 4a: Display quality summary
+                                    if (job.import_summary) {
+                                        var s = job.import_summary;
+                                        var total = job.total_lines || 0;
+                                        var inserted = job.processed_lines || 0;
+                                        var skipped = job.skipped_lines || 0;
+                                        var missingUser = s.missing_user || 0;
+                                        var missingTs =
+                                            s.missing_timestamp || 0;
+                                        var inferred =
+                                            s.timestamp_inferred_count || 0;
 
-      loadJobs();
-    })();
-  </script>
-</body>
+                                        var pctUser =
+                                            total > 0
+                                                ? Math.round(
+                                                      (1 -
+                                                          missingUser / total) *
+                                                          100,
+                                                  )
+                                                : 0;
+                                        var pctTs =
+                                            total > 0
+                                                ? Math.round(
+                                                      (1 - missingTs / total) *
+                                                          100,
+                                                  )
+                                                : 0;
+
+                                        var summaryHtml =
+                                            '<div class="card mt-16" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px">';
+                                        summaryHtml +=
+                                            '<h4 style="margin:0 0 12px;font-size:14px;color:#1e293b">📊 Qualité d\'extraction</h4>';
+                                        summaryHtml +=
+                                            '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">';
+                                        summaryHtml +=
+                                            '<div style="text-align:center"><div style="font-size:22px;font-weight:700;color:#2563eb">' +
+                                            inserted +
+                                            '</div><div style="font-size:11px;color:#64748b">logs importés</div></div>';
+                                        summaryHtml +=
+                                            '<div style="text-align:center"><div style="font-size:22px;font-weight:700;color:' +
+                                            (pctTs >= 90
+                                                ? "#16a34a"
+                                                : pctTs >= 60
+                                                  ? "#d97706"
+                                                  : "#dc2626") +
+                                            '">' +
+                                            pctTs +
+                                            '%</div><div style="font-size:11px;color:#64748b">dates originales<br>' +
+                                            (missingTs > 0
+                                                ? "(" + missingTs + " inférées)"
+                                                : "✓ toutes extraites") +
+                                            "</div></div>";
+                                        summaryHtml +=
+                                            '<div style="text-align:center"><div style="font-size:22px;font-weight:700;color:' +
+                                            (pctUser >= 70
+                                                ? "#16a34a"
+                                                : pctUser >= 40
+                                                  ? "#d97706"
+                                                  : "#94a3b8") +
+                                            '">' +
+                                            pctUser +
+                                            '%</div><div style="font-size:11px;color:#64748b">avec utilisateur<br>' +
+                                            (missingUser > 0
+                                                ? "(" +
+                                                  missingUser +
+                                                  " non trouvés)"
+                                                : "✓ tous identifiés") +
+                                            "</div></div>";
+                                        summaryHtml += "</div>";
+                                        if (skipped > 0)
+                                            summaryHtml +=
+                                                '<p style="font-size:12px;color:#dc2626;margin:8px 0 0">⚠ ' +
+                                                skipped +
+                                                " lignes ignorées (vides ou invalides)</p>";
+                                        summaryHtml += "</div>";
+                                        document
+                                            .getElementById("progress-section")
+                                            .insertAdjacentHTML(
+                                                "afterend",
+                                                summaryHtml,
+                                            );
+                                    }
+
+                                    window.toast.success(
+                                        "Import terminé avec succès",
+                                    );
+                                    uploadBtn.disabled = false;
+                                    uploadBtn.textContent = "Importer";
+                                    selectedFile = null;
+                                    currentJobId = null;
+                                    loadJobs();
+                                } else if (job.status === "failed") {
+                                    clearInterval(pollTimer);
+                                    document.getElementById(
+                                        "progress-text",
+                                    ).textContent = "Import échoué";
+                                    window.toast.error(
+                                        "Import échoué : " +
+                                            (job.error_message ||
+                                                "Erreur inconnue"),
+                                    );
+                                    uploadBtn.disabled = false;
+                                    uploadBtn.textContent = "Importer";
+                                    currentJobId = null;
+                                    loadJobs();
+                                }
+                            })
+                            .catch(function (err) {
+                                clearInterval(pollTimer);
+                                document.getElementById(
+                                    "progress-text",
+                                ).textContent = "Erreur de polling import";
+                                window.toast.error(
+                                    err.error ||
+                                        "Erreur de communication avec le serveur",
+                                );
+                                uploadBtn.disabled = false;
+                                uploadBtn.textContent = "Importer";
+                                currentJobId = null;
+                                loadJobs();
+                            });
+                    }, 1500);
+                }
+
+                function loadJobs() {
+                    api.get("/api/import/jobs").then(function (jobs) {
+                        var tb = document.getElementById("jobs-body");
+                        if (!jobs.length) {
+                            tb.innerHTML =
+                                '<tr><td colspan="5" class="no-data" data-i18n="import.no_jobs">Aucun import</td></tr>';
+                            return;
+                        }
+                        tb.innerHTML = jobs
+                            .map(function (j) {
+                                var statusCls =
+                                    j.status === "completed"
+                                        ? "badge-status-resolved"
+                                        : j.status === "failed"
+                                          ? "badge-status-open"
+                                          : j.status === "processing"
+                                            ? "badge-status-new"
+                                            : "";
+                                return (
+                                    "<tr><td>" +
+                                    esc(j.filename) +
+                                    '</td><td><span class="badge ' +
+                                    statusCls +
+                                    '">' +
+                                    j.status +
+                                    "</span></td><td>" +
+                                    j.processed_lines +
+                                    " / " +
+                                    j.total_lines +
+                                    "</td><td>" +
+                                    j.error_count +
+                                    "</td><td>" +
+                                    fmtDT(j.created_at) +
+                                    "</td></tr>"
+                                );
+                            })
+                            .join("");
+                    });
+                }
+
+                loadJobs();
+            })();
+        </script>
+        <script src="/js/mobile-nav.js" defer></script>
+    </body>
 </html>

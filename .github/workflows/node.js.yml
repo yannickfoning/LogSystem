@@ -1,0 +1,38 @@
+name: Node.js CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # Supply chain security: use pinned version tags
+      - uses: actions/checkout@v4.2.2
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Run tests
+        run: npm test
+        env:
+          NODE_ENV: test
+          SESSION_SECRET: test-session-secret-min-32-chars-long
+          CSRF_SECRET: test-csrf-secret-min-32-chars-long-xxx
+          DB_HOST: localhost
+          DB_PORT: 3306
+          DB_USER: root
+          DB_PASSWORD: ""
+          DB_NAME: logsystem_test
+          DB_SSL: "false"
+          PORT: 3001

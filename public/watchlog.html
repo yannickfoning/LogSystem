@@ -2,24 +2,24 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Watch Log - LogSystem</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>LogSystem — Watch Log</title>
   <link rel="stylesheet" href="/styles.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/css/responsive.css">
   <link rel="stylesheet" href="/watchlog.css">
 </head>
 <body>
   <nav class="navbar">
     <div class="brand">
-      <img src="/image/coleps.png" alt="Coleps"
-           style="height:36px;width:auto;object-fit:contain;border-radius:4px;">
+      <img src="/image/coleps.png" alt="Coleps" class="brand-logo-img">
       <span>LogSystem</span>
     </div>
-    <ul class="nav-links">
+    <button class="hamburger" id="hamburger-btn" aria-label="Menu" aria-expanded="false"><span></span><span></span><span></span></button>
+    <ul class="nav-links" id="nav-links">
       <li><a href="/dashboard.html" data-i18n="nav.dashboard">Tableau de bord</a></li>
       <li><a href="/search.html" data-i18n="nav.search">Recherche</a></li>
       <li><a href="/import.html" data-i18n="nav.import">Import</a></li>
-      <li><a href="/watchlog.html" class="active" data-i18n="nav.watchlog">Watch Log</a></li>
+      <li><a href="/watchlog.html" aria-current="page" data-i18n="nav.watchlog">Watch Log</a></li>
       <li><a href="/admin.html" id="admin-link" data-i18n="nav.admin">Administration</a></li>
     </ul>
     <div class="nav-right">
@@ -28,26 +28,25 @@
       <a href="#" id="logout-btn" class="btn btn-xs btn-secondary">Déconnexion</a>
     </div>
   </nav>
-  <div class="watch-container">
-    <!-- Header -->
+  <main class="watch-container" role="main">
     <div class="watch-header">
       <div class="header-title">
-        <i class="fas fa-eye"></i>
+        <span class="icon-inline" id="icon-eye" aria-hidden="true"></span>
         <span data-i18n="watchlog.title">Watch Log — Monitoring Temps Réel</span>
-        <div class="status-indicator"></div>
+        <div class="status-indicator" aria-label="Statut connexion live"></div>
       </div>
       <div class="controls">
-        <button class="btn-small btn-primary" id="btnPause" data-i18n="watchlog.pause">
-          <i class="fas fa-pause"></i> Pause
+        <button class="btn-small btn-primary" id="btnPause" data-i18n="watchlog.pause" aria-label="Pause ou reprendre le flux">
+          <span class="icon-inline" id="icon-pause" aria-hidden="true"></span> Pause
         </button>
-        <button class="btn-small btn-secondary" id="btnClear" data-i18n="watchlog.clear">
-          <i class="fas fa-trash"></i> Effacer
+        <button class="btn-small btn-secondary" id="btnClear" data-i18n="watchlog.clear" aria-label="Effacer le flux">
+          <span class="icon-inline" id="icon-trash" aria-hidden="true"></span> Effacer
         </button>
-        <button class="btn-small btn-secondary" id="btnExport" data-i18n="watchlog.export">
-          <i class="fas fa-download"></i> Exporter
+        <button class="btn-small btn-secondary" id="btnExport" data-i18n="watchlog.export" aria-label="Exporter les logs">
+          <span class="icon-inline" id="icon-download" aria-hidden="true"></span> Exporter
         </button>
-        <button class="btn-small btn-danger" id="btnDisconnect" data-i18n="watchlog.disconnect">
-          <i class="fas fa-times"></i> Déconnecter
+        <button class="btn-small btn-danger" id="btnDisconnect" data-i18n="watchlog.disconnect" aria-label="Déconnecter le flux">
+          <span class="icon-inline" id="icon-times" aria-hidden="true"></span> Déconnecter
         </button>
       </div>
     </div>
@@ -77,11 +76,11 @@
       <!-- Left: Log Stream -->
       <div class="log-stream">
         <div class="stream-header">
-          <div class="stream-title" data-i18n="watchlog.stream.title">
-            <i class="fas fa-stream"></i> Flux en direct
+          <div class="stream-title panel-header-flex" data-i18n="watchlog.stream.title">
+            <span class="icon-inline" id="icon-stream" aria-hidden="true"></span> Flux en direct
           </div>
           <div class="stream-controls">
-            <select class="stream-filter" id="filterLevel">
+            <select class="stream-filter" id="filterLevel" aria-label="Filtrer par niveau" title="Filtrer par niveau">
               <option value="" data-i18n="watchlog.stream.filter.all">Tous les niveaux</option>
               <option value="DEBUG">DEBUG</option>
               <option value="INFO">INFO</option>
@@ -90,34 +89,33 @@
               <option value="CRITICAL">CRITICAL</option>
               <option value="FATAL">FATAL</option>
             </select>
-            <select class="stream-filter" id="filterService">
+            <select class="stream-filter" id="filterService" aria-label="Filtrer par service" title="Filtrer par service">
               <option value="" data-i18n="watchlog.stream.filter.services">Tous les services</option>
             </select>
           </div>
         </div>
-        <div class="log-entries" id="logEntries"></div>
+        <div class="log-entries" id="logEntries" aria-live="polite" aria-label="Flux de logs en direct"></div>
       </div>
 
       <!-- Right Panel -->
       <div class="right-panel">
         <!-- AMÉLIORATION 4: Anomalies Alert Panel -->
-        <div class="panel-card" id="anomalyPanel" style="display: none; border-color: #ef4444;">
-          <div class="panel-header" style="background: rgba(239, 68, 68, 0.2); color: #ef4444;">
-            <i class="fas fa-exclamation-triangle"></i> Anomalies Détectées
-            <span class="badge" style="background: #ef4444; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px;">⚠️</span>
+        <div class="panel-card anomaly-panel" id="anomalyPanel">
+          <div class="panel-header anomaly-header panel-header-flex">
+            <span class="icon-inline" id="icon-warning" aria-hidden="true"></span> Anomalies Détectées
+            <span class="wl-alert-badge">⚠️</span>
           </div>
-          <div class="panel-body">
-            <div id="anomalyDetails" style="font-size: 12px; line-height: 1.6;">
-              <p id="anomalyText" style="color: #ef4444; margin: 0;"></p>
-              <p id="anomalyStats" style="color: #9ca3af; margin: 8px 0 0; font-size: 11px;"></p>
+          <div class="panel-body anomaly-body">
+            <div id="anomalyDetails">
+              <p id="anomalyText" class="anomaly-text"></p>
+              <p id="anomalyStats" class="anomaly-stats"></p>
             </div>
           </div>
         </div>
 
-        <!-- Heatmap -->
         <div class="panel-card">
-          <div class="panel-header" data-i18n="watchlog.panel.heatmap">
-            <i class="fas fa-fire"></i> Heatmap 24h (erreurs par heure)
+          <div class="panel-header panel-header-flex" data-i18n="watchlog.panel.heatmap">
+            <span class="icon-inline" id="icon-fire" aria-hidden="true"></span> Heatmap 24h (erreurs par heure)
           </div>
           <div class="panel-body">
             <div class="heatmap" id="heatmap"></div>
@@ -133,8 +131,8 @@
 
         <!-- Error Distribution -->
         <div class="panel-card">
-          <div class="panel-header" data-i18n="watchlog.panel.distribution">
-            <i class="fas fa-chart-bar"></i> Répartition par niveau
+          <div class="panel-header panel-header-flex" data-i18n="watchlog.panel.distribution">
+            <span class="icon-inline" id="icon-chart-bar" aria-hidden="true"></span> Répartition par niveau
           </div>
           <div class="panel-body">
             <div class="level-chart" id="levelChart"></div>
@@ -143,8 +141,8 @@
 
         <!-- Top Services -->
         <div class="panel-card">
-          <div class="panel-header" data-i18n="watchlog.panel.top_services">
-            <i class="fas fa-cogs"></i> Top Services
+          <div class="panel-header panel-header-flex" data-i18n="watchlog.panel.top_services">
+            <span class="icon-inline" id="icon-cogs" aria-hidden="true"></span> Top Services
           </div>
           <div class="panel-body">
             <ul class="service-list" id="serviceList"></ul>
@@ -153,46 +151,44 @@
 
         <!-- FIX BUG-TRENDS-01: Tableau de tendances temps reel similaire au dashboard -->
         <div class="panel-card">
-          <div class="panel-header" data-i18n="watchlog.panel.trends">
-            <i class="fas fa-chart-line"></i> Tendances par heure (24h)
-            <span id="trends-update-time" style="font-size:10px;color:var(--text2);margin-left:auto"></span>
+          <div class="panel-header panel-header-flex" data-i18n="watchlog.panel.trends">
+            <span class="icon-inline" id="icon-chart-line" aria-hidden="true"></span> Tendances par heure (24h)
+            <span id="trends-update-time" class="wl-trends-time"></span>
           </div>
-          <div class="panel-body" style="padding:8px 0">
-            <div id="hourly-trends-table" style="font-size:11px">
-              <div style="text-align:center;color:var(--text2);padding:12px">Chargement...</div>
+          <div class="panel-body wl-trends-body">
+            <div id="hourly-trends-table" class="wl-trends-table">
+              <div class="trends-loading">Chargement...</div>
             </div>
           </div>
         </div>
 
-        <!-- Alertes recentes -->
         <div class="panel-card">
-          <div class="panel-header" data-i18n="watchlog.panel.alerts">
-            <i class="fas fa-bell"></i> Alertes recentes
-            <span id="alert-badge" style="background:var(--accent-red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:6px;display:none">0</span>
+          <div class="panel-header panel-header-flex" data-i18n="watchlog.panel.alerts">
+            <span class="icon-inline" id="icon-bell" aria-hidden="true"></span> Alertes recentes
+            <span id="alert-badge" class="wl-alert-badge is-hidden">0</span>
           </div>
           <div class="panel-body">
-            <ul class="service-list" id="alertsList" style="max-height:180px;overflow-y:auto"></ul>
+            <ul class="service-list wl-alerts-scroll" id="alertsList"></ul>
           </div>
         </div>
       </div>
     </div>
-  </div>
+  </main>
 
-
-  <!-- FIX BUG-WATCH-04: Modal detail log pour watchlog -->
-  <div class="modal-backdrop" id="wl-modal-detail" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center">
-    <div class="modal-box" style="background:var(--surface1,#1e2433);border-radius:12px;padding:24px;max-width:700px;width:95%;max-height:85vh;overflow-y:auto;position:relative">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-        <div class="modal-title" id="wl-modal-title" style="font-size:15px;font-weight:700;color:var(--text1,#f1f5f9)">Detail du log</div>
-        <button onclick="document.getElementById('wl-modal-detail').style.display='none'" style="background:none;border:none;color:var(--text2,#94a3b8);font-size:20px;cursor:pointer;padding:4px 8px">&times;</button>
+  <div class="wl-modal-backdrop" id="wl-modal-detail">
+    <div class="wl-modal-box">
+      <div class="wl-modal-head">
+        <div class="wl-modal-title" id="wl-modal-title">Detail du log</div>
+        <button type="button" class="wl-modal-close" id="wl-modal-close" aria-label="Fermer">&times;</button>
       </div>
-      <div id="wl-modal-body" style="color:var(--text1,#f1f5f9)">Chargement...</div>
+      <div id="wl-modal-body" class="wl-modal-body">Chargement...</div>
     </div>
   </div>
 
   <script src="/api.js"></script>
   <script src="/i18n.js"></script>
   <script src="/app-common.js"></script>
+  <script src="/js/mobile-nav.js" defer></script>
   <script>
     // FIX BUG-XSS-01: Fonctions d'echappement HTML pour prevenir les injections XSS
     function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
@@ -207,7 +203,7 @@
       sessionStartTime: Date.now(),
       buffer: [],
       seenLogIds: new Set(),
-      maxBuffer: 500,
+      maxBuffer: 1000,
       metrics: {
         total: 0,
         errors: 0,
@@ -230,81 +226,78 @@
     let eventSource = null;       // pour les logs en direct → /api/alerts/stream
     let statsSource = null;       // pour les stats/anomalies → /api/logs/watch/stream
     let liveRefreshTimer = null;
-    let reconnectAttempts = 0;
-    const MAX_RECONNECT_ATTEMPTS = 5;
+    let reconnectDelay = 1000;
+    let statsReconnectDelay = 1000;
+    const MAX_RECONNECT_ATTEMPTS = 50;
+
+    function mountIcons() {
+      if (!window.icons) return;
+      var map = {
+        'icon-eye': 'eye', 'icon-pause': 'pause', 'icon-trash': 'trash',
+        'icon-download': 'download', 'icon-times': 'times', 'icon-stream': 'stream',
+        'icon-warning': 'exclamationTriangle', 'icon-fire': 'fire',
+        'icon-chart-bar': 'chartBar', 'icon-cogs': 'cogs', 'icon-chart-line': 'chartLine', 'icon-bell': 'bell'
+      };
+      Object.keys(map).forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.innerHTML = window.icons[map[id]];
+      });
+    }
     const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
-    // ─── Connexion SSE #1 : flux de logs et alertes en direct ──────────────
-    // Les logs arrivent via "log" / "log_batch"; les vraies alertes via "alert".
+    // ─── Mode polling (SSE non compatible Vercel serverless) ──────────────
+    // Les logs se rechargent toutes les 15s via polling REST
     function initSSE() {
-      eventSource = new EventSource('/api/alerts/stream');
-
-      eventSource.addEventListener('connected', function() {
-        document.querySelector('.status-indicator').style.background = '#22c55e';
-        reconnectAttempts = 0;
-      });
-
-      eventSource.addEventListener('alert', function(e) {
-        try {
-          var data = JSON.parse(e.data);
-          if (data.event_type === 'log') {
-            // Compat anciennes sessions avant separation des evenements.
-            addLogEntry(data);
-            scheduleLiveRefresh();
-          } else if (data.message && data.severity) {
-            // Vraie alerte système : l'afficher dans le flux ET dans le panneau alertes
-            addLogEntry({
-              timestamp: data.created_at || new Date().toISOString(),
-              log_level: data.severity === 'critical' ? 'CRITICAL' : data.severity === 'high' ? 'ERROR' : 'WARNING',
-              message: '[Alerte] ' + data.message,
-              service: 'alerts',
-              source: 'system'
-            });
-            prependAlertItem(data); // ajout immédiat dans le panneau alertes
-          }
-        } catch (err) {
-          // Ignore malformed alert event
-        }
-      });
-
-      eventSource.addEventListener('log', function(e) {
-        try {
-          addLogEntry(JSON.parse(e.data));
-          scheduleLiveRefresh();
-        } catch (err) {
-          // Ignore malformed log event
-        }
-      });
-
-      eventSource.addEventListener('log_batch', function(e) {
-        try {
-          var data = JSON.parse(e.data);
-          addLogEntries(data.logs || []);
-          scheduleLiveRefresh();
-        } catch (err) {
-          // Ignore malformed batch event
-        }
-      });
-
-      eventSource.addEventListener('heartbeat', function() { /* keep-alive */ });
-
-      eventSource.onerror = function() {
-        document.querySelector('.status-indicator').style.background = '#ef4444';
-        if (eventSource) eventSource.close();
-        if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-          reconnectAttempts++;
-          setTimeout(initSSE, 2000 * reconnectAttempts);
-        }
-      };
+      // SSE désactivé — trop de reconnexions épuisent le pool MySQL Aiven (25 connexions max)
+      // Mode polling : loadLogs() est appelé toutes les 15s par le setInterval ci-dessous
+      var indicator = document.querySelector('.status-indicator');
+      if (indicator) indicator.style.background = '#f59e0b'; // orange = mode polling
+      console.info('[WatchLog] Mode polling actif (Vercel serverless)');
     }
 
-    // ─── Connexion SSE #2 : stats et détection d'anomalies ─────────────────
+    // ─── Stats via polling (SSE non compatible Vercel) ────────────────────
     function initStatsSSE() {
-      statsSource = new EventSource('/api/logs/watch/stream');
+      // Polling uniquement — SSE épuise le pool MySQL
+      // Les stats sont rafraîchies par loadWatchStats() appelé toutes les 15s
+      console.info('[WatchLog] Stats mode polling actif');
+      if (false) { // disabled SSE
+        statsSource = null;
+        var sseConnected = false;
+        if (false) {
+          console.warn('[WatchLog] SSE non disponible (Vercel serverless) — mode polling activé');
+          statsSource.close();
+          statsSource = null;
+          // Poll stats every 10 seconds instead
+          if (!window._watchPollInterval) {
+            window._watchPollInterval = setInterval(function() {
+              api.get('/api/logs/watch/stats').then(function(stats) {
+                if (stats) updateStats(stats);
+              }).catch(function(){});
+              // Also reload logs
+              if (typeof loadLogs === 'function') loadLogs();
+            }, 10000);
+          }
+        }
+      };
 
       statsSource.addEventListener('connected', function() {
-        // Stats stream connected
+        statsReconnectDelay = 1000;
       });
+
+      function updateStats(stats) {
+        if (stats.logs_last_hour !== undefined) {
+          var el = document.getElementById('stat-logs-min');
+          if (el) el.textContent = stats.logs_last_hour || 0;
+        }
+        if (stats.errors_last_hour !== undefined) {
+          var el2 = document.getElementById('stat-errors');
+          if (el2) el2.textContent = stats.errors_last_hour || 0;
+        }
+        if (stats.services_active !== undefined) {
+          var el3 = document.getElementById('stat-services');
+          if (el3) el3.textContent = stats.services_active || 0;
+        }
+      }
 
       statsSource.addEventListener('stats_update', function(e) {
         try {
@@ -322,9 +315,9 @@
       });
 
       statsSource.onerror = function() {
-        // Reconnexion silencieuse pour les stats
         if (statsSource) statsSource.close();
-        setTimeout(initStatsSSE, 10000);
+        setTimeout(initStatsSSE, statsReconnectDelay);
+        statsReconnectDelay = Math.min(statsReconnectDelay * 2, 30000);
       };
     }
 
@@ -390,7 +383,7 @@
       const text = document.getElementById('anomalyText');
       const stats = document.getElementById('anomalyStats');
       
-      panel.style.display = 'block';
+      panel.classList.add('is-visible');
       text.textContent = `⚠️ Anomalie détectée: Taux d'erreur ${anomaly.current_rate?.toFixed(2)}% (normal: ${anomaly.baseline_rate?.toFixed(2)}%)`;
       stats.innerHTML = `
         <strong>Augmentation:</strong> ${anomaly.rate_increase_percent}% | 
@@ -402,7 +395,7 @@
     // AMÉLIORATION 4: Hide anomaly alert
     function hideAnomalyAlert() {
       const panel = document.getElementById('anomalyPanel');
-      panel.style.display = 'none';
+      panel.classList.remove('is-visible');
     }
 
     function resetMetrics() {
@@ -505,53 +498,59 @@
       }, 1000);
     }
 
-    function updateUI() {
-      // Update metrics
-      const elapsedMin = Math.max((Date.now() - STATE.sessionStartTime) / 60000, 0.0167); // min 1s
-      const logsPerMin = Math.round(STATE.metrics.total / elapsedMin) || 0;
-      document.getElementById('metricsLogsPerMin').textContent = logsPerMin;
-      document.getElementById('metricsErrors').textContent = STATE.metrics.errors;
-      document.getElementById('metricsServices').textContent = STATE.metrics.services.size;
-      const errorRate = STATE.metrics.total > 0 ? Math.round((STATE.metrics.errors / STATE.metrics.total) * 100) : 0;
-      document.getElementById('metricsErrorRate').textContent = errorRate + '%';
 
-      // Update stream
-      updateLogStream();
+    const SOURCE_CONFIG = {
+      watch:  { color: '#10b981', label: 'WATCH' },
+      import: { color: '#3b82f6', label: 'IMPORT' },
+      api:    { color: '#6366f1', label: 'API' },
+      manual: { color: '#94a3b8', label: 'MANUAL' }
+    };
 
-      // Update heatmap
-      updateHeatmap();
-
-      // Update level chart
-      updateLevelChart();
-
-      // Update services
-      updateServiceList();
-    }
+    let renderPending = false;
 
     function updateLogStream() {
-      const container = document.getElementById('logEntries');
-      const filtered = STATE.buffer.filter(log => {
-        if (STATE.filters.level && log.log_level !== STATE.filters.level) return false;
-        if (STATE.filters.service && log.service !== STATE.filters.service) return false;
-        return true;
-      });
+      if (renderPending) return;
+      renderPending = true;
 
-      // FIX BUG-WATCH-02: Ajouter data-id pour click, afficher service
-      container.innerHTML = filtered.slice(0, 100).map(log => {
-        const time = new Date(log.timestamp || Date.now()).toLocaleTimeString('fr-FR');
-        const svc  = log.service ? `<div class="log-service" style="font-size:10px;color:var(--text2);margin-right:6px">${esc(log.service)}</div>` : '';
-        const idAttr = log.id ? ` data-log-id="${log.id}"` : '';
-        return `
-          <div class="log-entry"${idAttr} style="cursor:${log.id ? 'pointer' : 'default'}">
+      window.requestAnimationFrame(() => {
+        renderPending = false;
+        const container = document.getElementById('logEntries');
+        if (!container) return;
+
+        const filtered = STATE.buffer.filter(log => {
+          if (STATE.filters.level && log.log_level !== STATE.filters.level) return false;
+          if (STATE.filters.service && log.service !== STATE.filters.service) return false;
+          return true;
+        });
+
+        const fragment = document.createDocumentFragment();
+        
+        filtered.slice(0, 100).forEach(log => {
+          const div = document.createElement('div');
+          div.className = 'log-entry';
+          if (log.id) {
+            div.style.cursor = 'pointer';
+            div.setAttribute('data-log-id', log.id);
+          }
+
+          const time = new Date(log.timestamp || Date.now()).toLocaleTimeString('fr-FR');
+          const svc = log.service ? `<div class="log-service" style="font-size:10px;color:var(--text2);margin-right:6px">${esc(log.service)}</div>` : '';
+          const st = log.source_type || 'watch';
+          const conf = SOURCE_CONFIG[st] || SOURCE_CONFIG.watch;
+          const sourceBadge = `<span style="font-size:9px; padding: 1px 4px; border: 1px solid ${conf.color}; color: ${conf.color}; background: ${conf.color}11; border-radius: 4px; margin-right: 6px; font-weight: bold;">${conf.label}</span>`;
+          
+          div.innerHTML = `
             <div class="log-time">${time}</div>
             <div class="log-level ${escAttr(log.log_level)}">${esc(log.log_level)}</div>
+            ${sourceBadge}
             ${svc}
-            ${log.event_type ? '<div class="log-meta" style="font-size:10px;color:var(--text2);margin-bottom:4px">Type: '+esc(log.event_type)+'</div>' : ''}
-            ${log.fingerprint ? '<div class="log-meta" style="font-size:10px;color:var(--text2);margin-bottom:4px">Empreinte: '+esc(log.fingerprint.slice(0,16))+'</div>' : ''}
             <div class="log-message">${esc((log.message || "").slice(0, 200))}</div>
-          </div>
-        `;
-      }).join('');
+          `;
+          fragment.appendChild(div);
+        });
+
+        container.replaceChildren(fragment);
+      });
     }
 
     function updateHeatmap() {
@@ -568,42 +567,60 @@
 
     function updateLevelChart() {
       const chart = document.getElementById('levelChart');
+      if (!chart) return;
       const max = Math.max(...Object.values(STATE.metrics.levelCount), 1);
+      // Ensure the container has a defined height for percentage bars to work
+      chart.style.cssText = 'display:flex;align-items:flex-end;gap:4px;height:80px;width:100%;';
       chart.innerHTML = Object.entries(STATE.metrics.levelCount).map(([level, count]) => {
-        const height = (count / max) * 100;
-        return `
-          <div style="flex: 1;">
-            <div class="level-bar" style="height: ${height}%; background: ${LEVEL_COLORS[level]};"></div>
-            <div class="level-label">${level} (${count})</div>
-          </div>
-        `;
+        const height = Math.max(Math.round((count / max) * 100), count > 0 ? 2 : 0);
+        const color  = LEVEL_COLORS[level] || '#6b7280';
+        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+          <div style="width:100%;height:${height}%;background:${color};border-radius:3px 3px 0 0;min-height:${count>0?'3px':'0'};transition:height 0.3s"></div>
+          <div style="font-size:8px;color:var(--text2,#888);white-space:nowrap">${level.slice(0,3)}</div>
+          <div style="font-size:8px;color:${color};font-weight:600">${count}</div>
+        </div>`;
       }).join('');
     }
 
     function updateServiceList() {
-      const list = document.getElementById('serviceList');
-      const sorted = Array.from(STATE.metrics.services.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
-      list.innerHTML = sorted.map(([service, count]) => `
-        <li class="service-item">
-          <span class="service-name">${esc(service)}</span>
-          <span class="service-count">${count}</span>
-        </li>
-      `).join('');
+      var list = document.getElementById('serviceList');
+      if (!list) return;
+      // STATE.metrics.services is a Map<serviceName, count>
+      var entries = Array.from(STATE.metrics.services.entries || STATE.metrics.services || []);
+      if (!entries.length) { list.innerHTML = '<li style="color:var(--text2);font-size:12px">Aucun service</li>'; return; }
+      // Sort by count descending
+      entries.sort(function(a, b) { return (b[1] || 0) - (a[1] || 0); });
+      list.innerHTML = entries.slice(0, 10).map(function(entry) {
+        var svcName  = Array.isArray(entry) ? entry[0] : entry;
+        var svcCount = Array.isArray(entry) ? entry[1] : '';
+        return '<li style="font-size:12px;padding:3px 0;color:var(--text1);display:flex;justify-content:space-between">'
+          + '<span>' + esc(String(svcName)) + '</span>'
+          + (svcCount ? '<span style="color:var(--text2)">' + svcCount + '</span>' : '')
+          + '</li>';
+      }).join('');
+    }
+    function updateUI() {
+      // Update metrics
+      const elapsedMin = Math.max((Date.now() - STATE.sessionStartTime) / 60000, 0.0167); // min 1s
+      const logsPerMin = Math.round(STATE.metrics.total / elapsedMin) || 0;
+      document.getElementById('metricsLogsPerMin').textContent = logsPerMin;
+      document.getElementById('metricsErrors').textContent = STATE.metrics.errors;
+      document.getElementById('metricsServices').textContent = STATE.metrics.services.size;
+      const errorRate = STATE.metrics.total > 0 ? Math.round((STATE.metrics.errors / STATE.metrics.total) * 100) : 0;
+      document.getElementById('metricsErrorRate').textContent = errorRate + '%';
 
-      // Update service filter dropdown
-      const filterService = document.getElementById('filterService');
-      const currentValue = filterService.value;
-      filterService.innerHTML = '<option value="">' + (window.i18n ? window.i18n.t('watchlog.stream.filter.services') : 'Tous les services') + '</option>' + sorted.map(([service]) => `
-        <option value="${escAttr(service)}">${esc(service)}</option>
-      `).join('');
-      filterService.value = currentValue;
+      // Update components
+      updateLogStream();
+      updateHeatmap();
+      updateLevelChart();
+      updateServiceList();
     }
 
     // Event Listeners
     document.getElementById('btnPause').addEventListener('click', () => {
       STATE.paused = !STATE.paused;
       var label = STATE.paused ? (window.i18n ? window.i18n.t('watchlog.resume') : 'Reprendre') : (window.i18n ? window.i18n.t('watchlog.pause') : 'Pause');
-      document.getElementById('btnPause').innerHTML = '<i class="fas ' + (STATE.paused ? 'fa-play' : 'fa-pause') + '"></i> ' + label;
+      document.getElementById('btnPause').innerHTML = '<span class="icon-inline" aria-hidden="true">' + window.icons[STATE.paused ? 'play' : 'pause'] + '</span> ' + label;
     });
 
     document.getElementById('btnClear').addEventListener('click', () => {
@@ -626,10 +643,20 @@
 
     document.getElementById('btnExport').addEventListener('click', () => {
       if (!STATE.buffer.length) { alert(window.i18n ? window.i18n.t('watchlog.export.empty') : 'Aucun log à exporter.'); return; }
-      var header = 'Horodatage,Niveau,Service,Message\n';
+      var q = function(s){ return '"' + String(s||'').replace(/"/g,'""').replace(/[\r\n]/g,' ') + '"'; };
+      var cols = ['ID','Horodatage','Niveau','Source','Service','Utilisateur','Type événement','Message'];
+      var header = cols.map(q).join(',') + '\n';
       var rows = STATE.buffer.map(function(l) {
-        var q = function(s){ return '"' + String(s||'').replace(/"/g,'""') + '"'; };
-        return [q(l.timestamp), q(l.log_level), q(l.service||''), q(l.message||'')].join(',');
+        return [
+          q(l.id || ''),
+          q(l.timestamp ? new Date(l.timestamp).toLocaleString('fr-FR') : ''),
+          q(l.log_level || ''),
+          q(l.source || l.log_source || ''),
+          q(l.service || ''),
+          q(l.log_user || l.target_user || ''),
+          q(l.event_type || ''),
+          q(l.message || '')
+        ].join(',');
       }).join('\n');
       var blob = new Blob(['\uFEFF' + header + rows], { type: 'text/csv;charset=utf-8' });
       var a = document.createElement('a');
@@ -667,8 +694,9 @@
 
 
     // Close watchlog modal on backdrop click
-    document.getElementById('wl-modal-detail').addEventListener('click', function(e){ if(e.target===this) this.style.display='none'; });
-    document.addEventListener('keydown', function(e){ if(e.key==='Escape') { var m=document.getElementById('wl-modal-detail'); if(m) m.style.display='none'; } });
+    document.getElementById('wl-modal-close').addEventListener('click', function(){ document.getElementById('wl-modal-detail').classList.remove('is-open'); });
+    document.getElementById('wl-modal-detail').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('is-open'); });
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape') { var m=document.getElementById('wl-modal-detail'); if(m) m.classList.remove('is-open'); } });
 
     // FIX BUG-WATCH-03: Click sur entree de log pour voir details complets
     document.getElementById('logEntries').addEventListener('click', function(e) {
@@ -686,6 +714,16 @@
          ['Type evenement',l.event_type],['IP client',l.client_ip],
          ['Utilisateur cible',l.target_user],['Type erreur',l.error_type]
         ].forEach(function(kv){ if(kv[1]!=null&&kv[1]!=='') html+='<p><strong>'+esc(kv[0])+':</strong> '+esc(String(kv[1]))+'</p>'; });
+        
+        // Ajout des informations SIEM de provenance et temporalite
+        const st = l.source_type || 'watch';
+        const conf = SOURCE_CONFIG[st] || SOURCE_CONFIG.watch;
+        const ingestedAt = l.imported_at || l.created_at;
+
+        html += `<p><strong>Provenance:</strong> <span style="font-size:10px; padding: 2px 6px; border: 1px solid ${conf.color}; color: ${conf.color}; background: ${conf.color}11; border-radius: 4px; font-weight: bold;">${conf.label}</span></p>`;
+        html += `<p><strong style="color:#f59e0b">Temps Événement:</strong> ${fmtDT(l.timestamp)}</p>`;
+        html += `<p><strong style="color:#3b82f6">Temps Ingestion:</strong> ${ingestedAt ? fmtDT(ingestedAt) : 'N/A'}</p>`;
+        
         html += '<p><strong>Message:</strong></p><pre style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;white-space:pre-wrap;font-size:11px;max-height:150px;overflow:auto">'+esc(l.message||'')+'</pre>';
         if (l.stack_trace) html += '<p><strong>Stack trace:</strong></p><pre style="background:rgba(80,0,0,0.3);color:#ff9999;padding:10px;border-radius:6px;white-space:pre-wrap;font-size:10px;max-height:150px;overflow:auto">'+esc(l.stack_trace)+'</pre>';
         html += '</div>';
@@ -695,7 +733,7 @@
           var b=modal.querySelector('#wl-modal-body');
           if(t) t.textContent='Log #'+l.id;
           if(b) b.innerHTML=html;
-          modal.style.display='flex';
+          modal.classList.add('is-open');
         }
       }).catch(function(){});
     });
@@ -708,15 +746,119 @@
 
     const LEVEL_SEV = { DEBUG:'#6366f1', INFO:'#0ea5e9', WARNING:'#f59e0b', ERROR:'#ef4444', CRITICAL:'#7c3aed', FATAL:'#991b1b' };
 
+    // ─── SOLUTION VERCEL WATCHLOG: Polling Intelligent Adaptatif ───────────────
+    // Sur Vercel serverless, le file watching est impossible. Cette solution utilise:
+    // 1. Delta polling (après last seen ID) pour minimiser les requêtes
+    // 2. Adaptation dynamique de l'intervalle selon l'activité
+    // 3. Détection automatique de l'environnement Vercel
+    // 4. Fallback sur mode dégradé si erreurs répétées
+    
+    let _lastSeenLogId = 0;
+    let _pollInterval = 15000; // 15s par défaut
+    let _pollTimer = null;
+    let _consecutiveErrors = 0;
+    let _isVercelEnv = false;
+    let _lastActivityTime = Date.now();
+
+    // Détection environnement Vercel
+    function detectEnvironment() {
+      _isVercelEnv = window.location.hostname.includes('.vercel.app') || 
+                     window.location.hostname === 'localhost' && window.location.port === '3000';
+      console.info('[WatchLog] Environment detected:', _isVercelEnv ? 'Vercel serverless' : 'Standard');
+      
+      // Adapter l'intervalle selon l'environnement
+      if (_isVercelEnv) {
+        _pollInterval = 10000; // 10s sur Vercel (plus réactif)
+      } else {
+        _pollInterval = 5000; // 5s en standard (SSE disponible)
+      }
+    }
+
     function loadRecentLogs() {
-      const twentyFourHoursAgo = new Date(Date.now() - TWENTY_FOUR_HOURS_MS).toISOString().slice(0,19);
-      return api.get('/api/logs?limit=100&sort=id&order=desc&date_from=' + encodeURIComponent(twentyFourHoursAgo)).then(function(resp) {
+      // Initial load: get 100 most recent logs ordered by id DESC
+      return api.get('/api/logs?limit=100&sort=id&order=desc').then(function(resp) {
         const rows = resp && resp.data ? resp.data : (Array.isArray(resp) ? resp : []);
         replaceBufferWithLogs(rows);
+        if (rows.length) {
+          _lastSeenLogId = Math.max(...rows.map(r => r.id || 0));
+        }
+        _consecutiveErrors = 0; // Reset error counter on success
       }).catch(function(err) {
-          if (window.toast) window.toast.warning('Impossible de charger les logs récents');
+          _consecutiveErrors++;
+          if (window.toast && _consecutiveErrors > 3) {
+            window.toast.warning('Impossible de charger les logs récents');
+          }
           console.warn('[WatchLog] Failed to load recent logs:', err && (err.error || err.message || err));
       });
+    }
+
+    function pollNewLogs() {
+      // Poll for logs newer than last seen ID (delta polling)
+      if (STATE.paused) return;
+      
+      const url = _lastSeenLogId
+        ? '/api/logs?limit=50&sort=id&order=asc&after_id=' + _lastSeenLogId
+        : '/api/logs?limit=50&sort=id&order=desc';
+        
+      api.get(url).then(function(resp) {
+        const rows = resp && resp.data ? resp.data : (Array.isArray(resp) ? resp : []);
+        
+        if (!rows.length) {
+          // Pas de nouveaux logs: augmenter l'intervalle progressivement
+          _pollInterval = Math.min(_pollInterval * 1.2, 60000); // Max 60s
+        } else {
+          // Nouveaux logs: réduire l'intervalle pour plus de réactivité
+          addLogEntries(rows);
+          const maxId = Math.max(...rows.map(r => r.id || 0));
+          if (maxId > _lastSeenLogId) {
+            _lastSeenLogId = maxId;
+            _lastActivityTime = Date.now();
+          }
+          _pollInterval = Math.max(_pollInterval * 0.8, 5000); // Min 5s
+        }
+        
+        _consecutiveErrors = 0;
+        scheduleNextPoll();
+      }).catch(function(err) {
+        _consecutiveErrors++;
+        console.warn('[WatchLog] Poll error:', err);
+        
+        // Mode dégradé après 5 erreurs consécutives
+        if (_consecutiveErrors >= 5) {
+          _pollInterval = Math.min(_pollInterval * 2, 120000); // Max 2min
+          if (window.toast) {
+            window.toast.warning('Mode dégradé: polling ralenti');
+          }
+        }
+        
+        scheduleNextPoll();
+      });
+    }
+
+    function scheduleNextPoll() {
+      if (_pollTimer) clearTimeout(_pollTimer);
+      _pollTimer = setTimeout(pollNewLogs, _pollInterval);
+    }
+
+    function startPolling() {
+      detectEnvironment();
+      loadRecentLogs().then(function() {
+        scheduleNextPoll();
+      });
+      
+      // Afficher le statut de connexion
+      var indicator = document.querySelector('.status-indicator');
+      if (indicator) {
+        indicator.style.background = _isVercelEnv ? '#f59e0b' : '#10b981';
+        indicator.title = _isVercelEnv ? 'Mode polling (Vercel)' : 'Mode SSE (Standard)';
+      }
+    }
+
+    function stopPolling() {
+      if (_pollTimer) {
+        clearTimeout(_pollTimer);
+        _pollTimer = null;
+      }
     }
 
     function loadHourlyTrends() {
@@ -762,23 +904,53 @@
       }).catch(function() {});
     }
 
-    // Refresh trends every 30s
-    setInterval(loadHourlyTrends, 30000);
-    setInterval(loadRecentAlerts, 15000);
+    // Refresh trends every 30s (adaptatif selon activité)
+    let _trendsTimer = null;
+    let _alertsTimer = null;
+    
+    function scheduleTrendsRefresh() {
+      if (_trendsTimer) clearTimeout(_trendsTimer);
+      const interval = _isVercelEnv ? 30000 : 15000; // 30s Vercel, 15s standard
+      _trendsTimer = setTimeout(function() {
+        loadHourlyTrends();
+        scheduleTrendsRefresh();
+      }, interval);
+    }
+    
+    function scheduleAlertsRefresh() {
+      if (_alertsTimer) clearTimeout(_alertsTimer);
+      const interval = _isVercelEnv ? 20000 : 10000; // 20s Vercel, 10s standard
+      _alertsTimer = setTimeout(function() {
+        loadRecentAlerts();
+        scheduleAlertsRefresh();
+      }, interval);
+    }
 
     window.addEventListener('load', () => {
-      initSSE();        // flux de logs en direct via /api/alerts/stream
-      initStatsSSE();   // stats + anomalies via /api/logs/watch/stream
-      loadRecentLogs();
+      mountIcons();
+      initSSE(); // SSE désactivé sur Vercel, fallback auto
+      initStatsSSE(); // stats + anomalies via /api/logs/watch/stream (polling sur Vercel)
+      
+      // Démarrer le polling intelligent
+      startPolling();
+      
+      // Démarrer les refreshs adaptatifs
+      scheduleTrendsRefresh();
+      scheduleAlertsRefresh();
+      
       loadHourlyTrends();
       loadRecentAlerts();
       updateUI();
     });
 
     window.addEventListener('beforeunload', () => {
+      stopPolling();
+      if (_trendsTimer) clearTimeout(_trendsTimer);
+      if (_alertsTimer) clearTimeout(_alertsTimer);
       if (eventSource) eventSource.close();
       if (statsSource) statsSource.close();
     });
   </script>
+  <script src="/js/mobile-nav.js" defer></script>
 </body>
 </html>

@@ -75,6 +75,15 @@ export async function runRetention(userId = null) {
     );
     results.read_alerts = alerts.affectedRows;
 
+    // FIX #15: Purger les alertes non lues anciennes (90 jours max)
+    const oldCutoff = new Date();
+    oldCutoff.setDate(oldCutoff.getDate() - 90);
+    const [oldAlerts] = await conn.execute(
+      `DELETE FROM alerts WHERE created_at < ?${scopeSql}`,
+      [oldCutoff.toISOString().slice(0, 19).replace('T', ' '), ...scopeParams]
+    );
+    results.old_alerts = oldAlerts.affectedRows;
+
     await conn.commit();
     return results;
   } catch (e) {

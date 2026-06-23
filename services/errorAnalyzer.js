@@ -11,6 +11,11 @@ import pool from '../config/database.js';
  */
 export async function analyzeErrorGroup(fingerprint, userId) {
   try {
+    if (!userId) {
+      logger.error({ event: 'security_violation', reason: 'Missing userId in analyzeErrorGroup' }, '[ERROR ANALYZER]');
+      return null;
+    }
+
     // Get group statistics
     const [groups] = await pool.execute(
       `SELECT fingerprint, COUNT(*) as occurrence_count, 
@@ -26,27 +31,29 @@ export async function analyzeErrorGroup(fingerprint, userId) {
       return null;
     }
     
+    // AMÉLIORATION : Parallélisation des requêtes pour réduire la latence
+    const [affectedRows, sampleRows] = await Promise.all([
+      pool.execute(
+        `SELECT DISTINCT module, target_user, error_type, event_type
+         FROM logs 
+         WHERE fingerprint = ? AND user_id = ?`,
+        [fingerprint, userId]
+      ),
+      pool.execute(
+        `SELECT message, stack_trace, timestamp FROM logs 
+         WHERE fingerprint = ? AND user_id = ?
+         ORDER BY timestamp DESC LIMIT 3`,
+        [fingerprint, userId]
+      )
+    ]);
+
     const group = groups[0];
-    
-    // Get affected modules and users
-    const [affected] = await pool.execute(
-      `SELECT DISTINCT module, target_user, error_type, event_type
-       FROM logs 
-       WHERE fingerprint = ? AND user_id = ?`,
-      [fingerprint, userId]
-    );
-    
+    const affected = affectedRows[0];
+    const samples = sampleRows[0];
+
     const modules = [...new Set(affected.map(a => a.module).filter(Boolean))];
     const users = [...new Set(affected.map(a => a.target_user).filter(Boolean))];
     const errorType = affected[0]?.error_type || null;
-    
-    // Get sample logs
-    const [samples] = await pool.execute(
-      `SELECT message, stack_trace, timestamp FROM logs 
-       WHERE fingerprint = ? AND user_id = ?
-       ORDER BY timestamp DESC LIMIT 3`,
-      [fingerprint, userId]
-    );
     
     const suggestion = suggestFix(errorType, samples[0]?.message, samples[0]?.stack_trace);
     
@@ -73,6 +80,11 @@ export async function analyzeErrorGroup(fingerprint, userId) {
  */
 export async function detectRecurringPatterns(userId, windowHours = 24) {
   try {
+    if (!userId) {
+      logger.error({ event: 'security_violation', reason: 'Missing userId in detectRecurringPatterns' }, '[PATTERN DETECTION]');
+      return [];
+    }
+
     const windowStart = new Date(Date.now() - windowHours * 3600000);
     
     // Get most frequent fingerprints in the window
@@ -80,22 +92,37 @@ export async function detectRecurringPatterns(userId, windowHours = 24) {
       `SELECT fingerprint, COUNT(*) as count, MAX(log_level) as max_level, 
               MAX(timestamp) as last_seen
        FROM logs 
-       WHERE user_id = ? AND timestamp >= ? AND log_level IN ('ERROR', 'CRITICAL', 'FATAL')
+       WHERE user_id = ? AND timestamp >= ? 
+       AND log_level IN ('ERROR', 'CRITICAL', 'FATAL')
        GROUP BY fingerprint
        ORDER BY count DESC
        LIMIT 10`,
-      [userId, windowStart.toISOString().slice(0, 19).replace('T', ' ')]
+      [userId, windowStart]
     );
     
+    if (patterns.length === 0) return [];
+
+    // FIX: Optimized to fetch details for all fingerprints in one query
+    const fingerprints = patterns.map(p => p.fingerprint);
+    const [allDetails] = await pool.execute(
+      `SELECT fingerprint, module, error_type 
+       FROM logs 
+       WHERE user_id = ? AND fingerprint IN (${fingerprints.map(() => '?').join(',')})
+       GROUP BY fingerprint, module, error_type`,
+      [userId, ...fingerprints]
+    );
+
+    // Group details by fingerprint
     const enriched = [];
     for (const pattern of patterns) {
-      const analysis = await analyzeErrorGroup(pattern.fingerprint, userId);
-      if (analysis) {
-        enriched.push({
-          ...pattern,
-          ...analysis
-        });
-      }
+      const details = allDetails.filter(d => d.fingerprint === pattern.fingerprint);
+      
+      enriched.push({
+        ...pattern,
+        affected_modules: [...new Set(details.map(d => d.module).filter(Boolean))],
+        error_type: details[0]?.error_type,
+        suggestion: suggestFix(details[0]?.error_type, null, null)
+      });
     }
     
     return enriched;
@@ -110,7 +137,7 @@ export async function detectRecurringPatterns(userId, windowHours = 24) {
  */
 export function suggestFix(errorType, message, stackTrace) {
   const msg = String(message || '').toLowerCase();
-  const stack = String(stackTrace || '').toLowerCase();
+  const _stack = String(stackTrace || '').toLowerCase();
   const err = String(errorType || '').toUpperCase();
   
   // AMÉLIORATION 6: Comprehensive error handling suggestions
@@ -231,6 +258,12 @@ export function suggestFix(errorType, message, stackTrace) {
     return 'Deadlock détecté en base de données. Revisitez l\'ordre des transactions et les verrous.';
   }
   
+  if (msg.includes('missing_user') || msg.includes('missing_module')) {
+    return 'Le parseur n\'a pas pu extraire les métadonnées. Vérifiez le format source ou la configuration du parser_format.';
+  }
+  if (msg.includes('connection limit exceeded')) {
+    return 'La base de données a atteint sa limite de connexions. Augmentez DB_CONNECTION_LIMIT ou optimisez l\'utilisation des connexions.';
+  }
   if (msg.includes('duplicate entry') || msg.includes('unique constraint')) {
     return 'Violation de contrainte UNIQUE en base de données. Vérifiez les doublons et les valeurs uniques.';
   }

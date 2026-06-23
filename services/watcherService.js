@@ -9,8 +9,10 @@ import { normalizeLevel } from '../config/database.js';
 import pool from '../config/database.js';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { alertEngineBus } from './alertEngine.js'; // FIX #5: Import du bus event-driven
 import { alertWorker } from '../workers/alertWorker.js';
+import { enrichLogMetadata } from '../lib/processing/logMetadata.js';
 
 let watcher = null;
 const fileOffsets = new Map(); // FIX #4: Suivi des offsets par fichier
@@ -30,22 +32,36 @@ async function enqueueFileProcessing(filePath, fn) {
 }
 
 function getDirs() {
+  const IS_VERCEL = !!(process.env.VERCEL || process.env.VERCEL_ENV || process.env.NOW_REGION);
   const dirs = (process.env.WATCH_DIRS || './logs').split(',').map(d => d.trim()).filter(Boolean);
-  for (const d of dirs) {
-    if (!fs.existsSync(d)) {
-      fs.mkdirSync(d, { recursive: true });
+  
+  // Only attempt directory creation on non-Vercel environments
+  if (!IS_VERCEL) {
+    for (const d of dirs) {
+      if (!fs.existsSync(d)) {
+        fs.mkdirSync(d, { recursive: true });
+      }
     }
   }
+  
   return dirs;
 }
 
 async function parseDirOwners() {
-  const mapping = process.env.WATCH_DIR_USER_MAP || './logs:1';
+  const mapping = process.env.WATCH_DIR_USER_MAP;
   const owners = {};
   const userIds = new Set();
   
+  if (!mapping || mapping.trim() === '') {
+    logger.info({ event: 'watcher_no_mapping' }, '[WATCHER] No directory-to-user mapping defined.');
+    return owners;
+  }
+
   for (const entry of mapping.split(',')) {
-    const [dir, userId] = entry.trim().split(':');
+    const trimmed = entry.trim();
+    if (!trimmed) continue;
+
+    const [dir, userId] = trimmed.split(':');
     if (!dir || !userId) {
       throw new Error(`Invalid WATCH_DIR_USER_MAP entry: ${entry}`);
     }
@@ -68,7 +84,7 @@ async function parseDirOwners() {
     const validIds = new Set(users.map(u => u.id));
     for (const userId of userIds) {
       if (!validIds.has(userId)) {
-        throw new Error(`User ID ${userId} in WATCH_DIR_USER_MAP does not exist in database`);
+        logger.warn({ event: 'invalid_watcher_user', userId }, `User ID ${userId} in WATCH_DIR_USER_MAP does not exist in database. Logs for this directory will be orphaned.`);
       }
     }
   }
@@ -77,6 +93,10 @@ async function parseDirOwners() {
 }
 
 let dirOwners = null;
+
+function watchPathHash(filePath) {
+  return crypto.createHash('sha256').update(String(filePath)).digest('hex');
+}
 
 function findOwnerForPath(filePath) {
   const resolvedPath = path.resolve(filePath);
@@ -99,7 +119,7 @@ function findOwnerForPath(filePath) {
 // W-02: Load persisted offsets from database on startup
 async function loadPersistedOffsets() {
   try {
-    const [rows] = await pool.execute('SELECT path, offset FROM watch_offsets');
+    const [rows] = await pool.execute('SELECT path, `offset` FROM watch_offsets');
     for (const row of rows) {
       fileOffsets.set(row.path, row.offset);
     }
@@ -113,8 +133,8 @@ async function loadPersistedOffsets() {
 async function persistOffset(filePath, offset) {
   try {
     await pool.execute(
-      'INSERT INTO watch_offsets (path, offset, updated_at) VALUES (?, ?, NOW()) ON DUPLICATE KEY UPDATE offset = ?, updated_at = NOW()',
-      [filePath, offset, offset]
+      'INSERT INTO watch_offsets (path_hash, path, `offset`, updated_at) VALUES (?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE path = VALUES(path), `offset` = VALUES(`offset`), updated_at = NOW()',
+      [watchPathHash(filePath), filePath, offset]
     );
   } catch (e) {
     logger.warn({ event: 'could_not_persist_offset', filePath, error: e.message }, '[WATCHER]');
@@ -167,20 +187,39 @@ async function processLogFile(filePath, incremental = true) {
     // FIX #9: Enrichissement hors DB pour optimiser les connexions
     const userId = findOwnerForPath(filePath) || null;
     
-    const entries = parsed.map(entry => ({
-      ...entry,
-      normalized_message: normalizeMessage(entry.message),
-      event_type: classifyLog(entry.message, entry.service || 'watched', entry.service),
-      fingerprint: generateFingerprint(entry.service, classifyLog(entry.message, entry.service || 'watched', entry.service), normalizeMessage(entry.message), userId),
-      log_level: normalizeLevel(entry.log_level || 'INFO'),
-      log_format: detected,
-      user_id: userId,
-      source_server: entry.source_server || entry.host || entry.source || path.basename(filePath),
-      created_time: entry.created_time || String(entry.timestamp || '').slice(11, 19) || null,
-      timezone: entry.timezone || null,
-      timestamp_inferred: entry.timestamp_inferred ? 1 : 0,
-      classification_confidence: entry.classification_confidence || null
-    }));
+    if (!userId) {
+      logger.warn({ event: 'orphan_log_detected', filePath }, '[WATCHER] File has no assigned owner in WATCH_DIR_USER_MAP. Logs will be imported with user_id = NULL.');
+    }
+
+    const entries = parsed.map(entry => {
+      const enriched = enrichLogMetadata({
+        ...entry,
+        normalized_message: normalizeMessage(entry.message),
+        event_type: classifyLog(entry.message, entry.service || 'watched', entry.service),
+        log_level: normalizeLevel(entry.log_level || 'INFO'),
+        log_format: detected,
+        parser_format: detected,
+        user_id: userId,
+        source_server: entry.source_server || entry.host || entry.hostname || entry.source || path.basename(filePath),
+        created_time: entry.created_time || String(entry.timestamp || '').slice(11, 19) || null,
+        timezone: entry.timezone || null,
+        timestamp_inferred: entry.timestamp_inferred ? 1 : 0,
+        classification_confidence: entry.classification_confidence || null,
+        source_type: 'watch',
+        imported_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+      }, {
+        format: detected,
+        source_type: 'watch',
+        filePath,
+      });
+      enriched.fingerprint = generateFingerprint(
+        enriched.service,
+        enriched.event_type,
+        enriched.normalized_message,
+        userId
+      );
+      return enriched;
+    });
 
     // FIX #9: UNE seule connexion pour tout le fichier
     const conn = await pool.getConnection();
@@ -191,6 +230,7 @@ async function processLogFile(filePath, incremental = true) {
       const logValues = entries.map(entry => [
         entry.raw_log,
         entry.timestamp,
+        entry.event_timestamp || entry.timestamp,
         entry.created_time,
         entry.timezone,
         entry.log_level,
@@ -202,21 +242,28 @@ async function processLogFile(filePath, incremental = true) {
         entry.event_type,
         entry.fingerprint,
         entry.user_id,
+        entry.source_type,
         entry.ip_address || entry.client_ip || null,
         entry.module || null,
         entry.error_type || null,
         entry.stack_trace || null,
         entry.target_user || null,
-        entry.log_format || null,
+        entry.log_format || entry.parser_format || null,
         entry.timestamp_inferred,
-        entry.classification_confidence
+        entry.classification_confidence,
+        entry.imported_at || null,
+        entry.source_system || null,
+        entry.main_service || null,
+        entry.hostname || null,
+        entry.log_origin || null,
       ]);
 
-      const [logResult] = await conn.query(
+      await conn.query(
         `INSERT IGNORE INTO logs (
-          raw_log, timestamp, created_time, timezone, log_level, source, source_server, service, message, normalized_message,
-          event_type, fingerprint, user_id, client_ip, module, error_type, stack_trace,
-          target_user, parser_format, timestamp_inferred, classification_confidence
+          raw_log, timestamp, event_timestamp, created_time, timezone, log_level, source, source_server, service, message, normalized_message,
+          event_type, fingerprint, user_id, source_type, client_ip, module, error_type, stack_trace,
+          target_user, parser_format, timestamp_inferred, classification_confidence,
+          imported_at, source_system, main_service, hostname, log_origin
         ) VALUES ?`,
         [logValues]
       );
@@ -309,7 +356,7 @@ async function processLogFile(filePath, incremental = true) {
     logger.info({ event: 'lines_processed', count: parsed.length, filePath }, '[WATCHER]');
     
     // FIX #5: Déclencher évaluation alertes + flux temps réel (Watch Log)
-    if (userId && parsed.length > 0) {
+    if (parsed.length > 0) {
       alertWorker.broadcastLogBatch(entries, { userId });
       alertEngineBus.emit('logs.inserted', { userId, count: parsed.length });
     }
@@ -334,7 +381,7 @@ export async function startWatcher() {
   logger.info({ event: 'watching_directories', directories: dirs.join(', ') }, '[WATCHER]');
 
   watcher = chokidar.watch(dirs, {
-    ignored: /(^|[\/\\])\../,
+    ignored: /(^|[/\\])\../,
     persistent: true,
     usePolling: false, // ✅ Observation #6 CORRIGÉ : mode natif pour latence ms vs 30s
     awaitWriteFinish: {
@@ -372,11 +419,33 @@ export function stopWatcher() {
 }
 
 export function getWatcherStatus() {
+  const IS_VERCEL = !!(process.env.VERCEL || process.env.VERCEL_ENV || process.env.NOW_REGION);
+  
+  // On Vercel, file watching is not supported
+  if (IS_VERCEL) {
+    return {
+      running: false,
+      watched_files: 0,
+      dirs: [],
+      unmapped_dirs: 0,
+      inflight: 0,
+      platform: 'vercel',
+      message: 'File watching not supported on serverless platforms'
+    };
+  }
+  
+  const dirs = getDirs();
+  const mappedDirs = Object.keys(dirOwners || {});
+  const resolvedDirs = dirs.map(d => path.resolve(d));
+  const unmappedCount = resolvedDirs.filter(d => !mappedDirs.includes(d)).length;
+
   return {
     running: watcher !== null,
     watched_files: fileOffsets.size,
-    dirs: getDirs(),
-    inflight: inflightProcesses.size
+    dirs,
+    unmapped_dirs: unmappedCount,
+    inflight: inflightProcesses.size,
+    platform: 'standard'
   };
 }
 
@@ -461,15 +530,15 @@ export async function getWatchStats(userId) {
         MIN(timestamp) as first_log,
         MAX(timestamp) as last_log
        FROM logs 
-       WHERE user_id = ? AND timestamp >= DATE_SUB(NOW(), INTERVAL 1 HOUR)`,
+       WHERE user_id = ? AND imported_at >= DATE_SUB(NOW(), INTERVAL 1 HOUR)`,
       [userId]
     );
 
     // Top errors
     const [topErrors] = await conn.query(
-      `SELECT fingerprint, event_type, COUNT(*) as count, MAX(timestamp) as last_seen
+      `SELECT fingerprint, ANY_VALUE(event_type) as event_type, COUNT(*) as count, MAX(timestamp) as last_seen
        FROM logs
-       WHERE user_id = ? AND log_level IN ('ERROR', 'CRITICAL', 'FATAL') AND timestamp >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
+       WHERE user_id = ? AND log_level IN ('ERROR', 'CRITICAL', 'FATAL') AND imported_at >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
        GROUP BY fingerprint
        ORDER BY count DESC
        LIMIT 5`,
@@ -478,25 +547,66 @@ export async function getWatchStats(userId) {
 
     // Throughput per minute (last 60 minutes)
     const [throughput] = await conn.query(
-      `SELECT DATE_FORMAT(timestamp, '%Y-%m-%d %H:%i') as minute, COUNT(*) as count
+      `SELECT DATE_FORMAT(imported_at, '%Y-%m-%d %H:%i') as minute, COUNT(*) as count
        FROM logs
-       WHERE user_id = ? AND timestamp >= DATE_SUB(NOW(), INTERVAL 60 MINUTE)
-       GROUP BY DATE_FORMAT(timestamp, '%Y-%m-%d %H:%i')
+       WHERE user_id = ? AND imported_at >= DATE_SUB(NOW(), INTERVAL 60 MINUTE)
+       GROUP BY minute
        ORDER BY minute DESC`,
+      [userId]
+    );
+
+    const [topServices] = await conn.query(
+      `SELECT COALESCE(main_service, service, 'unknown') as service,
+              COUNT(*) as count,
+              COUNT(CASE WHEN log_level IN ('ERROR', 'CRITICAL', 'FATAL') THEN 1 END) as error_count
+       FROM logs
+       WHERE user_id = ? AND imported_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+       GROUP BY COALESCE(main_service, service, 'unknown')
+       ORDER BY count DESC
+       LIMIT 10`,
+      [userId]
+    );
+
+    const [hourlyErrors] = await conn.query(
+      `SELECT HOUR(COALESCE(event_timestamp, timestamp, imported_at)) as hour, COUNT(*) as count
+       FROM logs
+       WHERE user_id = ?
+         AND COALESCE(event_timestamp, timestamp, imported_at) >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+         AND log_level IN ('ERROR', 'CRITICAL', 'FATAL')
+       GROUP BY hour`,
       [userId]
     );
 
     // logs_per_min (pour compat front WatchLog)
     const total = stats[0]?.total_logs ?? 0;
     const logs_per_min = total > 0 ? total / 60 : 0;
+    const statRow = stats[0] || {};
+    const level_counts = {
+      DEBUG: Number(statRow.debug_count || 0),
+      INFO: Number(statRow.info_count || 0),
+      WARNING: Number(statRow.warning_count || 0),
+      ERROR: Number(statRow.error_count || 0),
+      CRITICAL: Number(statRow.critical_count || 0),
+      FATAL: Number(statRow.fatal_count || 0)
+    };
+    const hourly_errors = new Array(24).fill(0);
+    for (const row of hourlyErrors || []) {
+      const hour = Number(row.hour);
+      if (hour >= 0 && hour < 24) hourly_errors[hour] = Number(row.count || 0);
+    }
 
     return {
       stats: {
-        ...(stats[0] || {}),
-        logs_per_min
+        ...statRow,
+        logs_per_min,
+        level_counts,
+        hourly_errors
       },
       top_errors: topErrors || [],
-      throughput: throughput || []
+      top_services: topServices || [],
+      throughput: throughput || [],
+      level_counts,
+      hourly_errors
     };
   } catch (error) {
     logger.error({ event: 'stats_error', error: error.message }, '[WATCHER]');
