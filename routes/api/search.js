@@ -174,39 +174,30 @@ router.get('/', async (req, res) => {
       params
     );
 
-    // Calculer les facets (dimensions disponibles pour raffiner la recherche)
-    const [facets] = await pool.query(
-      `SELECT 
-        log_level, COUNT(*) as count
-       FROM logs 
-       WHERE ${whereClause}
-       GROUP BY log_level
-       UNION ALL
-       SELECT CONCAT('error_type:', COALESCE(error_type, 'unknown')), COUNT(*) 
-       FROM logs 
-       WHERE ${whereClause} AND error_type IS NOT NULL
-       GROUP BY error_type
-       UNION ALL
-       SELECT CONCAT('service:', service), COUNT(*) 
-       FROM logs 
-       WHERE ${whereClause} AND service IS NOT NULL
-       GROUP BY service
-       UNION ALL
-       SELECT CONCAT('module:', module), COUNT(*) 
-       FROM logs 
-       WHERE ${whereClause} AND module IS NOT NULL
-       GROUP BY module
-       LIMIT 50`,
+    // Calculer les facets — chaque SELECT du UNION reçoit ses propres params
+    // BUGFIX: UNION ALL avec pool.query() nécessite de répéter params pour chaque bloc WHERE
+    const [facetsLevel] = await pool.query(
+      `SELECT log_level AS facet_key, COUNT(*) AS cnt FROM logs WHERE ${whereClause} GROUP BY log_level`,
       params
     );
-
-    // Format facets
+    const [facetsEType] = await pool.query(
+      `SELECT CONCAT('error_type:', error_type) AS facet_key, COUNT(*) AS cnt
+       FROM logs WHERE ${whereClause} AND error_type IS NOT NULL GROUP BY error_type LIMIT 20`,
+      params
+    );
+    const [facetsSvc] = await pool.query(
+      `SELECT CONCAT('service:', service) AS facet_key, COUNT(*) AS cnt
+       FROM logs WHERE ${whereClause} AND service IS NOT NULL GROUP BY service LIMIT 20`,
+      params
+    );
+    const [facetsMod] = await pool.query(
+      `SELECT CONCAT('module:', module) AS facet_key, COUNT(*) AS cnt
+       FROM logs WHERE ${whereClause} AND module IS NOT NULL GROUP BY module LIMIT 20`,
+      params
+    );
     const facetMap = {};
-    for (const row of facets) {
-      const key = row.log_level || row['CONCAT(\'error_type:\', COALESCE(error_type, \'unknown\'))'] ||
-                  row['CONCAT(\'service:\', service)'] || row['CONCAT(\'module:\', module)'];
-      const count = row.count || row['COUNT(*)'];
-      if (key) facetMap[key] = count;
+    for (const row of [...facetsLevel, ...facetsEType, ...facetsSvc, ...facetsMod]) {
+      if (row.facet_key) facetMap[row.facet_key] = Number(row.cnt);
     }
 
     // [FIX-20] Masquer stack_trace pour les utilisateurs non-admins — peut contenir des chemins système internes
