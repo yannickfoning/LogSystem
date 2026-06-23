@@ -95,7 +95,13 @@ router.get('/summary', async (req, res) => {
     }
     
     const scope = userScope(req);
-    const [total] = await pool.execute('SELECT COUNT(*) as cnt FROM logs WHERE 1=1' + scope.sql, [...scope.params]);
+    
+    try {
+      var [total] = await pool.execute('SELECT COUNT(*) as cnt FROM logs WHERE 1=1' + scope.sql, [...scope.params]);
+    } catch (dbErr) {
+      logger.error({ event: 'dashboard_summary_db_error', step: 'total_count', error: dbErr.message }, '[DASHBOARD]');
+      return res.status(503).json({ error: 'Base de données indisponible', code: 'DB_UNAVAILABLE' });
+    }
     
     /**
      * todayCount: logs whose event occurred today (event_timestamp).
@@ -103,42 +109,42 @@ router.get('/summary', async (req, res) => {
      */
     const todayStr = new Date().toISOString().slice(0, 10);
     const eventTsCol = 'COALESCE(event_timestamp, timestamp)';
-    const [today] = await pool.execute(
-      `SELECT COUNT(*) as cnt FROM logs WHERE ${eventTsCol} >= ?` + scope.sql,
+    var [today] = await pool.execute(
+      `SELECT COUNT(*) as cnt FROM logs WHERE ${eventTsCol} IS NOT NULL AND ${eventTsCol} >= ?` + scope.sql,
       [todayStr + ' 00:00:00', ...scope.params]
     );
-    const [importedToday] = await pool.execute(
+    var [importedToday] = await pool.execute(
       'SELECT COUNT(*) as cnt FROM logs WHERE imported_at >= ?' + scope.sql,
       [todayStr + ' 00:00:00', ...scope.params]
     );
-    const [errorCount] = await pool.execute(
-      `SELECT COUNT(*) as cnt FROM logs WHERE ${eventTsCol} >= ? AND log_level IN ('ERROR', 'CRITICAL', 'FATAL')` + scope.sql,
+    var [errorCount] = await pool.execute(
+      `SELECT COUNT(*) as cnt FROM logs WHERE ${eventTsCol} IS NOT NULL AND ${eventTsCol} >= ? AND log_level IN ('ERROR', 'CRITICAL', 'FATAL')` + scope.sql,
       [todayStr + ' 00:00:00', ...scope.params]
     );
     const alertFilter = alertScope(req);
-    const [unreadAlerts] = await pool.execute(
+    var [unreadAlerts] = await pool.execute(
       "SELECT COUNT(*) as cnt FROM alerts WHERE status = 'new'" + alertFilter.sql,
       alertFilter.params
     );
-    const [fatalCount] = await pool.execute(
+    var [fatalCount] = await pool.execute(
       "SELECT COUNT(*) as cnt FROM logs WHERE log_level = 'FATAL'" + scope.sql,
       scope.params
     );
-    const [criticalCount] = await pool.execute(
+    var [criticalCount] = await pool.execute(
       "SELECT COUNT(*) as cnt FROM logs WHERE log_level = 'CRITICAL'" + scope.sql,
       scope.params
     );
-    const [sourceCount] = await pool.execute(
+    var [sourceCount] = await pool.execute(
       'SELECT COUNT(DISTINCT COALESCE(source_system, source)) as cnt FROM logs WHERE COALESCE(source_system, source) IS NOT NULL AND COALESCE(source_system, source) != \'\'' + scope.sql,
       scope.params
     );
-    const [levelRows] = await pool.execute(
-      'SELECT log_level, COUNT(*) as cnt FROM logs WHERE 1=1' + scope.sql + ' GROUP BY log_level',
+    var [levelRows] = await pool.execute(
+      'SELECT log_level, COUNT(*) as cnt FROM logs WHERE log_level IS NOT NULL' + scope.sql + ' GROUP BY log_level',
       scope.params
     );
 
     // Compter les utilisateurs
-    const [userCount] = await pool.execute('SELECT COUNT(*) as cnt FROM users WHERE is_active = 1');
+    var [userCount] = await pool.execute('SELECT COUNT(*) as cnt FROM users WHERE is_active = 1');
 
     // Niveaux par clé
     const levels = {};
@@ -181,8 +187,14 @@ router.get('/summary', async (req, res) => {
     await setCachedDashboard(userId, data);
     res.json(data);
   } catch (e) {
-    logger.error({ event: 'dashboard_stats_error', error: e.message }, '[DASHBOARD]');
-    if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur' });
+    logger.error({ event: 'dashboard_summary_error', error: e.message, stack: e.stack }, '[DASHBOARD]');
+    if (!res.headersSent) {
+      const statusCode = e.code === 'PROTOCOL_CONNECTION_LOST' ? 503 : 500;
+      res.status(statusCode).json({ 
+        error: statusCode === 503 ? 'Base de données indisponible' : 'Erreur serveur',
+        code: statusCode === 503 ? 'DB_CONNECTION_LOST' : 'SUMMARY_ERROR'
+      });
+    }
   }
 });
 
@@ -273,7 +285,9 @@ router.get('/trends', async (req, res) => {
               log_level,
               COUNT(*) AS cnt
        FROM logs
-       WHERE ${timestampCol} >= ? AND ${timestampCol} <= ?${scope.sql}
+       WHERE ${timestampCol} IS NOT NULL 
+         AND ${timestampCol} >= ? 
+         AND ${timestampCol} <= ?${scope.sql}
        GROUP BY day, log_level
        ORDER BY day ASC`,
       [startDate.toISOString().slice(0, 19).replace('T', ' '), 
@@ -302,7 +316,9 @@ router.get('/trends', async (req, res) => {
               COUNT(DISTINCT service) as unique_services,
               COUNT(DISTINCT source) as unique_sources
        FROM logs
-       WHERE ${timestampCol} >= ? AND ${timestampCol} <= ?${scope.sql}`,
+       WHERE ${timestampCol} IS NOT NULL 
+         AND ${timestampCol} >= ? 
+         AND ${timestampCol} <= ?${scope.sql}`,
       [startDate.toISOString().slice(0, 19).replace('T', ' '), 
        endDate.toISOString().slice(0, 19).replace('T', ' '), 
        ...scope.params]
@@ -311,7 +327,10 @@ router.get('/trends', async (req, res) => {
     const [topFingerprints] = await pool.execute(
       `SELECT fingerprint, COUNT(*) as cnt
        FROM logs
-       WHERE ${timestampCol} >= ? AND ${timestampCol} <= ? AND fingerprint IS NOT NULL${scope.sql}
+       WHERE ${timestampCol} IS NOT NULL 
+         AND ${timestampCol} >= ? 
+         AND ${timestampCol} <= ? 
+         AND fingerprint IS NOT NULL${scope.sql}
        GROUP BY fingerprint
        ORDER BY cnt DESC
        LIMIT 5`,
@@ -341,15 +360,21 @@ router.get('/trends', async (req, res) => {
       daily_total: dailyTotal,
       days: dates.length,
       stats: {
-        total_logs: stats[0].total_logs,
-        unique_services: stats[0].unique_services,
-        unique_sources: stats[0].unique_sources
+        total_logs: stats[0]?.total_logs || 0,
+        unique_services: stats[0]?.unique_services || 0,
+        unique_sources: stats[0]?.unique_sources || 0
       },
       top_fingerprints: topFingerprints
     });
   } catch (e) {
-    logger.error({ event: 'dashboard_trends_error', error: e.message }, '[DASHBOARD]');
-    if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur' });
+    logger.error({ event: 'dashboard_trends_error', error: e.message, stack: e.stack }, '[DASHBOARD]');
+    if (!res.headersSent) {
+      const statusCode = e.code === 'PROTOCOL_CONNECTION_LOST' ? 503 : 500;
+      res.status(statusCode).json({ 
+        error: statusCode === 503 ? 'Base de données indisponible' : 'Erreur serveur',
+        code: statusCode === 503 ? 'DB_CONNECTION_LOST' : 'TRENDS_ERROR'
+      });
+    }
   }
 });
 
@@ -368,18 +393,55 @@ router.get('/top-errors', async (req, res) => {
        LIMIT ?`,
       [...scope.params, limit]
     );
-    // Format attendu par le frontend Next.js
+    
+    // Fetch sample logs for each error group to show details
+    const errorGroupIds = rows.map(r => r.id);
+    const sampleLogsMap = new Map();
+    
+    if (errorGroupIds.length > 0) {
+      const placeholders = errorGroupIds.map(() => '?').join(',');
+      const [sampleLogs] = await pool.query(
+        `SELECT id, fingerprint, timestamp, log_level, message, source, service, error_type, 
+                stack_trace, target_user, log_user, module, event_type
+         FROM logs 
+         WHERE fingerprint IN (
+           SELECT fingerprint FROM error_groups WHERE id IN (${placeholders})
+         )${scope.sql}
+         ORDER BY timestamp DESC 
+         LIMIT 50`,
+        [...errorGroupIds, ...scope.params]
+      );
+      
+      // Group sample logs by fingerprint
+      for (const log of sampleLogs) {
+        if (!sampleLogsMap.has(log.fingerprint)) {
+          sampleLogsMap.set(log.fingerprint, []);
+        }
+        sampleLogsMap.get(log.fingerprint).push(log);
+      }
+    }
+    
+    // Format attendu par le frontend Next.js with sample logs
     const normalized = rows.map(r => ({
       ...r,
       count: r.occurrence_count,
       message: r.title || r.event_type,
       source: r.source_server,
       lastSeen: r.last_seen,
+      sampleLogs: sampleLogsMap.get(r.fingerprint) || []
     }));
     res.json({ topErrors: normalized, errors: normalized });
   } catch (e) {
-    logger.error({ event: 'dashboard_top_errors_error', error: e.message }, '[DASHBOARD]');
-    if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur' });
+    logger.error({ event: 'dashboard_top_errors_error', error: e.message, stack: e.stack }, '[DASHBOARD]');
+    if (!res.headersSent) {
+      const statusCode = e.code === 'PROTOCOL_CONNECTION_LOST' ? 503 : 500;
+      res.status(statusCode).json({ 
+        error: statusCode === 503 ? 'Base de données indisponible' : 'Erreur serveur',
+        code: statusCode === 503 ? 'DB_CONNECTION_LOST' : 'TOP_ERRORS_ERROR',
+        topErrors: [],
+        errors: []
+      });
+    }
   }
 });
 
@@ -435,7 +497,7 @@ router.get('/per-level', async (req, res) => {
   try {
     const scope = userScope(req);
     const [rows] = await pool.execute(
-      'SELECT log_level, COUNT(*) as cnt FROM logs WHERE 1=1' + scope.sql + ' GROUP BY log_level',
+      'SELECT log_level, COUNT(*) as cnt FROM logs WHERE log_level IS NOT NULL' + scope.sql + ' GROUP BY log_level',
       scope.params
     );
     const result = {};
