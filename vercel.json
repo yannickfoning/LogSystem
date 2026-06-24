@@ -21,11 +21,29 @@
     }
   ],
   "routes": [
-    { "src": "/api/(.*)", "dest": "server.js" },
-    { "src": "/health", "dest": "server.js" },
-    { "src": "/alerts/stream", "dest": "server.js" },
-    { "src": "/(.*\\.(html|css|js|svg|png|jpg|ico|webp|woff2?|ttf|eot|txt))", "dest": "/public/$1" },
-    { "src": "/", "dest": "server.js" },
-    { "src": "/(.*)", "dest": "server.js" }
+    {
+      "src": "/api/(.*)",
+      "dest": "server.js"
+    },
+    {
+      "src": "/health",
+      "dest": "server.js"
+    },
+    {
+      "src": "/alerts/stream",
+      "dest": "server.js"
+    },
+    {
+      "src": "/(.*\\.(html|css|js|svg|png|jpg|ico|webp|woff2?|ttf|eot|txt))",
+      "dest": "/public/$1"
+    },
+    {
+      "src": "/",
+      "dest": "server.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "server.js"
+    }
   ]
 }
