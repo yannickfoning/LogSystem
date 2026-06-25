@@ -1,45 +1,17 @@
 {
   "version": 2,
-  "builds": [
+  "rewrites": [
     {
-      "src": "server.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": [
-          "config/**",
-          "lib/**",
-          "lib/assets/**",
-          "middleware/**",
-          "routes/**",
-          "services/**",
-          "workers/**",
-          "public/**",
-          "db/**",
-          "migrations/**"
-        ]
-      }
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/server.js"
+      "source": "/api/(.*)",
+      "destination": "/server.js"
     },
     {
-      "src": "/health",
-      "dest": "/server.js"
+      "source": "/health",
+      "destination": "/server.js"
     },
     {
-      "src": "/(.*\\.(css|js|svg|png|jpg|ico|txt|webp|woff2?))",
-      "dest": "/public/$1"
-    },
-    {
-      "src": "/(.*\\.html)",
-      "dest": "/public/$1"
-    },
-    {
-      "src": "/",
-      "dest": "/server.js"
+      "source": "/(.*)",
+      "destination": "/server.js"
     }
   ],
   "functions": {
@@ -47,8 +19,5 @@
       "maxDuration": 60,
       "memory": 1024
     }
-  },
-  "env": {
-    "NODE_ENV": "production"
   }
 }
