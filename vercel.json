@@ -17,7 +17,19 @@
   "functions": {
     "server.js": {
       "maxDuration": 60,
-      "memory": 1024
+      "memory": 1024,
+      "includedFiles": [
+        "config/**",
+        "lib/**",
+        "lib/assets/**",
+        "middleware/**",
+        "routes/**",
+        "services/**",
+        "workers/**",
+        "public/**",
+        "db/**",
+        "migrations/**"
+      ]
     }
   }
 }

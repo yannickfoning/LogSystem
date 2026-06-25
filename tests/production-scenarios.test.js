@@ -156,10 +156,10 @@ describe('Archive extraction', () => {
 });
 
 describe('Vercel config', () => {
-  it('has maxDuration and includeFiles for WASM', () => {
+  it('has maxDuration and includedFiles for WASM', () => {
     const cfg = JSON.parse(readFileSync(path.join(root, 'vercel.json'), 'utf8'));
     expect(cfg.functions?.['server.js']?.maxDuration).toBe(60);
-    const includes = cfg.builds?.[0]?.config?.includeFiles || [];
+    const includes = cfg.functions?.['server.js']?.includedFiles || [];
     expect(includes.some(f => f.includes('unrar.wasm') || f.includes('lib/assets'))).toBe(true);
   });
 });
