@@ -5,38 +5,50 @@
       "src": "server.js",
       "use": "@vercel/node",
       "config": {
-        "maxLambdaSize": "50mb"
+        "includeFiles": [
+          "config/**",
+          "lib/**",
+          "lib/assets/**",
+          "middleware/**",
+          "routes/**",
+          "services/**",
+          "workers/**",
+          "public/**",
+          "db/**",
+          "migrations/**"
+        ]
       }
-    },
-    {
-      "src": "public/**",
-      "use": "@vercel/static"
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "server.js"
+      "dest": "/server.js"
     },
     {
       "src": "/health",
-      "dest": "server.js"
+      "dest": "/server.js"
     },
     {
-      "src": "/alerts/stream",
-      "dest": "server.js"
+      "src": "/(.*\\.(css|js|svg|png|jpg|ico|txt|webp|woff2?))",
+      "dest": "/public/$1"
     },
     {
-      "src": "/(.*\\.(html|css|js|svg|png|jpg|ico|webp|woff2?|ttf|eot|txt))",
+      "src": "/(.*\\.html)",
       "dest": "/public/$1"
     },
     {
       "src": "/",
-      "dest": "server.js"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "server.js"
+      "dest": "/server.js"
     }
-  ]
+  ],
+  "functions": {
+    "server.js": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  },
+  "env": {
+    "NODE_ENV": "production"
+  }
 }

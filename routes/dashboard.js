@@ -108,7 +108,7 @@ router.get('/summary', async (req, res) => {
      * importedTodayCount: logs imported today (ingestion activity).
      */
     const todayStr = new Date().toISOString().slice(0, 10);
-    const eventTsCol = 'COALESCE(event_timestamp, timestamp)';
+    const eventTsCol = 'COALESCE(event_timestamp, timestamp, imported_at)';
     var [today] = await pool.execute(
       `SELECT COUNT(*) as cnt FROM logs WHERE ${eventTsCol} IS NOT NULL AND ${eventTsCol} >= ?` + scope.sql,
       [todayStr + ' 00:00:00', ...scope.params]
@@ -183,6 +183,9 @@ router.get('/summary', async (req, res) => {
       data[key] = Number(levels[level] || 0);
     });
 
+    // Add levels_breakdown for frontend compatibility
+    data.levels_breakdown = levels;
+
     // P-09: Cache the result with 30s TTL
     await setCachedDashboard(userId, data);
     res.json(data);
@@ -240,20 +243,22 @@ router.get('/trends', async (req, res) => {
       const seriesData = {};
       levels.forEach(l => { seriesData[l] = new Array(24).fill(0); });
       const scope = userScope(req);
+      const timestampCol = 'COALESCE(event_timestamp, timestamp, imported_at)';
+      const startSql = startDate.toISOString().slice(0, 19).replace('T', ' ');
+      const endSql = endDate.toISOString().slice(0, 19).replace('T', ' ');
       const [rows] = await pool.execute(
-        `SELECT HOUR(timestamp) AS hour, log_level, COUNT(*) AS cnt
+        `SELECT HOUR(${timestampCol}) AS hour, UPPER(log_level) AS log_level, COUNT(*) AS cnt
          FROM logs
-         WHERE timestamp >= ? AND timestamp <= ?${scope.sql}
-         GROUP BY HOUR(timestamp), log_level
+         WHERE ${timestampCol} IS NOT NULL AND ${timestampCol} >= ? AND ${timestampCol} <= ?${scope.sql}
+         GROUP BY HOUR(${timestampCol}), UPPER(log_level)
          ORDER BY hour ASC`,
-        [startDate.toISOString().slice(0, 19).replace('T', ' '),
-         endDate.toISOString().slice(0, 19).replace('T', ' '),
-         ...scope.params]
+        [startSql, endSql, ...scope.params]
       );
       for (const row of rows) {
         const idx = Number(row.hour);
-        if (idx >= 0 && idx < 24 && seriesData[row.log_level] !== undefined) {
-          seriesData[row.log_level][idx] = Number(row.cnt);
+        const levelKey = String(row.log_level || '').toUpperCase();
+        if (idx >= 0 && idx < 24 && seriesData[levelKey] !== undefined) {
+          seriesData[levelKey][idx] = Number(row.cnt);
         }
       }
       const dailyTotal = labels.map((_, i) => levels.reduce((sum, level) => sum + seriesData[level][i], 0));
@@ -298,8 +303,9 @@ router.get('/trends', async (req, res) => {
     // Remplissage : chaque ligne de résultat → bon index dans le tableau
     for (const row of rows) {
       const idx = dates.indexOf(row.day);
-      if (idx >= 0 && seriesData[row.log_level] !== undefined) {
-        seriesData[row.log_level][idx] = Number(row.cnt);
+      const levelKey = String(row.log_level || '').toUpperCase();
+      if (idx >= 0 && seriesData[levelKey] !== undefined) {
+        seriesData[levelKey][idx] = Number(row.cnt);
       }
     }
 
@@ -422,14 +428,18 @@ router.get('/top-errors', async (req, res) => {
     }
     
     // Format attendu par le frontend Next.js with sample logs
-    const normalized = rows.map(r => ({
-      ...r,
-      count: r.occurrence_count,
-      message: r.title || r.event_type,
-      source: r.source_server,
-      lastSeen: r.last_seen,
-      sampleLogs: sampleLogsMap.get(r.fingerprint) || []
-    }));
+    const normalized = rows.map(r => {
+      const samples = sampleLogsMap.get(r.fingerprint) || [];
+      return {
+        ...r,
+        count: r.occurrence_count,
+        message: r.title || r.event_type,
+        source: r.source_server,
+        lastSeen: r.last_seen,
+        sample_log_id: r.sample_log_id || (samples[0] && samples[0].id) || null,
+        sampleLogs: samples
+      };
+    });
     res.json({ topErrors: normalized, errors: normalized });
   } catch (e) {
     logger.error({ event: 'dashboard_top_errors_error', error: e.message, stack: e.stack }, '[DASHBOARD]');
@@ -501,7 +511,16 @@ router.get('/per-level', async (req, res) => {
       scope.params
     );
     const result = {};
-    for (const r of rows) result[r.log_level] = r.cnt;
+    const allLevels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL', 'FATAL'];
+    // Initialize all levels to 0
+    allLevels.forEach(l => result[l] = 0);
+    // Fill in actual counts
+    for (const r of rows) {
+      const level = String(r.log_level || '').toUpperCase();
+      if (result.hasOwnProperty(level)) {
+        result[level] = r.cnt;
+      }
+    }
     res.json(result);
   } catch (e) {
     logger.error({ event: 'dashboard_level_distribution_error', error: e.message }, '[DASHBOARD]');

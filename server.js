@@ -27,12 +27,13 @@ import { scopeGuard } from './middleware/scopeGuard.js';
 import { csrfMiddleware, csrfValidation } from './middleware/csrf.js';
 import authRoutes from './routes/auth.js';
 import logsRoutes from './routes/logs.js';
+import logsIngestionRoutes from './routes/logs-ingestion.js';
 import importRoutes, { multerErrorHandler } from './routes/import.js';
 import dashboardRoutes from './routes/dashboard.js';
 import adminRoutes from './routes/admin.js';
 import searchApiRoutes from './routes/api/search.js';
 import { alertWorker } from './workers/alertWorker.js';
-import { startAlertEngine, setAlertWorker, stopAlertEngine } from './services/alertEngine.js';
+import { startAlertEngine, setAlertWorker, stopAlertEngine, initServerlessAlertEngine } from './services/alertEngine.js';
 import { startRetentionScheduler } from './services/retentionService.js';
 import { startWatcher, stopWatcher, getWatcherStatus } from './services/watcherService.js';
 import { startCacheService } from './services/cacheService.js';
@@ -75,6 +76,14 @@ if (!sessionSecret || sessionSecret.length < 32) {
 }
 const effectiveSecret = sessionSecret || ('logsystem-insecure-' + crypto.randomBytes(16).toString('hex'));
 
+// ── CSRF secret ──────────────────────────────────────────────────────────────
+const csrfSecret = process.env.CSRF_SECRET || (IS_VERCEL ? crypto.randomBytes(32).toString('hex') : null);
+if (!csrfSecret) {
+  logger.fatal('[FATAL] CSRF_SECRET must be set in production. Exiting.');
+  process.exit(1);
+}
+process.env.CSRF_SECRET = csrfSecret;
+
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use((req, res, next) => {
   res.locals.cspNonce = crypto.randomBytes(16).toString('base64');
@@ -110,6 +119,49 @@ app.use((req, res, next) => {
     },
     crossOriginEmbedderPolicy: false
   })(req, res, next);
+});
+
+// ── Background init (non-blocking) ───────────────────────────────────────────
+// Runs AFTER the app is exported so Vercel can handle requests immediately.
+// Serverless cold starts skip background work and avoid opening DB connections.
+let _initialized = false;
+let _initPromise = null;
+
+async function initApp() {
+  await testConnection();
+  await runMigrations();
+  if (!IS_VERCEL) {
+    // Services stateful : uniquement en dehors de Vercel
+    const cacheStarted = await startCacheService();
+    setAlertWorker(alertWorker);
+    await startAlertEngine().catch(e => logger.error({ event: 'alertEngineStartFailed', message: e.message }));
+    startRetentionScheduler().catch(e => logger.error({ event: 'retentionStartFailed', message: e.message }));
+    await startWatcher().catch(e => logger.error({ event: 'watcherStartFailed', message: e.message }));
+    const logsDir = (process.env.WATCH_DIRS || './logs').split(',')[0].trim();
+    if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+  }
+}
+
+// Initialisation lazy — une seule fois par cold start
+async function ensureInit() {
+  if (_initialized) return;
+  if (_initPromise) return _initPromise;
+  _initPromise = initApp().then(() => { _initialized = true; }).catch(err => {
+    _initPromise = null;
+    throw err;
+  });
+  return _initPromise;
+}
+
+// Middleware d'initialisation lazy (pour Vercel)
+app.use(async (req, res, next) => {
+  try {
+    await ensureInit();
+    next();
+  } catch (err) {
+    logger.error({ event: 'init_failed', message: err.message });
+    res.status(503).json({ error: 'Service en cours d\'initialisation, réessayez dans quelques secondes' });
+  }
 });
 
 // Adjust rate limits for Vercel serverless environment
@@ -181,6 +233,7 @@ app.use(csrfValidation);
 app.use('/api/auth/login', loginLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/logs', requireAuth, scopeGuard, logsRoutes);
+app.use('/api/logs', requireAuth, scopeGuard, logsIngestionRoutes);
 app.use('/api/import', requireAuth, scopeGuard, importRoutes);
 app.use('/api/dashboard', requireAuth, scopeGuard, dashboardRoutes);
 app.use('/api/admin', requireAuth, scopeGuard, adminRoutes);
@@ -237,17 +290,15 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Erreur interne du serveur' });
 });
 
-// ── Background init (non-blocking) ───────────────────────────────────────────
-// Runs AFTER the app is exported so Vercel can handle requests immediately.
-// Serverless cold starts skip background work and avoid opening DB connections.
-let _initialized = false;
-
 async function initialize() {
   if (_initialized) return;
   _initialized = true;
 
   if (IS_VERCEL) {
     logger.info({ event: 'background_jobs_disabled', platform: 'vercel' }, '[STARTUP]');
+    await initServerlessAlertEngine().catch(e =>
+      logger.error({ event: 'serverless_alert_init_failed', error: e.message }, '[STARTUP]')
+    );
     return;
   }
 

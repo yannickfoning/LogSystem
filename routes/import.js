@@ -12,7 +12,7 @@ import { normalizeMessage } from "../lib/processing/normalize.js";
 import { classifyLog } from "../lib/processing/classify.js";
 import { generateFingerprint } from "../lib/processing/fingerprint.js";
 import { normalizeLevel } from "../config/database.js";
-import { alertEngineBus } from "../services/alertEngine.js";
+import { alertEngineBus, evalAllForUser } from "../services/alertEngine.js";
 import { alertWorker } from "../workers/alertWorker.js";
 import { recordAudit } from "../middleware/audit.js";
 import { validateBody, importUploadSchema } from "../middleware/validation.js";
@@ -387,13 +387,22 @@ async function processImport(
     );
 
     if (userId && processed > 0) {
-      setImmediate(() => {
-        alertEngineBus.emit("logs.inserted", {
-          userId,
-          count: processed,
-          summary: importSummary,
+      const isVercel = !!(process.env.VERCEL || process.env.VERCEL_ENV);
+      if (isVercel) {
+        try {
+          await evalAllForUser(userId);
+        } catch (e) {
+          logger.error({ event: 'vercel_alert_eval_failed', userId, error: e.message }, '[IMPORT]');
+        }
+      } else {
+        setImmediate(() => {
+          alertEngineBus.emit("logs.inserted", {
+            userId,
+            count: processed,
+            summary: importSummary,
+          });
         });
-      });
+      }
       await invalidateDashboard(userId);
     }
   } catch (e) {
@@ -557,10 +566,14 @@ router.post(
       if (!req.file)
         return res.status(400).json({ error: "Aucun fichier fourni" });
 
-      const maxSize = parseInt(process.env.UPLOAD_MAX_SIZE || process.env.IMPORT_MAX_SIZE || "524288000", 10);
+      const isVercelEnv = !!(process.env.VERCEL || process.env.VERCEL_ENV);
+      const defaultMax = isVercelEnv ? 4500000 : 524288000;
+      const maxSize = parseInt(process.env.UPLOAD_MAX_SIZE || process.env.IMPORT_MAX_SIZE || String(defaultMax), 10);
       if (req.file.size > maxSize) {
         return res.status(413).json({
-          error: "Fichier trop gros (500 MB max). Divisez en plusieurs archives.",
+          error: isVercelEnv
+            ? 'Fichier trop gros (4.5 MB max sur Vercel). Compressez ou extrayez localement.'
+            : 'Fichier trop gros (500 MB max). Divisez en plusieurs archives.',
         });
       }
 

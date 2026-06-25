@@ -45,43 +45,36 @@ export function setAlertWorker(worker) {
 }
 
 async function ensureDefaultAlertRules() {
-  const [rows] = await pool.execute('SELECT COUNT(*) as cnt FROM alert_rules WHERE is_active = 1');
-  if (rows[0].cnt > 0) return;
+  try {
+    const [globalRows] = await pool.execute('SELECT COUNT(*) as cnt FROM alert_rules WHERE is_active = 1 AND is_global = 1');
+    if (globalRows[0].cnt > 0) return;
+  } catch (e) {
+    if (!/Unknown column.*is_global/i.test(e.message)) throw e;
+    const [rows] = await pool.execute('SELECT COUNT(*) as cnt FROM alert_rules WHERE is_active = 1');
+    if (rows[0].cnt > 0) return;
+  }
 
   logger.info({ event: 'seeding_default_alert_rules' }, '[ALERT]');
-  // FIX BUG-ALERT-03: Seed rules per-admin only (never NULL created_by)
-  const [adminUsers] = await pool.execute("SELECT id FROM users WHERE role = 'admin' AND is_active = 1 LIMIT 5");
-  if (!adminUsers.length) { logger.info({ event: 'no_admin_users_seeding_skipped' }, '[ALERT]'); return; }
-  // Comprehensive default alert rules (all 12 requirements)
+  const [adminUsers] = await pool.execute("SELECT id FROM users WHERE role = 'admin' AND is_active = 1 LIMIT 1");
+  const creatorId = adminUsers[0]?.id || null;
+  if (!creatorId) { logger.info({ event: 'no_admin_users_seeding_skipped' }, '[ALERT]'); return; }
+
   const allRules = [
-    // 5. Alertes critiques — ERROR: 10 erreurs / 5 minutes
     ['Erreurs fréquentes (ERROR)', 'Détecte 10+ erreurs ERROR sur 5 minutes', 'level', 'ERROR', 10, 5, 'high', 10],
-    // 5. FATAL: 1 occurrence
     ['FATAL détecté', 'Alerte immédiate sur toute occurrence FATAL', 'level', 'FATAL', 1, 60, 'critical', 5],
-    // 5. CRITICAL: 1 occurrence
     ['CRITICAL détecté', 'Alerte immédiate sur toute occurrence CRITICAL', 'level', 'CRITICAL', 1, 60, 'critical', 10],
-    // 5. SECURITY: 3 occurrences
     ['Événements sécurité', 'Détecte 3+ événements de sécurité', 'level', 'SECURITY', 3, 30, 'critical', 15],
-    // 5. AUTH failures: 5 in window
-    ['Échecs authentification', 'Détecte 5+ échecs de connexion sur 10 minutes', 'count', 'auth_fail', 5, 10, 'high', 15],
-    // 5. DISK: 80% (monitored via log patterns)
-    ['Disque critique (80%)', 'Alerte si logs signalent utilisation disque > 80%', 'fingerprint', 'disk_space_critical', 1, 60, 'critical', 30],
-    // Volume anormal
     ['Volume anormal', 'Alerte sur un volume de logs inhabituel (5000/h)', 'count', 'all', 5000, 60, 'medium', 60],
-    // Silence ingestion
-    ['Silence ingestion', 'Aucune activité détectée depuis 30 minutes', 'silence', 'all', 0, 30, 'medium', 60],
-    // ERROR trend (broader window)
     ['Erreurs critiques (1h)', 'Plus de 50 erreurs ERROR/CRITICAL sur 1 heure', 'level', 'ERROR', 50, 60, 'high', 30],
-    // WARNING surge
     ['Pic de WARNINGs', 'Détecte 100+ warnings sur 15 minutes', 'level', 'WARNING', 100, 15, 'medium', 20],
   ];
 
   for (const [name, description, conditionType, conditionValue, thresholdValue, timeWindow, severity, cooldown] of allRules) {
     await pool.execute(
-      `INSERT INTO alert_rules (name, description, condition_type, condition_value, threshold_value, time_window_minutes, severity, cooldown_minutes, is_active, created_by)
-       SELECT ?, ?, ?, ?, ?, ?, ?, ?, 1, ?
-       WHERE NOT EXISTS (SELECT 1 FROM alert_rules WHERE name = ? AND created_by = ?)`,
-      [name, description, conditionType, conditionValue, thresholdValue, timeWindow, severity, cooldown, adminUsers[0].id, name, adminUsers[0].id]
+      `INSERT INTO alert_rules (name, description, condition_type, condition_value, threshold_value, time_window_minutes, severity, cooldown_minutes, is_active, is_global, applicable_to_users, created_by)
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, NULL, ?
+       WHERE NOT EXISTS (SELECT 1 FROM alert_rules WHERE name = ? AND is_global = 1)`,
+      [name, description, conditionType, conditionValue, thresholdValue, timeWindow, severity, cooldown, creatorId, name]
     );
   }
 }
@@ -91,15 +84,14 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
   const windowStart = new Date(now.getTime() - rule.time_window_minutes * 60000);
   const conditionType = rule.condition_type;
   const conditionValue = rule.condition_value;
+  const tsCol = 'COALESCE(event_timestamp, timestamp, imported_at)';
   
-  // S-03 & S-07: Retirer OR user_id IS NULL pour éviter les fuites entre tenants
-  // Les règles globales (created_by IS NULL) ne doivent plus exister ou doivent être dupliquées par user
   const userFilter = targetUserId ? 'AND user_id = ?' : 'AND 1=0';
   const scopedParams = targetUserId ? [targetUserId] : [];
 
   if (conditionType === 'level') {
     const [rows] = await pool.execute(
-      'SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ? AND log_level = ? ' + userFilter,
+      `SELECT COUNT(*) as cnt FROM logs WHERE ${tsCol} >= ? AND log_level = ? ` + userFilter,
       [windowStart, normalizeLevel(conditionValue), ...scopedParams]
     );
     if (rows[0].cnt >= (rule.threshold_value ?? 1)) {
@@ -107,16 +99,15 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
     }
   } else if (conditionType === 'count') {
     const [rows] = await pool.execute(
-      'SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ? ' + userFilter,
+      `SELECT COUNT(*) as cnt FROM logs WHERE ${tsCol} >= ? ` + userFilter,
       [windowStart, ...scopedParams]
     );
     if (rows[0].cnt >= (rule.threshold_value ?? 100)) {
       return createAlert(rule, `Total log count ${rows[0].cnt} exceeds threshold ${rule.threshold_value} in last ${rule.time_window_minutes}min`, targetUserId);
     }
   } else if (conditionType === 'silence') {
-    // FIX #3: Support pour 'Aucune activité'
     const [rows] = await pool.execute(
-      'SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ? ' + userFilter,
+      `SELECT COUNT(*) as cnt FROM logs WHERE ${tsCol} >= ? ` + userFilter,
       [windowStart, ...scopedParams]
     );
     if (rows[0].cnt === 0) {
@@ -124,7 +115,7 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
     }
   } else if (conditionType === 'fingerprint') {
     const [rows] = await pool.execute(
-      'SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ? AND fingerprint = ? ' + userFilter,
+      `SELECT COUNT(*) as cnt FROM logs WHERE ${tsCol} >= ? AND fingerprint = ? ` + userFilter,
       [windowStart, conditionValue, ...scopedParams]
     );
     if (rows[0].cnt >= (rule.threshold_value ?? 1)) {
@@ -133,7 +124,7 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
   } else if (conditionType === 'threshold') {
     const level = normalizeLevel(conditionValue);
     const [rows] = await pool.execute(
-      'SELECT log_level, COUNT(*) as cnt FROM logs WHERE timestamp >= ? ' + userFilter + ' GROUP BY log_level',
+      `SELECT log_level, COUNT(*) as cnt FROM logs WHERE ${tsCol} >= ? ` + userFilter + ' GROUP BY log_level',
       [windowStart, ...scopedParams]
     );
     let triggered = false;
@@ -156,7 +147,7 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
       `SELECT
          COUNT(*) as total,
          SUM(CASE WHEN log_level IN ('ERROR','CRITICAL','FATAL') THEN 1 ELSE 0 END) as errors
-       FROM logs WHERE timestamp >= ? ${userFilter}`,
+       FROM logs WHERE ${tsCol} >= ? ${userFilter}`,
       [windowStart, ...scopedParams]
     );
     const total = rows[0]?.total || 0;
@@ -170,7 +161,7 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
     const levels = String(conditionValue || '').split('|').map(normalizeLevel);
     const placeholders = levels.map(() => '?').join(',');
     const [rows] = await pool.execute(
-      `SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ? AND log_level IN (${placeholders}) ${userFilter}`,
+      `SELECT COUNT(*) as cnt FROM logs WHERE ${tsCol} >= ? AND log_level IN (${placeholders}) ${userFilter}`,
       [windowStart, ...levels, ...scopedParams]
     );
     if (rows[0].cnt >= (rule.threshold_value ?? 1)) {
@@ -189,7 +180,7 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
     const minutes = parseInt(conditionValue, 10) || rule.time_window_minutes || 60;
     const since = new Date(now.getTime() - minutes * 60000);
     const [rows] = await pool.execute(
-      'SELECT COUNT(*) as cnt FROM logs WHERE timestamp >= ? ' + userFilter,
+      `SELECT COUNT(*) as cnt FROM logs WHERE ${tsCol} >= ? ` + userFilter,
       [since, ...scopedParams]
     );
     if (rows[0].cnt === 0) {
@@ -242,10 +233,11 @@ async function createAlert(rule, message, targetUserId = null) {
     const params = userId ? [windowStart, userId] : [windowStart];
     
     // Get count and sample logs
+    const tsCol = 'COALESCE(event_timestamp, timestamp, imported_at)';
     const [samples] = await pool.execute(
       `SELECT id, timestamp, message, module, target_user FROM logs 
-       WHERE timestamp >= ? ${userFilter} 
-       ORDER BY timestamp DESC LIMIT 3`,
+       WHERE ${tsCol} >= ? ${userFilter} 
+       ORDER BY ${tsCol} DESC LIMIT 3`,
       params
     );
     
@@ -260,7 +252,7 @@ async function createAlert(rule, message, targetUserId = null) {
     // Get affected modules and users
     const [stats] = await pool.execute(
       `SELECT DISTINCT module, target_user FROM logs 
-       WHERE timestamp >= ? ${userFilter}
+       WHERE ${tsCol} >= ? ${userFilter}
        AND module IS NOT NULL`,
       params
     );
@@ -401,7 +393,7 @@ async function evalSmartAlertsForUser(userId) {
   return created;
 }
 
-async function evalAllForUser(userId = null) {
+export async function evalAllForUser(userId = null) {
   if (!userId) return 0;
   const [rules] = await pool.execute(
     `SELECT * FROM alert_rules WHERE is_active = 1 AND (
@@ -470,6 +462,21 @@ async function evalAll() {
     logger.error({ event: 'eval_all_error', error: e.message }, '[ALERT]');
     return 0;
   }
+}
+
+let _serverlessAlertInit = false;
+
+/** Lightweight alert engine for Vercel — no background timers, evaluates on import/API */
+export async function initServerlessAlertEngine() {
+  if (_serverlessAlertInit) return;
+  _serverlessAlertInit = true;
+  await ensureDefaultAlertRules().catch(e =>
+    logger.error({ event: 'alert_rules_seed_failed', error: e.message }, '[ALERT]')
+  );
+  alertEngineBus.on('logs.inserted', ({ userId }) => {
+    if (userId) debounceEvalUser(userId);
+  });
+  logger.info({ event: 'alert_engine_serverless_ready' }, '[ALERT]');
 }
 
 export async function startAlertEngine() {

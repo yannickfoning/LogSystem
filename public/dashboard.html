@@ -303,7 +303,12 @@
       .replace(/>/g,'&gt;')
       .replace(/"/g,'&quot;')
       .replace(/'/g,'&#39;'); }
-    function fmtDate(d){ return d.toISOString().slice(0,10); }
+    function fmtDate(d){
+      var y = d.getFullYear();
+      var m = String(d.getMonth() + 1).padStart(2, '0');
+      var day = String(d.getDate()).padStart(2, '0');
+      return y + '-' + m + '-' + day;
+    }
 
     // ── Détection rôle admin ──
     function isAdmin() {
@@ -409,6 +414,23 @@
     }
 
     function renderTrendsTo(canvas, payload, big) {
+      if (!canvas) return null;
+      
+      // [FIX] Vérifier si on a des données
+      var hasData = false;
+      var levels = ['INFO','WARNING','ERROR','CRITICAL','FATAL','DEBUG'];
+      levels.forEach(function(l) {
+        var serie = payload.series ? payload.series[l] : payload[l.toLowerCase()];
+        if (serie && serie.some(function(v) { return v > 0; })) hasData = true;
+      });
+      
+      if (!hasData) {
+        // Afficher un message "Aucune donnée" au lieu d'un graphique vide
+        var wrapper = canvas.parentElement;
+        wrapper.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text2);font-size:13px;">' + t('dashboard.no_data') + '</div>';
+        return null;
+      }
+      
       var labels = payload.labels || [];
       var datasets = buildDatasets(payload.series || {});
       return new Chart(canvas, {
@@ -503,29 +525,55 @@
 
     // ── Répartition par niveau ──
     function loadLevelChart() {
-      api.get('/api/dashboard/summary').then(function(d){
+      api.get('/api/dashboard/per-level').then(function(d){  // [FIX] Appeler /per-level au lieu de /summary
         if (!d) return;
         var ctx = document.getElementById('level-chart'); if (!ctx) return;
-        var levels=['INFO','WARNING','ERROR','CRITICAL','FATAL','DEBUG'];
-        var colors=['#4f8ef7','#f59e0b','#ef4444','#8b5cf6','#fc5c65','#6b7280'];
-        var data = levels.map(function(l){ return d['level_'+l.toLowerCase()] || 0; });
-        if (levelChart) { levelChart.destroy(); levelChart=null; }
+        var levels = ['INFO','WARNING','ERROR','CRITICAL','FATAL','DEBUG'];
+        var colors = ['#4f8ef7','#f59e0b','#ef4444','#8b5cf6','#fc5c65','#6b7280'];
+        
+        // [FIX] Lire depuis /per-level qui retourne { INFO: N, WARNING: N, ... }
+        var data = levels.map(function(l) { return Number(d[l] || d[l.toLowerCase()] || 0); });
+        var total = data.reduce(function(a, b) { return a + b; }, 0);
+        
+        // [FIX] Si aucune donnée, afficher message au lieu de graphique vide
+        if (total === 0) {
+          var parent = ctx.parentElement;
+          parent.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text2);font-size:13px;">' + t('dashboard.no_data') + '</div>';
+          return;
+        }
+        
+        if (levelChart) { levelChart.destroy(); levelChart = null; }
         levelChart = new Chart(ctx, {
           type: 'doughnut',
-          data: { labels: levels, datasets: [{ data:data, backgroundColor:colors, borderWidth:0, hoverOffset:4 }] },
+          data: {
+            labels: levels,
+            datasets: [{
+              data: data,
+              backgroundColor: colors,
+              borderWidth: 0,
+              hoverOffset: 4
+            }]
+          },
           options: {
-            responsive:true, maintainAspectRatio:false, cutout:'70%',
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '70%',
             plugins: {
-              legend:{ display:false },
-              tooltip:{ callbacks:{ label:function(tc){
-                var t=tc.dataset.data.reduce(function(a,b){return a+b;},0);
-                var p=t>0?Math.round(tc.parsed/t*100):0;
-                return ' '+tc.label+': '+tc.parsed+' ('+p+'%)';
-              } } }
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: function(tc) {
+                    var p = total > 0 ? Math.round(tc.parsed / total * 100) : 0;
+                    return ' ' + tc.label + ': ' + tc.parsed + ' (' + p + '%)';
+                  }
+                }
+              }
             }
           }
         });
-      }).catch(function(){});
+      }).catch(function(e){
+        if (window.toast) toast.error((e && e.error) || 'Erreur répartition par niveau');
+      });
     }
 
     // ── KPI ──
@@ -599,8 +647,9 @@
         d = d && (d.topErrors || d.errors || d);
         if (!Array.isArray(d) || !d.length) { list.innerHTML='<p class="cell-empty">' + t('dashboard.no_error_groups') + '</p>'; return; }
         list.innerHTML = d.map(function(g){
-          var sampleId = g.sample_log_id || g.log_id || g.first_log_id || '';
-          var fp = g.fingerprint || '';
+          var samples = g.sampleLogs || [];
+          var sampleId = String(g.sample_log_id || g.log_id || g.first_log_id || (samples[0] && samples[0].id) || '');
+          var fp = String(g.fingerprint || '');
           return '<div class="err-group" data-sample-log-id="'+escAttr(sampleId)+'" data-fingerprint="'+escAttr(fp)+'" title="Details du groupe">'
             + '<div class="err-count">'+(g.occurrence_count||1)+'</div>'
             + '<div class="flex-1 overflow-hidden">'
@@ -711,8 +760,9 @@ function showErrorGroupDetail(fingerprint, fallbackLogId) {
       (fallbackLogId ? '<button type="button" class="btn btn-sm btn-secondary" id="btn-show-sample-log" data-log-id="'+escAttr(String(fallbackLogId))+'">Voir le log exemple</button>' : '') +
       (fingerprint ? ' <a class="btn btn-sm btn-primary" href="/search.html?fingerprint='+encodeURIComponent(fingerprint)+'">Voir dans la recherche</a>' : '');
   }).catch(function(e) {
+    var msg = (e && (e.error || e.message)) || 'Erreur de chargement';
     if (fallbackLogId) { showLogDetail(fallbackLogId); }
-    else { document.getElementById('modal-detail-body').innerHTML = '<p style="color:var(--accent-red);">Erreur: ' + esc(e && e.message || String(e)) + '</p>'; }
+    else { document.getElementById('modal-detail-body').innerHTML = '<p style="color:var(--accent-red);">Erreur: ' + esc(msg) + '</p>'; }
   });
 }
 
@@ -729,7 +779,8 @@ function showLogDetail(logId){
         if (!l) { body.innerHTML = '<p style="color:var(--text2);">Log introuvable</p>'; return; }
         body.innerHTML = '<div class="section-title">Log</div>' + renderKV(l) + '<div id="related-alert"></div><div id="related-watchdogs"></div>';
       }).catch(function(e){
-        document.getElementById('modal-detail-body').innerHTML = '<p style="color:var(--accent-red);">Erreur: '+esc(e&&e.message||e)+'</p>';
+        var msg = (e && (e.error || e.message)) || 'Erreur de chargement';
+        document.getElementById('modal-detail-body').innerHTML = '<p style="color:var(--accent-red);">Erreur: '+esc(msg)+'</p>';
       });
     }
 
@@ -744,7 +795,8 @@ function showLogDetail(logId){
         body.innerHTML = '<div class="section-title">Alerte</div>' + renderKV(alert);
         if (alert.status === 'new') markAlertRead(alertId).then(function(){ loadAlerts(); loadSummary(); });
       }).catch(function(e){
-        document.getElementById('modal-detail-body').innerHTML = '<p style="color:var(--accent-red);">Erreur: '+esc(e&&e.message||e)+'</p>';
+        var msg = (e && (e.error || e.message)) || 'Erreur de chargement';
+        document.getElementById('modal-detail-body').innerHTML = '<p style="color:var(--accent-red);">Erreur: '+esc(msg)+'</p>';
       });
     }
 
@@ -755,17 +807,26 @@ function showLogDetail(logId){
     });
 
     document.getElementById('top-errors-list').addEventListener('click', function(e){
-      var btn = e.target.closest('#btn-show-sample-log');
-      if (btn) {
-        document.querySelectorAll('.modal-backdrop.show').forEach(function(m){ m.classList.remove('show'); });
-        showLogDetail(btn.getAttribute('data-log-id'));
-        return;
-      }
       var g = e.target.closest('.err-group');
       if (!g) return;
       var sample = g.getAttribute('data-sample-log-id');
-      var fp2 = g.getAttribute('data-fingerprint');
-      if (fp2) { showErrorGroupDetail(fp2, sample); } else if (sample) { showLogDetail(sample); }
+      var fp = g.getAttribute('data-fingerprint');
+      
+      // [FIX] Vérifier que fingerprint est une vraie valeur non-vide
+      if (fp && fp.trim().length > 0) {
+        showErrorGroupDetail(fp.trim(), sample && sample.trim() ? sample.trim() : null);
+      } else if (sample && sample.trim().length > 0) {
+        showLogDetail(sample.trim());
+      } else {
+        toast.error(t('dashboard.error_no_detail'));
+      }
+    });
+
+    document.getElementById('modal-detail-body').addEventListener('click', function(e){
+      var btn = e.target.closest('#btn-show-sample-log');
+      if (!btn) return;
+      var logId = btn.getAttribute('data-log-id');
+      if (logId) showLogDetail(logId);
     });
 
     document.getElementById('alerts-list').addEventListener('click', function(e){
@@ -909,7 +970,8 @@ function showLogDetail(logId){
 
     window.addEventListener('resize', function() {
       if (levelChart) levelChart.resize();
-      if (window.trendChart) window.trendChart.resize();
+      if (trendsChart) trendsChart.resize();
+      if (trendsLargeChart) trendsLargeChart.resize();
     });
 
   })();

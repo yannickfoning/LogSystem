@@ -27,6 +27,23 @@ function collectJsFiles(dir, files = []) {
 }
 
 const files = collectJsFiles(PROJECT_ROOT);
+
+// Bundle unrar.wasm for Vercel serverless (RAR extraction)
+const wasmSources = [
+  path.join(PROJECT_ROOT, 'node_modules', 'node-unrar-js', 'dist', 'js', 'unrar.wasm'),
+  path.join(PROJECT_ROOT, 'node_modules', 'node-unrar-js', 'js', 'unrar.wasm'),
+];
+const wasmDestDir = path.join(PROJECT_ROOT, 'lib', 'assets');
+const wasmDest = path.join(wasmDestDir, 'unrar.wasm');
+for (const src of wasmSources) {
+  if (fs.existsSync(src)) {
+    fs.mkdirSync(wasmDestDir, { recursive: true });
+    fs.copyFileSync(src, wasmDest);
+    console.log(`Copied unrar.wasm to ${wasmDest}`);
+    break;
+  }
+}
+
 for (const file of files) {
   const result = spawnSync(process.execPath, ['--check', file], {
     cwd: PROJECT_ROOT,

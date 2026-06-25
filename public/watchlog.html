@@ -223,12 +223,10 @@
       ERROR: '#ef4444', CRITICAL: '#7c3aed', FATAL: '#991b1b'
     };
 
-    let eventSource = null;       // pour les logs en direct → /api/alerts/stream
-    let statsSource = null;       // pour les stats/anomalies → /api/logs/watch/stream
-    let liveRefreshTimer = null;
-    let reconnectDelay = 1000;
-    let statsReconnectDelay = 1000;
-    const MAX_RECONNECT_ATTEMPTS = 50;
+    let pollingTimer = null;
+    let lastLogId = 0;  // Pour ne récupérer que les nouveaux logs
+    let reconnectDelay = 2000;
+    let isPaused = false;
 
     function mountIcons() {
       if (!window.icons) return;
@@ -246,79 +244,71 @@
     const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
     // ─── Mode polling (SSE non compatible Vercel serverless) ──────────────
-    // Les logs se rechargent toutes les 15s via polling REST
-    function initSSE() {
-      // SSE désactivé — trop de reconnexions épuisent le pool MySQL Aiven (25 connexions max)
-      // Mode polling : loadLogs() est appelé toutes les 15s par le setInterval ci-dessous
-      var indicator = document.querySelector('.status-indicator');
-      if (indicator) indicator.style.background = '#f59e0b'; // orange = mode polling
-      console.info('[WatchLog] Mode polling actif (Vercel serverless)');
+    function startPolling() {
+      if (pollingTimer) clearInterval(pollingTimer);
+      
+      // Récupération initiale des derniers logs
+      fetchNewLogs();
+      fetchStats();
+      
+      // Polling des nouveaux logs toutes les 5s
+      pollingTimer = setInterval(() => {
+        if (!isPaused) {
+          fetchNewLogs();
+        }
+      }, 5000);
+      
+      // Polling des stats toutes les 15s
+      setInterval(fetchStats, 15000);
+      
+      document.querySelector('.status-indicator').style.background = '#22c55e';
+      updateConnectionStatus('connected');
     }
 
-    // ─── Stats via polling (SSE non compatible Vercel) ────────────────────
-    function initStatsSSE() {
-      // Polling uniquement — SSE épuise le pool MySQL
-      // Les stats sont rafraîchies par loadWatchStats() appelé toutes les 15s
-      console.info('[WatchLog] Stats mode polling actif');
-      if (false) { // disabled SSE
-        statsSource = null;
-        var sseConnected = false;
-        if (false) {
-          console.warn('[WatchLog] SSE non disponible (Vercel serverless) — mode polling activé');
-          statsSource.close();
-          statsSource = null;
-          // Poll stats every 10 seconds instead
-          if (!window._watchPollInterval) {
-            window._watchPollInterval = setInterval(function() {
-              api.get('/api/logs/watch/stats').then(function(stats) {
-                if (stats) updateStats(stats);
-              }).catch(function(){});
-              // Also reload logs
-              if (typeof loadLogs === 'function') loadLogs();
-            }, 10000);
-          }
+    function fetchNewLogs() {
+      // Appel à l'endpoint de logs existant avec filtre sur l'ID
+      var url = '/api/logs?limit=50&sort=id&order=desc';
+      if (lastLogId > 0) url += '&after_id=' + lastLogId;
+      
+      api.get(url).then(function(d) {
+        var logs = d && d.data ? d.data : (Array.isArray(d) ? d : []);
+        if (logs.length > 0) {
+          // Mettre à jour le dernier ID connu
+          lastLogId = Math.max(lastLogId, ...logs.map(l => l.id || 0));
+          // N'ajouter que les vrais nouveaux logs (id > ancien lastLogId)
+          addLogEntries(logs.reverse());
+          scheduleLiveRefresh();
         }
-      };
-
-      statsSource.addEventListener('connected', function() {
-        statsReconnectDelay = 1000;
+        reconnectDelay = 2000; // Reset backoff
+        document.querySelector('.status-indicator').style.background = '#22c55e';
+      }).catch(function(err) {
+        console.warn('[WatchLog] Polling error:', err);
+        document.querySelector('.status-indicator').style.background = '#f59e0b';
       });
+    }
 
-      function updateStats(stats) {
-        if (stats.logs_last_hour !== undefined) {
-          var el = document.getElementById('stat-logs-min');
-          if (el) el.textContent = stats.logs_last_hour || 0;
-        }
-        if (stats.errors_last_hour !== undefined) {
-          var el2 = document.getElementById('stat-errors');
-          if (el2) el2.textContent = stats.errors_last_hour || 0;
-        }
-        if (stats.services_active !== undefined) {
-          var el3 = document.getElementById('stat-services');
-          if (el3) el3.textContent = stats.services_active || 0;
-        }
+    function fetchStats() {
+      api.get('/api/logs/watch/stats').then(function(d) {
+        if (d && d.stats) updateMetricsFromStats(d.stats);
+      }).catch(function() {});
+      
+      // Récupérer les alertes récentes
+      api.get('/api/dashboard/alerts?limit=10&status=new').then(function(alerts) {
+        if (Array.isArray(alerts)) alerts.forEach(prependAlertItem);
+      }).catch(function() {});
+    }
+
+    function stopPolling() {
+      if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null; }
+      document.querySelector('.status-indicator').style.background = '#ef4444';
+      updateConnectionStatus('disconnected');
+    }
+
+    function updateConnectionStatus(status) {
+      var label = document.getElementById('connectionStatus');
+      if (label) {
+        label.textContent = status === 'connected' ? t('watchlog.connected') : t('watchlog.disconnected');
       }
-
-      statsSource.addEventListener('stats_update', function(e) {
-        try {
-          var data = JSON.parse(e.data);
-          if (data.stats) updateMetricsFromStats(data.stats);
-        } catch (err) { console.warn('[WatchLog] Stats parse error:', err); }
-      });
-
-      statsSource.addEventListener('anomaly_detected', function(e) {
-        try {
-          var anomaly = JSON.parse(e.data);
-          if (anomaly.anomaly_detected) showAnomalyAlert(anomaly);
-          else hideAnomalyAlert();
-        } catch (err) { console.warn('[WatchLog] Anomaly parse error:', err); }
-      });
-
-      statsSource.onerror = function() {
-        if (statsSource) statsSource.close();
-        setTimeout(initStatsSSE, statsReconnectDelay);
-        statsReconnectDelay = Math.min(statsReconnectDelay * 2, 30000);
-      };
     }
 
     // ─── Ajout immédiat d'une alerte dans le panneau "Alertes récentes" ────
@@ -618,9 +608,9 @@
 
     // Event Listeners
     document.getElementById('btnPause').addEventListener('click', () => {
-      STATE.paused = !STATE.paused;
-      var label = STATE.paused ? (window.i18n ? window.i18n.t('watchlog.resume') : 'Reprendre') : (window.i18n ? window.i18n.t('watchlog.pause') : 'Pause');
-      document.getElementById('btnPause').innerHTML = '<span class="icon-inline" aria-hidden="true">' + window.icons[STATE.paused ? 'play' : 'pause'] + '</span> ' + label;
+      isPaused = !isPaused;
+      var label = isPaused ? (window.i18n ? window.i18n.t('watchlog.resume') : 'Reprendre') : (window.i18n ? window.i18n.t('watchlog.pause') : 'Pause');
+      document.getElementById('btnPause').innerHTML = '<span class="icon-inline" aria-hidden="true">' + window.icons[isPaused ? 'play' : 'pause'] + '</span> ' + label;
     });
 
     document.getElementById('btnClear').addEventListener('click', () => {
@@ -631,8 +621,7 @@
     });
 
     document.getElementById('btnDisconnect').addEventListener('click', () => {
-      if (eventSource) eventSource.close();
-      if (statsSource) statsSource.close();
+      stopPolling();
       window.location.href = '/';
     });
 
@@ -928,10 +917,6 @@
 
     window.addEventListener('load', () => {
       mountIcons();
-      initSSE(); // SSE désactivé sur Vercel, fallback auto
-      initStatsSSE(); // stats + anomalies via /api/logs/watch/stream (polling sur Vercel)
-      
-      // Démarrer le polling intelligent
       startPolling();
       
       // Démarrer les refreshs adaptatifs
@@ -947,8 +932,6 @@
       stopPolling();
       if (_trendsTimer) clearTimeout(_trendsTimer);
       if (_alertsTimer) clearTimeout(_alertsTimer);
-      if (eventSource) eventSource.close();
-      if (statsSource) statsSource.close();
     });
   </script>
   <script src="/js/mobile-nav.js" defer></script>

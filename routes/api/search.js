@@ -8,6 +8,108 @@ const router = Router();
 router.use(requireAuth);
 router.use(searchLimiter);
 
+const LOG_SEARCH_SELECT = `
+  id, timestamp, event_timestamp, imported_at, log_level, source, source_server, service,
+  message, normalized_message, event_type, fingerprint, module, error_type,
+  stack_trace, target_user, log_user,
+  COALESCE(log_source, source) AS log_source,
+  COALESCE(source_system, log_source, source) AS source_system,
+  COALESCE(main_service, service) AS main_service,
+  COALESCE(hostname, source_server) AS hostname,
+  file_name, import_job_id, parser_format, timestamp_inferred, classification_confidence, created_time
+`.replace(/\s+/g, ' ').trim();
+
+const LOG_SEARCH_SELECT_MIN = `
+  id, timestamp, imported_at, log_level, source, source_server, service,
+  message, normalized_message, event_type, fingerprint, module, error_type,
+  stack_trace, target_user, log_user, file_name, import_job_id
+`.replace(/\s+/g, ' ').trim();
+
+function appendTextSearch(whereConditions, params, query) {
+  const trimmedQuery = query.trim();
+  if (trimmedQuery.length < 4) {
+    whereConditions.push('(message LIKE ? OR normalized_message LIKE ?)');
+    const like = '%' + trimmedQuery + '%';
+    params.push(like, like);
+    return;
+  }
+  whereConditions.push('MATCH(message, normalized_message) AGAINST(? IN BOOLEAN MODE)');
+  params.push(trimmedQuery);
+}
+
+function applySearchFallback(whereClause, params) {
+  let fbWhere = whereClause;
+  let fbParams = [...params];
+  if (fbWhere.includes('MATCH(message, normalized_message)')) {
+    fbWhere = fbWhere.replace(
+      'MATCH(message, normalized_message) AGAINST(? IN BOOLEAN MODE)',
+      '(message LIKE ? OR normalized_message LIKE ?)'
+    );
+    const q = fbParams.pop();
+    fbParams.push('%' + q + '%', '%' + q + '%');
+  }
+  return { fbWhere, fbParams };
+}
+
+function isSearchSchemaError(err) {
+  return /Unknown column|FULLTEXT/i.test(err?.message || '');
+}
+
+async function runCountQuery(whereClause, params) {
+  try {
+    const [countResult] = await pool.query(
+      `SELECT COUNT(*) as total FROM logs WHERE ${whereClause}`,
+      params
+    );
+    return countResult[0]?.total || 0;
+  } catch (e) {
+    if (!isSearchSchemaError(e)) throw e;
+    const { fbWhere, fbParams } = applySearchFallback(whereClause, params);
+    const [countResult] = await pool.query(
+      `SELECT COUNT(*) as total FROM logs WHERE ${fbWhere}`,
+      fbParams
+    );
+    return countResult[0]?.total || 0;
+  }
+}
+
+async function runFacetQuery(sql, params, whereClause) {
+  try {
+    const [rows] = await pool.query(sql, params);
+    return rows;
+  } catch (e) {
+    if (!isSearchSchemaError(e)) throw e;
+    const { fbWhere, fbParams } = applySearchFallback(whereClause, params);
+    const fbSql = sql.replace(whereClause, fbWhere);
+    const [rows] = await pool.query(fbSql, fbParams);
+    return rows;
+  }
+}
+
+async function runLogsSearch(whereClause, params, limitNum, offsetNum) {
+  const orderBy = 'COALESCE(event_timestamp, timestamp, imported_at) DESC';
+  const fullSql = `SELECT ${LOG_SEARCH_SELECT} FROM logs WHERE ${whereClause} ORDER BY ${orderBy} LIMIT ${limitNum} OFFSET ${offsetNum}`;
+  try {
+    const [logs] = await pool.query(fullSql, params);
+    return logs;
+  } catch (e) {
+    if (!isSearchSchemaError(e)) throw e;
+    logger.warn({ event: 'search_fallback', error: e.message }, '[API]');
+    const { fbWhere, fbParams } = applySearchFallback(whereClause, params);
+    const [logs] = await pool.query(
+      `SELECT ${LOG_SEARCH_SELECT_MIN} FROM logs WHERE ${fbWhere} ORDER BY timestamp DESC LIMIT ${limitNum} OFFSET ${offsetNum}`,
+      fbParams
+    );
+    return logs.map(row => ({
+      ...row,
+      log_source: row.source,
+      source_system: row.source,
+      main_service: row.service,
+      hostname: row.source_server
+    }));
+  }
+}
+
 /**
  * GET /api/search
  * 
@@ -37,6 +139,9 @@ router.get('/', async (req, res) => {
       service = null,
       module = null,
       source_server = null,
+      source_system = null,
+      main_service = null,
+      hostname = null,
       target_user = null,
       fingerprint = null,
       from_timestamp = null,
@@ -47,7 +152,7 @@ router.get('/', async (req, res) => {
       offset = 0
     } = req.query;
 
-    const limitNum = Math.min(parseInt(limit) || 50, 1000);
+    const limitNum = Math.min(parseInt(limit) || 50, 100);
     const offsetNum = Math.max(parseInt(offset) || 0, 0);
 
     if (query && query.length > 500) {
@@ -68,18 +173,9 @@ router.get('/', async (req, res) => {
       params.push(...scope.params);
     }
 
-    // Filtres texte avec FULLTEXT (P-03)
-    // FIX #6: Fallback automatique sur LIKE pour les termes courts (< 4 caractères)
+    // Filtres texte avec FULLTEXT (P-03) + fallback LIKE
     if (query && query.trim().length > 0) {
-      const trimmedQuery = query.trim();
-      if (trimmedQuery.length < 4) {
-        whereConditions.push('(message LIKE ? OR normalized_message LIKE ?)');
-        const like = '%' + trimmedQuery + '%';
-        params.push(like, like);
-      } else {
-        whereConditions.push('MATCH(message, normalized_message) AGAINST(? IN BOOLEAN MODE)');
-        params.push(trimmedQuery);
-      }
+      appendTextSearch(whereConditions, params, query);
     }
 
     // Filtres métadonnées
@@ -96,6 +192,9 @@ router.get('/', async (req, res) => {
     if (service) {
       whereConditions.push('service = ?');
       params.push(service);
+    } else if (main_service) {
+      whereConditions.push('service = ?');
+      params.push(main_service);
     }
 
     if (module) {
@@ -106,6 +205,14 @@ router.get('/', async (req, res) => {
     if (source_server) {
       whereConditions.push('source_server = ?');
       params.push(source_server);
+    } else if (hostname) {
+      whereConditions.push('source_server = ?');
+      params.push(hostname);
+    }
+
+    if (source_system) {
+      whereConditions.push('source = ?');
+      params.push(source_system);
     }
 
     if (target_user) {
@@ -145,12 +252,7 @@ router.get('/', async (req, res) => {
 
     const whereClause = whereConditions.join(' AND ');
 
-    // Compter le total
-    const [countResult] = await pool.query(
-      `SELECT COUNT(*) as total FROM logs WHERE ${whereClause}`,
-      params
-    );
-    const totalCount = countResult[0]?.total || 0;
+    const totalCount = await runCountQuery(whereClause, params);
 
     if (totalCount > 10000) {
       return res.status(422).json({
@@ -159,41 +261,30 @@ router.get('/', async (req, res) => {
       });
     }
 
-    // Fetch logs avec pagination
-    // pool.query() used instead of execute() — mysql2 prepared statements don't support LIMIT ? OFFSET ?
-    const [logs] = await pool.query(
-      `SELECT 
-        id, timestamp, created_time, imported_at, log_level, source, source_server, service, 
-        message, normalized_message, event_type, fingerprint, module, error_type,
-        stack_trace, target_user, log_user, log_source, file_name, import_job_id,
-        parser_format, timestamp_inferred, classification_confidence
-       FROM logs 
-       WHERE ${whereClause}
-       ORDER BY timestamp DESC
-       LIMIT ${limitNum} OFFSET ${offsetNum}`,
-      params
-    );
+    const logs = await runLogsSearch(whereClause, params, limitNum, offsetNum);
 
-    // Calculer les facets — chaque SELECT du UNION reçoit ses propres params
-    // BUGFIX: UNION ALL avec pool.query() nécessite de répéter params pour chaque bloc WHERE
-    const [facetsLevel] = await pool.query(
+    const facetsLevel = await runFacetQuery(
       `SELECT log_level AS facet_key, COUNT(*) AS cnt FROM logs WHERE ${whereClause} GROUP BY log_level`,
-      params
+      params,
+      whereClause
     );
-    const [facetsEType] = await pool.query(
+    const facetsEType = await runFacetQuery(
       `SELECT CONCAT('error_type:', error_type) AS facet_key, COUNT(*) AS cnt
        FROM logs WHERE ${whereClause} AND error_type IS NOT NULL GROUP BY error_type LIMIT 20`,
-      params
+      params,
+      whereClause
     );
-    const [facetsSvc] = await pool.query(
+    const facetsSvc = await runFacetQuery(
       `SELECT CONCAT('service:', service) AS facet_key, COUNT(*) AS cnt
        FROM logs WHERE ${whereClause} AND service IS NOT NULL GROUP BY service LIMIT 20`,
-      params
+      params,
+      whereClause
     );
-    const [facetsMod] = await pool.query(
+    const facetsMod = await runFacetQuery(
       `SELECT CONCAT('module:', module) AS facet_key, COUNT(*) AS cnt
        FROM logs WHERE ${whereClause} AND module IS NOT NULL GROUP BY module LIMIT 20`,
-      params
+      params,
+      whereClause
     );
     const facetMap = {};
     for (const row of [...facetsLevel, ...facetsEType, ...facetsSvc, ...facetsMod]) {
@@ -232,7 +323,7 @@ router.get('/error-directory', async (req, res) => {
       offset = 0
     } = req.query;
 
-    const limitNum = Math.min(parseInt(limit) || 50, 1000);
+    const limitNum = Math.min(parseInt(limit) || 50, 100);
     const offsetNum = Math.max(parseInt(offset) || 0, 0);
 
     let whereConditions = ['1=1'];

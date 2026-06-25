@@ -82,11 +82,22 @@ const dbConfig = {
   waitForConnections: true,
   connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || String(defaultConnLimit), 10),
   queueLimit: 10,
-  connectTimeout: 10000,
+  connectTimeout: 30000,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10000,
   ssl: sslConfig,
 };
 
 const pool = mysql.createPool(dbConfig);
+
+// Keepalive toutes les 5 minutes pour maintenir la connexion Aiven (hors Vercel)
+if (!isVercelEnv && process.env.DB_KEEPALIVE !== 'false') {
+  setInterval(() => {
+    pool.execute('SELECT 1').catch(err => {
+      logger.warn({ event: 'db_keepalive_failed', error: err.message }, '[DB]');
+    });
+  }, 5 * 60 * 1000);
+}
 
 // Test connexion au démarrage — sans process.exit (incompatible Vercel serverless)
 pool.getConnection()

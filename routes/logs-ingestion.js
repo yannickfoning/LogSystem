@@ -8,7 +8,7 @@ import { normalizeMessage } from '../lib/processing/normalize.js';
 import { classifyLog } from '../lib/processing/classify.js';
 import { generateFingerprint } from '../lib/processing/fingerprint.js';
 import { enrichLogMetadata } from '../lib/processing/logMetadata.js';
-import { alertEngineBus } from '../services/alertEngine.js';
+import { alertEngineBus, evalAllForUser } from '../services/alertEngine.js';
 import crypto from 'crypto';
 
 const router = Router();
@@ -146,14 +146,6 @@ router.post('/ingest', async (req, res) => {
 
         await conn.execute(insertSql, insertParams);
 
-        // Trigger alert engine for real-time alerts
-        if (['ERROR', 'CRITICAL', 'FATAL'].includes(normalizedLevel)) {
-          alertEngineBus.emit('log', {
-            ...enriched,
-            id: conn.insertId // Will be available after insert
-          });
-        }
-
         ingestResults.success++;
       } catch (err) {
         ingestResults.failed++;
@@ -166,6 +158,19 @@ router.post('/ingest', async (req, res) => {
     }
 
     await conn.commit();
+
+    if (userId && ingestResults.success > 0) {
+      const isVercel = !!(process.env.VERCEL || process.env.VERCEL_ENV);
+      if (isVercel) {
+        try {
+          await evalAllForUser(userId);
+        } catch (alertErr) {
+          logger.error({ event: 'ingest_alert_eval_failed', userId, error: alertErr.message }, '[INGEST]');
+        }
+      } else {
+        alertEngineBus.emit('logs.inserted', { userId, count: ingestResults.success });
+      }
+    }
 
     res.json({
       success: true,

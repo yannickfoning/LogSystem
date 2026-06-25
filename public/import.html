@@ -442,10 +442,15 @@
                                     document.getElementById(
                                         "progress-text",
                                     ).textContent = "Import échoué";
+                                    
+                                    // [FIX] Afficher un message d'erreur clair pour RAR sur Vercel
+                                    var errorMsg = job.error_message || "Erreur inconnue";
+                                    if (errorMsg && (errorMsg.includes("RAR") || errorMsg.includes("rar") || errorMsg.includes("unrar") || errorMsg.includes("archive"))) {
+                                        errorMsg = "Extraction RAR non disponible sur cette plateforme. Veuillez utiliser ZIP ou décompresser localement avant import.";
+                                    }
+                                    
                                     window.toast.error(
-                                        "Import échoué : " +
-                                            (job.error_message ||
-                                                "Erreur inconnue"),
+                                        "Import échoué : " + errorMsg,
                                     );
                                     uploadBtn.disabled = false;
                                     uploadBtn.textContent = "Importer";

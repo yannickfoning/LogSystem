@@ -45,6 +45,15 @@ function buildFilters(query, userScopeFilter, useImportedAtForDateRange = false)
   if (imported_from && ISO_RE.test(imported_from)) { sql += ' AND imported_at >= ?'; params.push(imported_from.replace('T',' ')); }
   if (imported_to && ISO_RE.test(imported_to)) { sql += ' AND imported_at <= ?'; params.push(imported_to.replace('T',' ')); }
 
+  // after_id filter for polling (Vercel compatibility)
+  if (query.after_id) {
+    const afterId = parseInt(query.after_id, 10);
+    if (!isNaN(afterId) && afterId > 0) {
+      sql += ' AND id > ?';
+      params.push(afterId);
+    }
+  }
+
   if (search) {
     // [FIX-PERF-01] FULLTEXT MATCH/AGAINST au lieu de LIKE '%...%' — utilise l'index ft_message
     const safeSearch = search.replace(/[<>()~*@"]/g, '').trim().substring(0, 200);
@@ -259,7 +268,8 @@ router.get('/analysis/:fingerprint', async (req, res) => {
 
     const [groups] = await pool.execute(
       `SELECT fingerprint, COUNT(*) as occurrences,
-              MIN(timestamp) as first_seen, MAX(timestamp) as last_seen,
+              MIN(COALESCE(event_timestamp, timestamp, imported_at)) as first_seen,
+              MAX(COALESCE(event_timestamp, timestamp, imported_at)) as last_seen,
               MAX(log_level) as severity_max,
               COUNT(DISTINCT service) as service_count,
               COUNT(DISTINCT source_server) as source_server_count
