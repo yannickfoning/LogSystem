@@ -71,18 +71,10 @@ if (IS_PROD) {
 
 // ── Session secret ────────────────────────────────────────────────────────────
 const sessionSecret = process.env.SESSION_SECRET;
-if (!sessionSecret || sessionSecret.length < 32) {
-  logger.warn('[WARN] SESSION_SECRET missing or too short — using insecure fallback. Set SESSION_SECRET in Vercel env vars!');
-}
-const effectiveSecret = sessionSecret || ('logsystem-insecure-' + crypto.randomBytes(16).toString('hex'));
-
-// ── CSRF secret ──────────────────────────────────────────────────────────────
-const csrfSecret = process.env.CSRF_SECRET || (IS_VERCEL ? crypto.randomBytes(32).toString('hex') : null);
-if (!csrfSecret) {
-  logger.fatal('[FATAL] CSRF_SECRET must be set in production. Exiting.');
+if (!sessionSecret || sessionSecret.includes('change-me') || sessionSecret.length < 32) {
+  logger.fatal('[FATAL] SESSION_SECRET must be at least 32 characters and not contain "change-me". Exiting.');
   process.exit(1);
 }
-process.env.CSRF_SECRET = csrfSecret;
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use((req, res, next) => {
@@ -121,55 +113,7 @@ app.use((req, res, next) => {
   })(req, res, next);
 });
 
-// ── Background init (non-blocking) ───────────────────────────────────────────
-// Runs AFTER the app is exported so Vercel can handle requests immediately.
-// Serverless cold starts skip background work and avoid opening DB connections.
-let _initialized = false;
-let _initPromise = null;
-
-async function initApp() {
-  await testConnection();
-  await runMigrations();
-  if (!IS_VERCEL) {
-    // Services stateful : uniquement en dehors de Vercel
-    const cacheStarted = await startCacheService();
-    setAlertWorker(alertWorker);
-    await startAlertEngine().catch(e => logger.error({ event: 'alertEngineStartFailed', message: e.message }));
-    startRetentionScheduler().catch(e => logger.error({ event: 'retentionStartFailed', message: e.message }));
-    await startWatcher().catch(e => logger.error({ event: 'watcherStartFailed', message: e.message }));
-    const logsDir = (process.env.WATCH_DIRS || './logs').split(',')[0].trim();
-    if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
-  }
-}
-
-// Initialisation lazy — une seule fois par cold start
-async function ensureInit() {
-  if (_initialized) return;
-  if (_initPromise) return _initPromise;
-  _initPromise = initApp().then(() => { _initialized = true; }).catch(err => {
-    _initPromise = null;
-    throw err;
-  });
-  return _initPromise;
-}
-
-// Middleware d'initialisation lazy (pour Vercel)
-app.use(async (req, res, next) => {
-  try {
-    await ensureInit();
-    next();
-  } catch (err) {
-    logger.error({ event: 'init_failed', message: err.message });
-    res.status(503).json({ error: 'Service en cours d\'initialisation, réessayez dans quelques secondes' });
-  }
-});
-
-// Adjust rate limits for Vercel serverless environment
-const isVercel = !!(process.env.VERCEL || process.env.VERCEL_ENV);
-const globalMax = isVercel ? 1000 : 500;
-const loginMax = isVercel ? 30 : 10;
-
-const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: globalMax, standardHeaders: true, legacyHeaders: false });
+const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 500, standardHeaders: true, legacyHeaders: false });
 app.use(globalLimiter);
 
 const loginLimiter = rateLimit({
@@ -290,18 +234,8 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Erreur interne du serveur' });
 });
 
-async function initialize() {
-  if (_initialized) return;
-  _initialized = true;
-
-  if (IS_VERCEL) {
-    logger.info({ event: 'background_jobs_disabled', platform: 'vercel' }, '[STARTUP]');
-    await initServerlessAlertEngine().catch(e =>
-      logger.error({ event: 'serverless_alert_init_failed', error: e.message }, '[STARTUP]')
-    );
-    return;
-  }
-
+// ── Start ───────────────────────────────────────────────────────────────────────────
+async function start() {
   try {
     await testConnection();
     logger.info({ event: 'db_connected' }, '[DB] Connected');
