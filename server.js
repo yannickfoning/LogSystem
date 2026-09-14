@@ -21,6 +21,7 @@ import compression from 'compression';
 import fs from 'fs';
 
 import { testConnection, buildSslOptions } from './config/database.js';
+import pool from './config/database.js';
 import { runMigrations } from './lib/database/migrationRunner.js';
 import { requireAuth, requireAuthPage, requireAdminPage } from './middleware/auth.js';
 import { scopeGuard } from './middleware/scopeGuard.js';
@@ -41,6 +42,9 @@ import { startRetentionScheduler } from './services/retentionService.js';
 import { startWatcher, stopWatcher, getWatcherStatus } from './services/watcherService.js';
 import { startCacheService } from './services/cacheService.js';
 import { createHtmlCspMiddleware } from './middleware/htmlCsp.js';
+import { initCacheCleanup, updateRecommendationFrequency } from './services/performance-optimizer.js';
+import recommendationsAdvancedRoutes from './routes/api/recommendations-advanced.js';
+import topErrorsAdvancedRoutes from './routes/dashboard/top-errors-advanced.js';
 
 // ── Detect environment ────────────────────────────────────────────────────────
 const IS_PROD = process.env.NODE_ENV === 'production';
@@ -188,6 +192,8 @@ app.use('/api/admin', requireAuth, scopeGuard, adminRoutes);
 app.use('/api/search', requireAuth, scopeGuard, searchApiRoutes);
 app.use('/api/error-suggestions', requireAuth, scopeGuard, errorSuggestionsRoutes);
 app.use('/api/recommendations', requireAuth, scopeGuard, recommendationsRoutes);
+app.use('/api/recommendations/advanced', requireAuth, scopeGuard, recommendationsAdvancedRoutes);
+app.use('/api/dashboard/top-errors', requireAuth, scopeGuard, topErrorsAdvancedRoutes);
 
 app.get('/api/watchdogs/status', requireAuth, (req, res) => {
   res.json(getWatcherStatus());
@@ -246,6 +252,21 @@ async function start() {
 
   await startCacheService().catch(() => {});
   setAlertWorker(alertWorker);
+
+  // Initialiser l'optimisation de performance
+  initCacheCleanup();
+
+  // Mettre à jour les fréquences toutes les 5 minutes
+  setInterval(async () => {
+    try {
+      const [users] = await pool.execute('SELECT id FROM users WHERE is_active = 1');
+      for (const user of users) {
+        await updateRecommendationFrequency(user.id);
+      }
+    } catch (e) {
+      logger.error({ event: 'frequency_update_failed', error: e.message });
+    }
+  }, 5 * 60 * 1000);
 
   await startAlertEngine().catch(e => logger.error({ event: 'alertEngineStartFailed', message: e.message }));
   await ensureDefaultRecommendations().catch(e => logger.error({ event: 'recommendationsSeedFailed', message: e.message }));
