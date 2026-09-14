@@ -123,13 +123,13 @@
 
                 <div class="form-row mt-16">
                     <div class="form-group">
-                        <label>Format des dates dans le fichier</label>
+                        <label data-i18n="import.date_format">Format des dates dans le fichier</label>
                         <select id="date-locale" name="locale">
-                            <option value="fr" selected>
+                            <option value="fr" selected data-i18n="import.locale.fr">
                                 Français (JJ/MM/AAAA)
                             </option>
-                            <option value="us">Américain (MM/JJ/AAAA)</option>
-                            <option value="iso">ISO 8601 (AAAA-MM-JJ)</option>
+                            <option value="us" data-i18n="import.locale.us">Américain (MM/JJ/AAAA)</option>
+                            <option value="iso" data-i18n="import.locale.iso">ISO 8601 (AAAA-MM-JJ)</option>
                         </select>
                     </div>
                 </div>
@@ -374,16 +374,17 @@
                                                   )
                                                 : 0;
 
+                                        var t = window.i18n ? window.i18n.t : function(k) { return k; };
                                         var summaryHtml =
                                             '<div class="card mt-16" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px">';
                                         summaryHtml +=
-                                            '<h4 style="margin:0 0 12px;font-size:14px;color:#1e293b">📊 Qualité d\'extraction</h4>';
+                                            '<h4 style="margin:0 0 12px;font-size:14px;color:#1e293b">📊 ' + t('import.quality.title') + '</h4>';
                                         summaryHtml +=
                                             '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">';
                                         summaryHtml +=
                                             '<div style="text-align:center"><div style="font-size:22px;font-weight:700;color:#2563eb">' +
                                             inserted +
-                                            '</div><div style="font-size:11px;color:#64748b">logs importés</div></div>';
+                                            '</div><div style="font-size:11px;color:#64748b">' + t('import.quality.imported') + '</div></div>';
                                         summaryHtml +=
                                             '<div style="text-align:center"><div style="font-size:22px;font-weight:700;color:' +
                                             (pctTs >= 90
@@ -393,10 +394,10 @@
                                                   : "#dc2626") +
                                             '">' +
                                             pctTs +
-                                            '%</div><div style="font-size:11px;color:#64748b">dates originales<br>' +
+                                            '%</div><div style="font-size:11px;color:#64748b">' + t('import.quality.dates') + '<br>' +
                                             (missingTs > 0
-                                                ? "(" + missingTs + " inférées)"
-                                                : "✓ toutes extraites") +
+                                                ? t('import.quality.inferred', {count: missingTs})
+                                                : "✓ " + t('import.quality.all_extracted')) +
                                             "</div></div>";
                                         summaryHtml +=
                                             '<div style="text-align:center"><div style="font-size:22px;font-weight:700;color:' +
@@ -407,19 +408,17 @@
                                                   : "#94a3b8") +
                                             '">' +
                                             pctUser +
-                                            '%</div><div style="font-size:11px;color:#64748b">avec utilisateur<br>' +
+                                            '%</div><div style="font-size:11px;color:#64748b">' + t('import.quality.with_user') + '<br>' +
                                             (missingUser > 0
-                                                ? "(" +
-                                                  missingUser +
-                                                  " non trouvés)"
-                                                : "✓ tous identifiés") +
+                                                ? t('import.quality.not_found', {count: missingUser})
+                                                : "✓ " + t('import.quality.all_identified')) +
                                             "</div></div>";
                                         summaryHtml += "</div>";
                                         if (skipped > 0)
                                             summaryHtml +=
-                                                '<p style="font-size:12px;color:#dc2626;margin:8px 0 0">⚠ ' +
-                                                skipped +
-                                                " lignes ignorées (vides ou invalides)</p>";
+                                                '<p style="font-size:12px;color:#dc2626;margin:8px 0 0">' +
+                                                t('import.quality.skipped_text', {count: skipped}) +
+                                                "</p>";
                                         summaryHtml += "</div>";
                                         document
                                             .getElementById("progress-section")

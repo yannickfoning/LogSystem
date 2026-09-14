@@ -7,10 +7,10 @@ ALTER TABLE `logs` ADD COLUMN `main_service` VARCHAR(255) NULL;
 ALTER TABLE `logs` ADD COLUMN `hostname` VARCHAR(255) NULL;
 ALTER TABLE `logs` ADD COLUMN `log_origin` VARCHAR(255) NULL;
 
--- Backfill from existing columns (retrocompat)
+-- Backfill from existing columns (retrocompat) - handles missing columns
 UPDATE `logs` SET `event_timestamp` = `timestamp` WHERE `event_timestamp` IS NULL AND `timestamp` IS NOT NULL;
 UPDATE `logs` SET `hostname` = COALESCE(`source_server`, `source`) WHERE `hostname` IS NULL;
-UPDATE `logs` SET `source_system` = COALESCE(`log_source`, `source`, `source_server`) WHERE `source_system` IS NULL;
+UPDATE `logs` SET `source_system` = COALESCE(`source`, `source_server`) WHERE `source_system` IS NULL;
 UPDATE `logs` SET `main_service` = COALESCE(`service`, 'Application') WHERE `main_service` IS NULL;
 UPDATE `logs` SET `log_origin` = COALESCE(`source_type`, 'legacy') WHERE `log_origin` IS NULL;
 

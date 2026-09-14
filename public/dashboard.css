@@ -328,13 +328,14 @@ body { font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe 
   min-width: 36px;
   height: 36px;
   border-radius: 8px;
-  background: rgba(239,68,68,0.12);
-  color: var(--accent-red);
-  font-size: 13px;
+  background: rgba(239,68,68,0.15);
+  color: #ef4444;
+  font-size: 14px;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 1px solid rgba(239,68,68,0.3);
 }
 
 .err-title { font-size: 12px; color: var(--text); font-weight: 500; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }

@@ -45,13 +45,13 @@
     <div class="card search-filters-card">
       <div class="filter-grid">
         <div class="form-group">
-          <label class="filter-label" for="f-search">Mot-clé</label>
-          <input type="text" id="f-search" placeholder="Mot-clé..." minlength="2" maxlength="500" autocomplete="off">
+          <label class="filter-label" for="f-search" data-i18n="search.keyword">Mot-clé</label>
+          <input type="text" id="f-search" data-i18n-placeholder="search.keyword" placeholder="Mot-clé..." minlength="2" maxlength="500" autocomplete="off">
         </div>
         <div class="form-group">
-          <label class="filter-label" for="f-level">Niveau</label>
+          <label class="filter-label" for="f-level" data-i18n="search.level">Niveau</label>
           <select id="f-level">
-            <option value="">Tous les niveaux</option>
+            <option value="" data-i18n="search.all_levels">Tous les niveaux</option>
             <option value="DEBUG">DEBUG</option>
             <option value="INFO">INFO</option>
             <option value="WARNING">WARNING</option>
@@ -61,27 +61,27 @@
           </select>
         </div>
         <div class="form-group">
-          <label class="filter-label" for="f-source">Source</label>
-          <input type="text" id="f-source" placeholder="Source">
+          <label class="filter-label" for="f-source" data-i18n="search.source">Source</label>
+          <input type="text" id="f-source" data-i18n-placeholder="search.source" placeholder="Source">
         </div>
         <div class="form-group">
-          <label class="filter-label" for="f-service">Service</label>
-          <input type="text" id="f-service" placeholder="Service">
+          <label class="filter-label" for="f-service" data-i18n="search.service">Service</label>
+          <input type="text" id="f-service" data-i18n-placeholder="search.service" placeholder="Service">
         </div>
         <div class="form-group">
-          <label class="filter-label" for="f-main-service">Service principal</label>
-          <input type="text" id="f-main-service" placeholder="Authentication, Database...">
+          <label class="filter-label" for="f-main-service" data-i18n="search.main_service">Service principal</label>
+          <input type="text" id="f-main-service" data-i18n-placeholder="search.main_service" placeholder="Authentication, Database...">
         </div>
         <div class="form-group">
-          <label class="filter-label" for="f-hostname">Hôte</label>
-          <input type="text" id="f-hostname" placeholder="hostname">
+          <label class="filter-label" for="f-hostname" data-i18n="search.hostname">Hôte</label>
+          <input type="text" id="f-hostname" data-i18n-placeholder="search.hostname" placeholder="hostname">
         </div>
         <div class="form-group">
-          <label class="filter-label" for="f-date-from">Date log (de)</label>
+          <label class="filter-label" for="f-date-from" data-i18n="search.date_from">Date log (de)</label>
           <input type="date" id="f-date-from">
         </div>
         <div class="form-group">
-          <label class="filter-label" for="f-date-to">Date log (à)</label>
+          <label class="filter-label" for="f-date-to" data-i18n="search.date_to">Date log (à)</label>
           <input type="date" id="f-date-to">
         </div>
       </div>
@@ -89,8 +89,8 @@
         Recherche combinée ex: <code>ERROR + nginx + 03/06/2026</code>
       </div>
       <div class="search-actions">
-        <button class="btn btn-primary" id="search-btn">Rechercher</button>
-        <button class="btn btn-secondary" id="reset-btn">Réinitialiser</button>
+        <button class="btn btn-primary" id="search-btn" data-i18n="search.btn">Rechercher</button>
+        <button class="btn btn-secondary" id="reset-btn" data-i18n="search.reset">Réinitialiser</button>
         <span id="search-combo-hint" class="search-combo-hint"></span>
       </div>
     </div>
@@ -108,18 +108,18 @@
     </div>
 
     <div class="card">
-      <p class="table-swipe-hint">← Swipe pour voir plus de colonnes</p>
+      <p class="table-swipe-hint" data-i18n="search.swipe_hint">← Swipe pour voir plus de colonnes</p>
       <div class="table-wrapper">
         <table class="search-table">
           <thead>
             <tr>
-              <th>Date log</th>
+              <th data-i18n="search.table.date">Date log</th>
               <th data-i18n="common.level">Niveau</th>
               <th data-i18n="common.source">Source</th>
-              <th class="col-hide-mobile">Service princ.</th>
-              <th class="col-hide-mobile">Hôte</th>
-              <th class="col-hide-mobile">Utilisateur</th>
-              <th class="col-hide-mobile">Import</th>
+              <th class="col-hide-mobile" data-i18n="search.table.service">Service princ.</th>
+              <th class="col-hide-mobile" data-i18n="search.table.hostname">Hôte</th>
+              <th class="col-hide-mobile" data-i18n="search.table.user">Utilisateur</th>
+              <th class="col-hide-mobile" data-i18n="search.table.import">Import</th>
               <th data-i18n="common.message">Message</th>
             </tr>
           </thead>
@@ -202,8 +202,8 @@
             var tsCell = r.timestamp_inferred
               ? '<td><span class="ts-inferred" title="Date inférée">' + fmtDT(eventTs) + ' <small>~</small></span></td>'
               : '<td>' + fmtDT(eventTs) + '</td>';
-            var userCell = r.log_user || r.target_user
-              ? '<td class="col-hide-mobile"><span class="user-badge">' + esc(r.log_user || r.target_user) + '</span></td>'
+            var userCell = r.target_user
+              ? '<td class="col-hide-mobile"><span class="user-badge">' + esc(r.target_user) + '</span></td>'
               : '<td class="col-hide-mobile"><span class="user-empty">—</span></td>';
             var importCell = r.imported_at
               ? '<td class="col-hide-mobile cell-muted">' + fmtDT(r.imported_at) + '</td>'
@@ -356,37 +356,90 @@
         var tr = e.target.closest('tr[data-id]');
         if (!tr) return;
         var id = tr.getAttribute('data-id');
+        
+        // Load log details first
         api.get('/api/logs/' + id).then(function(log) {
-          if (window.renderLogDetailHtml) {
-            document.getElementById('detail-content').innerHTML = window.renderLogDetailHtml(log, esc, fmtDT, badge);
-          } else {
-          var html = '<div style="font-size:13px;line-height:1.8">';
-          html += '<p><strong data-i18n="modal.id">Identifiant:</strong> ' + log.id + '</p>';
-          var eventTs = log.event_timestamp || log.timestamp;
-          html += '<p><strong>Date du log:</strong> ' + fmtDT(eventTs);
-          if (log.timestamp_inferred) {
-            html += ' <span title="La date originale du log n\'a pas pu être extraite. Cette date correspond au moment de l\'import." '
-                  + 'style="background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:4px;font-size:11px;margin-left:6px">'
-                  + '⚠ date inférée</span>';
-          }
-          html += '</p>';
-          if (log.imported_at) html += '<p><strong>Date d\'import:</strong> ' + fmtDT(log.imported_at) + '</p>';
-          html += '<p><strong data-i18n="modal.level">Importance:</strong> ' + badge(log.log_level) + '</p>';
-          html += '<p><strong data-i18n="modal.source">Source:</strong> ' + esc(log.source_system || log.log_source || log.source) + '</p>';
-          html += '<p><strong>Service principal:</strong> ' + esc(log.main_service || '—') + '</p>';
-          html += '<p><strong>Hôte:</strong> ' + esc(log.hostname || log.source_server || '—') + '</p>';
-          html += '<p><strong data-i18n="modal.service">Service:</strong> ' + esc(log.service) + '</p>';
-          html += '<p><strong>Utilisateur (log):</strong> ' + esc(log.log_user || log.target_user || '—') + '</p>';
-          if (log.log_origin) html += '<p><strong>Origine:</strong> ' + esc(log.log_origin) + '</p>';
-          html += '<hr style="border-color:var(--border);margin:12px 0">';
-          html += '<p><strong data-i18n="modal.message">Message:</strong></p><pre style="background:var(--surface2);padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-all;font-size:12px;max-height:200px;overflow:auto">' + esc(log.message) + '</pre>';
-          if (log.stack_trace) {
-            html += '<p style="margin-top:8px"><strong>Stack trace:</strong></p><pre style="background:#1a0000;color:#ff6b6b;padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-all;font-size:11px;max-height:200px;overflow:auto">' + esc(log.stack_trace) + '</pre>';
-          }
-          html += '</div>';
-          document.getElementById('detail-content').innerHTML = html;
-          }
-          document.getElementById('detail-modal').classList.add('active');
+          var errorType = log.error_type || null;
+          
+          // Load recommendation based on error type if available
+          var recommendationPromise = errorType ? 
+            api.get('/api/recommendations/match/' + encodeURIComponent(errorType) + 
+              (log.event_type ? '?event_type=' + encodeURIComponent(log.event_type) : '') +
+              (log.log_level ? (log.event_type ? '&' : '?') + 'log_level=' + encodeURIComponent(log.log_level) : '')) :
+            Promise.resolve({ recommendation: null });
+          
+          recommendationPromise.then(function(recData) {
+            var recommendation = recData && recData.recommendation ? recData.recommendation : null;
+            
+            if (window.renderLogDetailHtml) {
+              document.getElementById('detail-content').innerHTML = window.renderLogDetailHtml(log, esc, fmtDT, badge);
+            } else {
+              var html = '<div style="font-size:13px;line-height:1.8">';
+              html += '<p><strong data-i18n="modal.id">Identifiant:</strong> ' + log.id + '</p>';
+              var eventTs = log.event_timestamp || log.timestamp;
+              html += '<p><strong>Date du log:</strong> ' + fmtDT(eventTs);
+              if (log.timestamp_inferred) {
+                html += ' <span title="La date originale du log n\'a pas pu être extraite. Cette date correspond au moment de l\'import." '
+                      + 'style="background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:4px;font-size:11px;margin-left:6px">'
+                      + '⚠ date inférée</span>';
+              }
+              html += '</p>';
+              if (log.imported_at) html += '<p><strong>Date d\'import:</strong> ' + fmtDT(log.imported_at) + '</p>';
+              html += '<p><strong data-i18n="modal.level">Importance:</strong> ' + badge(log.log_level) + '</p>';
+              html += '<p><strong data-i18n="modal.source">Source:</strong> ' + esc(log.source_system || log.log_source || log.source) + '</p>';
+              html += '<p><strong>Service principal:</strong> ' + esc(log.main_service || '—') + '</p>';
+              html += '<p><strong>Hôte:</strong> ' + esc(log.hostname || log.source_server || '—') + '</p>';
+              html += '<p><strong data-i18n="modal.service">Service:</strong> ' + esc(log.service) + '</p>';
+              html += '<p><strong>Utilisateur (log):</strong> ' + esc(log.target_user || '—') + '</p>';
+              if (log.log_origin) html += '<p><strong>Origine:</strong> ' + esc(log.log_origin) + '</p>';
+              html += '<hr style="border-color:var(--border);margin:12px 0">';
+              html += '<p><strong data-i18n="modal.message">Message:</strong></p><pre style="background:var(--surface2);padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-all;font-size:12px;max-height:200px;overflow:auto">' + esc(log.message) + '</pre>';
+              if (log.stack_trace) {
+                html += '<p style="margin-top:8px"><strong>Stack trace:</strong></p><pre style="background:#1a0000;color:#ff6b6b;padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-all;font-size:11px;max-height:200px;overflow:auto">' + esc(log.stack_trace) + '</pre>';
+              }
+              
+              // Add recommendation if available
+              if (recommendation) {
+                html += '<div style="background:rgba(16,185,129,0.1);border-left:4px solid #10b981;padding:12px 16px;border-radius:6px;font-size:13px;margin:12px 0"><strong style="color:#10b981">💡 Recommandation :</strong><br><br>' + esc(recommendation) + '</div>';
+              }
+              
+              html += '</div>';
+              document.getElementById('detail-content').innerHTML = html;
+            }
+            document.getElementById('detail-modal').classList.add('active');
+          }).catch(function() {
+            // If recommendation fails, still show the log details without recommendation
+            if (window.renderLogDetailHtml) {
+              document.getElementById('detail-content').innerHTML = window.renderLogDetailHtml(log, esc, fmtDT, badge);
+            } else {
+              var html = '<div style="font-size:13px;line-height:1.8">';
+              html += '<p><strong data-i18n="modal.id">Identifiant:</strong> ' + log.id + '</p>';
+              var eventTs = log.event_timestamp || log.timestamp;
+              html += '<p><strong>Date du log:</strong> ' + fmtDT(eventTs);
+              if (log.timestamp_inferred) {
+                html += ' <span title="La date originale du log n\'a pas pu être extraite. Cette date correspond au moment de l\'import." '
+                      + 'style="background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:4px;font-size:11px;margin-left:6px">'
+                      + '⚠ date inférée</span>';
+              }
+              html += '</p>';
+              if (log.imported_at) html += '<p><strong>Date d\'import:</strong> ' + fmtDT(log.imported_at) + '</p>';
+              html += '<p><strong data-i18n="modal.level">Importance:</strong> ' + badge(log.log_level) + '</p>';
+              html += '<p><strong data-i18n="modal.source">Source:</strong> ' + esc(log.source_system || log.log_source || log.source) + '</p>';
+              html += '<p><strong>Service principal:</strong> ' + esc(log.main_service || '—') + '</p>';
+              html += '<p><strong>Hôte:</strong> ' + esc(log.hostname || log.source_server || '—') + '</p>';
+              html += '<p><strong data-i18n="modal.service">Service:</strong> ' + esc(log.service) + '</p>';
+              html += '<p><strong>Utilisateur (log):</strong> ' + esc(log.target_user || '—') + '</p>';
+              if (log.log_origin) html += '<p><strong>Origine:</strong> ' + esc(log.log_origin) + '</p>';
+              html += '<hr style="border-color:var(--border);margin:12px 0">';
+              html += '<p><strong data-i18n="modal.message">Message:</strong></p><pre style="background:var(--surface2);padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-all;font-size:12px;max-height:200px;overflow:auto">' + esc(log.message) + '</pre>';
+              if (log.stack_trace) {
+                html += '<p style="margin-top:8px"><strong>Stack trace:</strong></p><pre style="background:#1a0000;color:#ff6b6b;padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-all;font-size:11px;max-height:200px;overflow:auto">' + esc(log.stack_trace) + '</pre>';
+              }
+              html += '</div>';
+              document.getElementById('detail-content').innerHTML = html;
+            }
+            document.getElementById('detail-modal').classList.add('active');
+          });
         });
       });
 

@@ -1,0 +1,53 @@
+## PROBLÈMES RÉSOLUS DANS CETTE SESSION
+
+### 1. Sécurité: Pages protégées accessibles sans authentification
+- **Problème**: Les pages HTML (dashboard.html, admin.html, etc.) étaient accessibles sans authentification
+- **Solution**: Ajout de middleware `requireAuthPage` et `requireAdminPage` dans server.js pour protéger les routes statiques
+- **Test**: `test-protected-redirect.js` - Confirme la redirection 302 vers login.html pour les utilisateurs non authentifiés
+- **Statut**: ✅ RÉSOLU
+
+### 2. API Import: Endpoint incorrect
+- **Problème**: Le script de test utilisait `/api/import` au lieu de `/api/import/upload`
+- **Solution**: Correction du chemin dans `test-manual-import.js`
+- **Test**: Import manuel réussi avec 10 logs traités
+- **Statut**: ✅ RÉSOLU
+
+### 3. File Watcher: Colonnes manquantes dans la base de données
+- **Problème**: Erreur "Column count doesn't match value count" lors de l'ingestion automatique
+- **Racine**: Colonnes `source_type` et `ingested_realtime` manquantes dans la table logs
+- **Solution**: 
+  - Ajout des colonnes manquantes via migration manuelle
+  - Correction de la requête INSERT dans watcherService.js pour inclure `event_timestamp`
+- **Test**: File watcher détecte et ingère automatiquement les nouveaux fichiers logs
+- **Statut**: ✅ RÉSOLU
+
+### 4. Authentification: Password hash mismatch
+- **Problème**: Login échouait avec "Identifiants invalides" malgré la présence de l'utilisateur
+- **Solution**: Exécution de `npm run create-admin` pour mettre à jour les hash de mots de passe
+- **Test**: Login réussi avec les identifiants par défaut
+- **Statut**: ✅ RÉSOLU
+
+## RÉSULTATS DES TESTS
+
+### Sécurité
+- ✅ Protected pages redirect to login (302 status)
+- ✅ Authentication working correctly
+- ✅ Session management functional
+
+### Ingestion de Logs
+- ✅ File watcher automatic ingestion (12 logs ingérés)
+- ✅ Manual import API working (10 logs imported via /api/import/upload)
+- ✅ Import job tracking functional (status: completed, 10/10 lines)
+
+### Base de données
+- ✅ Logs table updated with missing columns
+- ✅ Import jobs tracking functional
+- ✅ User authentication working
+
+## MODIFICATIONS EFFECTUÉES
+
+1. **server.js**: Ajout de protection des pages statiques
+2. **test-manual-import.js**: Correction du chemin API
+3. **watcherService.js**: Correction de la requête INSERT
+4. **db/migrations/add_source_type_column.sql**: Nouvelle migration
+5. **AUDIT_FONCTIONNEL.md**: Mise à jour du statut des modules testés

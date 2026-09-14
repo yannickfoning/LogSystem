@@ -59,7 +59,7 @@
     html += '<p><strong>Service:</strong> ' + esc(log.service || '—') + '</p>';
     html += '<p><strong>Hôte:</strong> ' + esc(log.source_server || '—') + '</p>';
     html += '<p><strong>Service:</strong> ' + esc(log.service || '—') + '</p>';
-    html += '<p><strong>Utilisateur:</strong> ' + esc(log.log_user || log.target_user || '—') + '</p>';
+    html += '<p><strong>Utilisateur:</strong> ' + esc(log.target_user || '—') + '</p>';
     if (log.log_origin) html += '<p><strong>Origine:</strong> ' + esc(log.log_origin) + '</p>';
     html += '<hr style="border-color:var(--border);margin:12px 0">';
     html += '<p><strong>Message:</strong></p><pre style="background:var(--surface2);padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-all;font-size:12px;max-height:200px;overflow:auto">' + esc(log.message) + '</pre>';

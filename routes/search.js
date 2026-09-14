@@ -162,12 +162,12 @@ router.get('/', async (req, res) => {
     // Fetch logs avec pagination
     // pool.query() used instead of execute() — mysql2 prepared statements don't support LIMIT ? OFFSET ?
     const [logs] = await pool.query(
-      `SELECT 
-        id, timestamp, created_time, imported_at, log_level, source, source_server, service, 
+      `SELECT
+        id, timestamp, created_time, imported_at, log_level, source, source_server, service,
         message, normalized_message, event_type, fingerprint, module, error_type,
-        stack_trace, target_user, log_user, log_source, file_name, import_job_id,
+        stack_trace, target_user,
         parser_format, timestamp_inferred, classification_confidence
-       FROM logs 
+       FROM logs
        WHERE ${whereClause}
        ORDER BY timestamp DESC
        LIMIT ${limitNum} OFFSET ${offsetNum}`,

@@ -254,7 +254,7 @@ async function processLogFile(filePath, incremental = true) {
 
       await conn.query(
         `INSERT IGNORE INTO logs (
-          raw_log, timestamp, created_time, timezone, log_level, source, source_server, service, message, normalized_message,
+          raw_log, timestamp, event_timestamp, created_time, timezone, log_level, source, source_server, service, message, normalized_message,
           event_type, fingerprint, user_id, source_type, client_ip, module, error_type, stack_trace,
           target_user, parser_format, timestamp_inferred, classification_confidence,
           imported_at

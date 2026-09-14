@@ -87,6 +87,8 @@ const dbConfig = {
   enableKeepAlive: true,
   keepAliveInitialDelay: 10000,
   ssl: sslConfig,
+  // Align JS Date ↔ MySQL DATETIME comparisons on UTC (imported_at/timestamp stored as UTC).
+  timezone: 'Z',
   // Memory leak protection
   maxIdle: Math.max(1, Math.floor(parseInt(process.env.DB_CONNECTION_LIMIT || String(defaultConnLimit), 10) / 2)),
   idleTimeout: 60000

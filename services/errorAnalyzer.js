@@ -5,6 +5,7 @@
 
 import logger from '../config/logger.js';
 import pool from '../config/database.js';
+import { mysqlUtcMinutesAgo } from '../lib/operationalTime.js';
 
 /**
  * Analyze a group of similar errors and return a detailed report
@@ -85,8 +86,8 @@ export async function detectRecurringPatterns(userId, windowHours = 24) {
       return [];
     }
 
-    const windowStart = new Date(Date.now() - windowHours * 3600000);
-    
+    const windowStartSql = mysqlUtcMinutesAgo(windowHours * 60);
+
     // Get most frequent fingerprints in the window
     const [patterns] = await pool.execute(
       `SELECT fingerprint, COUNT(*) as count, MAX(log_level) as max_level, 
@@ -97,7 +98,7 @@ export async function detectRecurringPatterns(userId, windowHours = 24) {
        GROUP BY fingerprint
        ORDER BY count DESC
        LIMIT 10`,
-      [userId, windowStart]
+      [userId, windowStartSql]
     );
     
     if (patterns.length === 0) return [];

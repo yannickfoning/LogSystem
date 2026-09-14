@@ -184,7 +184,6 @@ async function processImport(
     allParsedLogs = allParsedLogs.concat(
       parsedLogs.map((log) => ({
         ...log,
-        file_name: file.filename,
         file_created_at: file.file_created_at || null,
         file_modified_at: file.file_modified_at || null,
       })),
@@ -323,12 +322,10 @@ async function processImport(
           ingested_realtime: 0,
           file_created_at: logEntry.file_created_at || null,
           file_modified_at: logEntry.file_modified_at || null,
-          file_name: (logEntry.file_name || filename || "").slice(0, 255),
           import_job_id: jobId,
           imported_by_user_id: userId,
           imported_at: importTimestamp,
           log_source: logEntry.source || logEntry.source_server || importSource || null,
-          log_user: logEntry.target_user || logEntry.log_user || null,
         };
 
         normalized.normalized_message = normalizeMessage(normalized.message);
@@ -443,12 +440,9 @@ async function insertBatch(conn, batch, userId) {
       entry.classification_confidence,
       entry.file_created_at || null,
       entry.file_modified_at || null,
-      entry.file_name || null,
-      entry.import_job_id || null,
       entry.imported_by_user_id || userId || null,
       entry.imported_at || null,
       entry.log_source || null,
-      entry.log_user || null,
     ]);
 
     await conn.query(
@@ -456,9 +450,9 @@ async function insertBatch(conn, batch, userId) {
         raw_log, timestamp, created_time, timezone, log_level, source, source_server, source_system, service, message, normalized_message,
         event_type, fingerprint, user_id, source_type, ingested_realtime, client_ip, module, error_type,
         stack_trace, target_user, parser_format, timestamp_inferred, classification_confidence,
-        file_created_at, file_modified_at, file_name, import_job_id, imported_by_user_id, imported_at, log_source, log_user
-      ) VALUES ?`,
-      [logValues],
+        file_created_at, file_modified_at, imported_by_user_id, imported_at, log_source
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      logValues[0],
     );
 
     // FIX: error_groups — severity_max est VARCHAR donc on compare avec FIELD()

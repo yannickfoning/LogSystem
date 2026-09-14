@@ -11,17 +11,14 @@ router.use(searchLimiter);
 const LOG_SEARCH_SELECT = `
   id, timestamp, imported_at, log_level, source, source_server, service,
   message, normalized_message, event_type, fingerprint, module, error_type,
-  stack_trace, target_user, log_user,
-  source,
-  service,
-  source_server,
-  file_name, import_job_id, parser_format, timestamp_inferred, classification_confidence, created_time
+  stack_trace, target_user,
+  parser_format, timestamp_inferred, classification_confidence, created_time
 `.replace(/\s+/g, ' ').trim();
 
 const LOG_SEARCH_SELECT_MIN = `
   id, timestamp, imported_at, log_level, source, source_server, service,
   message, normalized_message, event_type, fingerprint, module, error_type,
-  stack_trace, target_user, log_user, file_name, import_job_id
+  stack_trace, target_user
 `.replace(/\s+/g, ' ').trim();
 
 function appendTextSearch(whereConditions, params, query) {

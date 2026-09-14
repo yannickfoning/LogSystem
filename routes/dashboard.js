@@ -5,7 +5,13 @@ import { userScope, requireAuth, requireAdmin } from '../middleware/auth.js';
 import { getCachedDashboard, setCachedDashboard, invalidateDashboard } from '../services/cacheService.js';
 import { getWatcherStatus } from '../services/watcherService.js';
 import { getRedisClient } from '../services/cacheService.js';
-import { OPERATIONAL_TS, OPERATIONAL_TS_EXPR } from '../lib/operationalTime.js';
+import {
+  OPERATIONAL_TS,
+  OPERATIONAL_TS_EXPR,
+  toMysqlUtcDatetime,
+  utcBoundsForCalendarDate,
+  utcTodayBounds,
+} from '../lib/operationalTime.js';
 
 // Helper function to safely parse integers from query parameters
 function asInt(v, def = 10) {
@@ -108,14 +114,14 @@ router.get('/summary', async (req, res) => {
      * todayCount: logs whose event occurred today (event_timestamp).
      * importedTodayCount: logs imported today (ingestion activity).
      */
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const { start: todayStartSql } = utcTodayBounds();
     var [importedToday] = await pool.execute(
       `SELECT COUNT(*) as cnt FROM logs WHERE ${OPERATIONAL_TS} >= ?` + scope.sql,
-      [todayStr + ' 00:00:00', ...scope.params]
+      [todayStartSql, ...scope.params]
     );
     var [errorCount] = await pool.execute(
       `SELECT COUNT(*) as cnt FROM logs WHERE ${OPERATIONAL_TS} >= ? AND log_level IN ('ERROR', 'CRITICAL', 'FATAL')` + scope.sql,
-      [todayStr + ' 00:00:00', ...scope.params]
+      [todayStartSql, ...scope.params]
     );
     const alertFilter = alertScope(req);
     var [unreadAlerts] = await pool.execute(
@@ -206,30 +212,37 @@ router.get('/trends', async (req, res) => {
     const startParam = req.query.start_date || req.query.date_from;
     const endParam = req.query.end_date || req.query.date_to; // No asInt needed here, it's a date string
 
-    // Priorité 1: dates explicites (nouveau système + alias frontend)
+    let startSql;
+    let endSql;
+
+    // Priorité 1: dates explicites (calendrier UTC — aligné sur fmtDate frontend)
     if (startParam && endParam) {
-      startDate = new Date(startParam.includes('T') ? startParam : startParam + 'T00:00:00');
-      endDate = new Date(endParam.includes('T') ? endParam : endParam + 'T23:59:59');
+      const startBounds = utcBoundsForCalendarDate(startParam);
+      const endBounds = utcBoundsForCalendarDate(endParam);
+      startSql = startBounds.start;
+      endSql = endBounds.end;
+      startDate = new Date(startParam.slice(0, 10) + 'T00:00:00.000Z');
+      endDate = new Date(endParam.slice(0, 10) + 'T23:59:59.000Z');
       days = parseInt(req.query.days) || 7;
-      
-      // Validation des dates
+
       if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
         return res.status(400).json({ error: 'Dates invalides' });
       }
-      
-      if (startDate >= endDate) {
+      if (startDate > endDate) {
         return res.status(400).json({ error: 'La date de début doit être antérieure à la date de fin' });
       }
-    } 
-    // Priorité 2: nombre de jours (compatibilité ancien système)
-    else { // No asInt needed here, it's a date string
+    }
+    // Priorité 2: nombre de jours (fenêtre glissante UTC)
+    else {
       days = parseInt(req.query.days || req.query.hours || '7', 10);
       const now = new Date();
       endDate = new Date(now);
-      endDate.setHours(23, 59, 59, 999);
-      startDate = new Date(now);
-      startDate.setDate(startDate.getDate() - (days - 1));
-      startDate.setHours(0, 0, 0, 0);
+      endSql = toMysqlUtcDatetime(endDate);
+      startDate = new Date(now.getTime() - (days - 1) * 86400000);
+      startDate.setUTCHours(0, 0, 0, 0);
+      endDate.setUTCHours(23, 59, 59, 999);
+      startSql = toMysqlUtcDatetime(startDate);
+      endSql = toMysqlUtcDatetime(endDate);
     }
 
     // Génération des jours pour la période
@@ -239,8 +252,6 @@ router.get('/trends', async (req, res) => {
       const seriesData = {};
       levels.forEach(l => { seriesData[l] = new Array(24).fill(0); });
       const scope = userScope(req);
-      const startSql = startDate.toISOString().slice(0, 19).replace('T', ' ');
-      const endSql = endDate.toISOString().slice(0, 19).replace('T', ' ');
       const [rows] = await pool.execute(
         `SELECT HOUR(${OPERATIONAL_TS}) AS hour, UPPER(log_level) AS log_level, COUNT(*) AS cnt
          FROM logs
@@ -269,7 +280,7 @@ router.get('/trends', async (req, res) => {
     const current = new Date(startDate);
     while (current <= endDate) {
       dates.push(current.toISOString().slice(0, 10));
-      current.setDate(current.getDate() + 1);
+      current.setUTCDate(current.getUTCDate() + 1);
     }
 
     const levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL', 'FATAL'];
@@ -289,9 +300,7 @@ router.get('/trends', async (req, res) => {
          AND ${OPERATIONAL_TS} <= ?${scope.sql}
        GROUP BY DATE_FORMAT(${OPERATIONAL_TS}, '%Y-%m-%d'), UPPER(log_level)
        ORDER BY day ASC`,
-      [startDate.toISOString().slice(0, 19).replace('T', ' '), 
-       endDate.toISOString().slice(0, 19).replace('T', ' '), 
-       ...scope.params]
+      [startSql, endSql, ...scope.params]
     );
 
     // Remplissage : chaque ligne de résultat → bon index dans le tableau
@@ -319,9 +328,7 @@ router.get('/trends', async (req, res) => {
        WHERE ${OPERATIONAL_TS} IS NOT NULL 
          AND ${OPERATIONAL_TS} >= ? 
          AND ${OPERATIONAL_TS} <= ?${scope.sql}`,
-      [startDate.toISOString().slice(0, 19).replace('T', ' '), 
-       endDate.toISOString().slice(0, 19).replace('T', ' '), 
-       ...scope.params]
+      [startSql, endSql, ...scope.params]
     );
 
     let topFingerprints = [];
@@ -336,9 +343,7 @@ router.get('/trends', async (req, res) => {
          GROUP BY fingerprint
          ORDER BY cnt DESC
          LIMIT 5`,
-        [startDate.toISOString().slice(0, 19).replace('T', ' '), 
-         endDate.toISOString().slice(0, 19).replace('T', ' '), 
-         ...scope.params]
+        [startSql, endSql, ...scope.params]
       );
     } catch (fpErr) {
       logger.warn({ event: 'dashboard_trends_fingerprints_skipped', error: fpErr.message }, '[DASHBOARD]');
@@ -406,9 +411,9 @@ router.get('/top-errors', async (req, res) => {
     if (errorGroupIds.length > 0) {
       const placeholders = errorGroupIds.map(() => '?').join(',');
       const [sampleLogs] = await pool.query(
-        `SELECT id, fingerprint, timestamp, log_level, message, source, service, error_type, 
-                stack_trace, target_user, log_user, module, event_type
-         FROM logs 
+        `SELECT id, fingerprint, timestamp, log_level, message, source, service, error_type,
+                stack_trace, target_user, module, event_type
+         FROM logs
          WHERE fingerprint IN (
            SELECT fingerprint FROM error_groups WHERE id IN (${placeholders})
          )${scope.sql}
@@ -461,7 +466,7 @@ router.get('/recent-logs', async (req, res) => {
     const limit = asInt(req.query.limit, 10);
     const [rows] = await pool.query(
       `SELECT id, raw_log, timestamp, log_level, message, source, source_server, source_system,
-              service, log_user, target_user, imported_at, file_name, import_job_id
+              service, target_user, imported_at
        FROM logs WHERE 1=1${scope.sql}
        ORDER BY ${OPERATIONAL_TS_EXPR} DESC LIMIT ?`,
       [...scope.params, limit]
@@ -472,8 +477,6 @@ router.get('/recent-logs', async (req, res) => {
       logLevel: r.log_level || r.logLevel,
       importedAt: r.imported_at || r.importedAt,
       createdAt: r.created_at || r.createdAt,
-      sourceDirectory: r.source_directory || r.sourceDirectory,
-      fileName: r.file_name || r.fileName,
     }));
     // Retourner les deux formats pour compatibilité
     res.json({ recentLogs: normalized, logs: normalized });
@@ -554,11 +557,8 @@ router.get('/today', async (req, res) => {
   try {
     const scope = userScope(req);
     const alertFilter = alertScope(req);
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    const end = new Date();
-    const startSql = start.toISOString().slice(0, 19).replace('T', ' ');
-    const endSql = end.toISOString().slice(0, 19).replace('T', ' ');
+    const { start: startSql, end: endSql } = utcTodayBounds();
+    const start = new Date(startSql.replace(' ', 'T') + 'Z');
 
     const [todayStats] = await pool.execute(
       `SELECT COUNT(*) as total_logs,

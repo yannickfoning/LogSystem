@@ -25,7 +25,7 @@
     <div class="nav-right">
       <a href="#" id="lang-toggle" class="lang-toggle-link">EN</a>
       <span class="user-info" id="user-info"></span>
-      <a href="#" id="logout-btn" class="btn btn-xs btn-secondary">Déconnexion</a>
+      <a href="#" id="logout-btn" class="btn btn-xs btn-secondary" data-i18n="nav.logout">Déconnexion</a>
     </div>
   </nav>
   <main class="watch-container" role="main">
@@ -102,7 +102,7 @@
         <!-- AMÉLIORATION 4: Anomalies Alert Panel -->
         <div class="panel-card anomaly-panel" id="anomalyPanel">
           <div class="panel-header anomaly-header panel-header-flex">
-            <span class="icon-inline" id="icon-warning" aria-hidden="true"></span> Anomalies Détectées
+            <span class="icon-inline" id="icon-warning" aria-hidden="true"></span> <span data-i18n="watchlog.anomalies">Anomalies Détectées</span>
             <span class="wl-alert-badge">⚠️</span>
           </div>
           <div class="panel-body anomaly-body">
@@ -178,10 +178,10 @@
   <div class="wl-modal-backdrop" id="wl-modal-detail">
     <div class="wl-modal-box">
       <div class="wl-modal-head">
-        <div class="wl-modal-title" id="wl-modal-title">Detail du log</div>
+        <div class="wl-modal-title" id="wl-modal-title" data-i18n="watchlog.modal.title">Detail du log</div>
         <button type="button" class="wl-modal-close" id="wl-modal-close" aria-label="Fermer">&times;</button>
       </div>
-      <div id="wl-modal-body" class="wl-modal-body">Chargement...</div>
+      <div id="wl-modal-body" class="wl-modal-body" data-i18n="watchlog.loading">Chargement...</div>
     </div>
   </div>
 
@@ -717,7 +717,7 @@
           q(l.log_level || ''),
           q(l.source || l.log_source || ''),
           q(l.service || ''),
-          q(l.log_user || l.target_user || ''),
+          q(l.target_user || ''),
           q(l.event_type || ''),
           q(l.message || '')
         ].join(',');

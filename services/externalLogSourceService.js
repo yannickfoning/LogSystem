@@ -283,7 +283,6 @@ async function ingestLogs(logs, source) {
           error_type: logEntry.error_type || null,
           stack_trace: logEntry.stack_trace || null,
           target_user: logEntry.target_user || null,
-          log_user: logEntry.user_id || null,
           user_id: source.user_id,
           parser_format: 'external-http',
           source_type: 'external',
@@ -307,12 +306,12 @@ async function ingestLogs(logs, source) {
 
         await conn.execute(
           `INSERT INTO logs (
-            timestamp, created_time, imported_at, log_level, 
-            message, normalized_message, event_type, fingerprint, service, 
-            module, source, source_server, error_type, stack_trace, 
-            target_user, log_user, user_id, parser_format, source_type, 
+            timestamp, created_time, imported_at, log_level,
+            message, normalized_message, event_type, fingerprint, service,
+            module, source, source_server, error_type, stack_trace,
+            target_user, user_id, parser_format, source_type,
             timestamp_inferred, classification_confidence, batch_id, external_source_id
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             enriched.timestamp,
             enriched.created_time,
@@ -329,7 +328,6 @@ async function ingestLogs(logs, source) {
             enriched.error_type,
             enriched.stack_trace,
             enriched.target_user,
-            enriched.log_user,
             enriched.user_id,
             enriched.parser_format,
             enriched.source_type,

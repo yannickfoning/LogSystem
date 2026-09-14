@@ -51,7 +51,7 @@ router.get('/', requireAuth, async (req, res) => {
     }
 
     const [rows] = await pool.execute(
-      `SELECT r.*, u.username as created_by_username 
+      `SELECT r.*, u.display_name as created_by_username 
        FROM error_recommendations r 
        LEFT JOIN users u ON r.created_by = u.id 
        WHERE r.is_active = 1 
@@ -72,7 +72,7 @@ router.get('/:id', requireAuth, async (req, res) => {
     if (isNaN(id)) return res.status(400).json({ error: 'ID invalide' });
 
     const [rows] = await pool.execute(
-      `SELECT r.*, u.username as created_by_username 
+      `SELECT r.*, u.display_name as created_by_username 
        FROM error_recommendations r 
        LEFT JOIN users u ON r.created_by = u.id 
        WHERE r.id = ?`,

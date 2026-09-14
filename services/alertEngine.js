@@ -2,7 +2,13 @@ import logger from '../config/logger.js';
 import pool, { levelSeverity, normalizeLevel } from '../config/database.js';
 import EventEmitter from 'events';
 import { detectVolumeAnomalies } from './anomaliesService.js';
-import { OPERATIONAL_TS, OPERATIONAL_TS_EXPR, isCloudDeployment } from '../lib/operationalTime.js';
+import {
+  OPERATIONAL_TS,
+  OPERATIONAL_TS_EXPR,
+  isCloudDeployment,
+  toMysqlUtcDatetime,
+  mysqlUtcMinutesAgo,
+} from '../lib/operationalTime.js';
 
 const ALERT_EVAL_INTERVAL = parseInt(process.env.ALERT_EVAL_INTERVAL || '60000', 10);
 const SAFETY_INTERVAL = parseInt(process.env.SAFETY_INTERVAL || ALERT_EVAL_INTERVAL.toString(), 10); // Fix #3: Use ALERT_EVAL_INTERVAL (60s) instead of 10s to prevent DB saturation
@@ -80,36 +86,84 @@ async function ensureDefaultAlertRules() {
   }
 }
 
+// Helper function to parse condition_value in both JSON and STRING formats
+function parseConditionValue(conditionValue, rule) {
+  // Try JSON format first (legacy format)
+  if (conditionValue && typeof conditionValue === 'string' && conditionValue.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(conditionValue);
+      // Map legacy JSON keys to modern format
+      if (parsed.level) return { value: parsed.level, threshold: parsed.count || 1 };
+      if (parsed.count) return { value: null, threshold: parsed.count };
+      return { value: null, threshold: 1 };
+    } catch (e) {
+      // If JSON parsing fails, fall back to string treatment
+      logger.warn({ event: 'json_parse_failed', conditionValue, error: e.message }, '[ALERT]');
+    }
+  }
+  
+  // Modern STRING format: use condition_value directly and threshold_value from rule
+  return { value: conditionValue, threshold: rule.threshold_value };
+}
+
 async function evalRule(rule, targetUserId = rule.created_by || null) {
   const now = new Date();
-  const windowStart = new Date(now.getTime() - rule.time_window_minutes * 60000);
+  const windowStartFormatted = mysqlUtcMinutesAgo(rule.time_window_minutes, now);
   const conditionType = rule.condition_type;
   const conditionValue = rule.condition_value;
   const tsCol = OPERATIONAL_TS;
   
   const userFilter = targetUserId ? 'AND user_id = ?' : 'AND 1=0';
   const scopedParams = targetUserId ? [targetUserId] : [];
+  
+  // Parse condition_value to support both JSON and STRING formats
+  const parsed = parseConditionValue(conditionValue, rule);
+  const effectiveValue = parsed.value !== null ? parsed.value : conditionValue;
+  const effectiveThreshold = parsed.threshold !== undefined ? parsed.threshold : rule.threshold_value;
 
   if (conditionType === 'level') {
     const [rows] = await pool.execute(
       `SELECT COUNT(*) as cnt FROM logs WHERE ${tsCol} >= ? AND log_level = ? ` + userFilter,
-      [windowStart, normalizeLevel(conditionValue), ...scopedParams]
+      [windowStartFormatted, normalizeLevel(effectiveValue), ...scopedParams]
     );
-    if (rows[0].cnt >= (rule.threshold_value ?? 1)) {
-      return createAlert(rule, `Level ${conditionValue} detected ${rows[0].cnt} times in last ${rule.time_window_minutes}min`, targetUserId);
+    
+    // DIAGNOSTIC LOG: Log condition evaluation details
+    const countValue = rows[0].cnt;
+    const thresholdValue = effectiveThreshold ?? 1;
+    const conditionResult = countValue >= thresholdValue;
+    
+    logger.info({ 
+      event: 'rule_condition_eval', 
+      ruleId: rule.id, 
+      ruleName: rule.name,
+      conditionType, 
+      effectiveValue, 
+      countValue, 
+      thresholdValue, 
+      conditionResult,
+      windowStart: windowStartFormatted,
+      userFilter,
+      scopedParams
+    }, '[ALERT] DIAGNOSTIC');
+    
+    if (conditionResult) {
+      logger.info({ event: 'rule_condition_true_calling_createAlert', ruleId: rule.id, countValue, thresholdValue }, '[ALERT] DIAGNOSTIC');
+      return createAlert(rule, `Level ${effectiveValue} detected ${rows[0].cnt} times in last ${rule.time_window_minutes}min`, targetUserId);
+    } else {
+      logger.info({ event: 'rule_condition_false_skipping_createAlert', ruleId: rule.id, countValue, thresholdValue }, '[ALERT] DIAGNOSTIC');
     }
   } else if (conditionType === 'count') {
     const [rows] = await pool.execute(
       `SELECT COUNT(*) as cnt FROM logs WHERE ${tsCol} >= ? ` + userFilter,
-      [windowStart, ...scopedParams]
+      [windowStartFormatted, ...scopedParams]
     );
-    if (rows[0].cnt >= (rule.threshold_value ?? 100)) {
-      return createAlert(rule, `Total log count ${rows[0].cnt} exceeds threshold ${rule.threshold_value} in last ${rule.time_window_minutes}min`, targetUserId);
+    if (rows[0].cnt >= (effectiveThreshold ?? 100)) {
+      return createAlert(rule, `Total log count ${rows[0].cnt} exceeds threshold ${effectiveThreshold} in last ${rule.time_window_minutes}min`, targetUserId);
     }
   } else if (conditionType === 'silence') {
     const [rows] = await pool.execute(
       `SELECT COUNT(*) as cnt FROM logs WHERE ${tsCol} >= ? ` + userFilter,
-      [windowStart, ...scopedParams]
+      [windowStartFormatted, ...scopedParams]
     );
     if (rows[0].cnt === 0) {
       return createAlert(rule, `Aucune activité depuis ${rule.time_window_minutes} minutes`, targetUserId);
@@ -117,29 +171,29 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
   } else if (conditionType === 'fingerprint') {
     const [rows] = await pool.execute(
       `SELECT COUNT(*) as cnt FROM logs WHERE ${tsCol} >= ? AND fingerprint = ? ` + userFilter,
-      [windowStart, conditionValue, ...scopedParams]
+      [windowStartFormatted, effectiveValue, ...scopedParams]
     );
-    if (rows[0].cnt >= (rule.threshold_value ?? 1)) {
-      return createAlert(rule, `Fingerprint ${conditionValue.slice(0, 12)}... occurred ${rows[0].cnt} times in last ${rule.time_window_minutes}min`, targetUserId);
+    if (rows[0].cnt >= (effectiveThreshold ?? 1)) {
+      return createAlert(rule, `Fingerprint ${effectiveValue.slice(0, 12)}... occurred ${rows[0].cnt} times in last ${rule.time_window_minutes}min`, targetUserId);
     }
   } else if (conditionType === 'threshold') {
-    const level = normalizeLevel(conditionValue);
+    const level = normalizeLevel(effectiveValue);
     const [rows] = await pool.execute(
       `SELECT log_level, COUNT(*) as cnt FROM logs WHERE ${tsCol} >= ? ` + userFilter + ' GROUP BY log_level',
-      [windowStart, ...scopedParams]
+      [windowStartFormatted, ...scopedParams]
     );
     let triggered = false;
     let msg = '';
     for (const row of rows) {
-      if (levelSeverity(row.log_level) >= levelSeverity(level) && row.cnt >= (rule.threshold_value ?? 10)) {
+      if (levelSeverity(row.log_level) >= levelSeverity(level) && row.cnt >= (effectiveThreshold ?? 10)) {
         triggered = true;
-        msg = `${row.log_level}: ${row.cnt} occurrences (threshold: ${rule.threshold_value})`;
+        msg = `${row.log_level}: ${row.cnt} occurrences (threshold: ${effectiveThreshold})`;
       }
     }
     if (triggered) {
       return createAlert(
         rule,
-        msg || `Level ${conditionValue} detected in last ${rule.time_window_minutes}min`,
+        msg || `Level ${effectiveValue} detected in last ${rule.time_window_minutes}min`,
         targetUserId
       );
     }
@@ -149,40 +203,40 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
          COUNT(*) as total,
          SUM(CASE WHEN log_level IN ('ERROR','CRITICAL','FATAL') THEN 1 ELSE 0 END) as errors
        FROM logs WHERE ${tsCol} >= ? ${userFilter}`,
-      [windowStart, ...scopedParams]
+      [windowStartFormatted, ...scopedParams]
     );
     const total = rows[0]?.total || 0;
     const errors = rows[0]?.errors || 0;
     const rate = total > 0 ? Math.min(100, (errors / total) * 100) : 0;
-    const threshold = parseFloat(conditionValue) || rule.threshold_value || 10;
+    const threshold = parseFloat(effectiveValue) || effectiveThreshold || 10;
     if (total > 0 && rate > threshold) {
       return createAlert(rule, `Taux d'erreur ${rate.toFixed(1)}% (> ${threshold}%) sur ${rule.time_window_minutes} min`, targetUserId);
     }
   } else if (conditionType === 'level_count') {
-    const levels = String(conditionValue || '').split('|').map(normalizeLevel);
+    const levels = String(effectiveValue || '').split('|').map(normalizeLevel);
     const placeholders = levels.map(() => '?').join(',');
     const [rows] = await pool.execute(
       `SELECT COUNT(*) as cnt FROM logs WHERE ${tsCol} >= ? AND log_level IN (${placeholders}) ${userFilter}`,
-      [windowStart, ...levels, ...scopedParams]
+      [windowStartFormatted, ...levels, ...scopedParams]
     );
-    if (rows[0].cnt >= (rule.threshold_value ?? 1)) {
-      return createAlert(rule, `${rows[0].cnt} log(s) ${conditionValue} détecté(s)`, targetUserId);
+    if (rows[0].cnt >= (effectiveThreshold ?? 1)) {
+      return createAlert(rule, `${rows[0].cnt} log(s) ${effectiveValue} détecté(s)`, targetUserId);
     }
   } else if (conditionType === 'import_status') {
     const scopeUser = targetUserId ? 'AND user_id = ?' : '';
     const [rows] = await pool.execute(
       `SELECT COUNT(*) as cnt FROM import_jobs WHERE status = 'failed' AND completed_at >= ? ${scopeUser}`,
-      [windowStart, ...(targetUserId ? [targetUserId] : [])]
+      [windowStartFormatted, ...(targetUserId ? [targetUserId] : [])]
     );
     if (rows[0].cnt >= (rule.threshold_value ?? 1)) {
       return createAlert(rule, `${rows[0].cnt} import(s) échoué(s) récemment`, targetUserId);
     }
   } else if (conditionType === 'log_inactivity') {
-    const minutes = parseInt(conditionValue, 10) || rule.time_window_minutes || 60;
-    const since = new Date(now.getTime() - minutes * 60000);
+    const minutes = parseInt(effectiveValue, 10) || rule.time_window_minutes || 60;
+    const sinceFormatted = mysqlUtcMinutesAgo(minutes, now);
     const [rows] = await pool.execute(
       `SELECT COUNT(*) as cnt FROM logs WHERE ${tsCol} >= ? ` + userFilter,
-      [since, ...scopedParams]
+      [sinceFormatted, ...scopedParams]
     );
     if (rows[0].cnt === 0) {
       return createAlert(rule, `Aucun log reçu depuis ${minutes} minutes`, targetUserId);
@@ -229,9 +283,9 @@ async function createAlert(rule, message, targetUserId = null) {
 
   // Fetch sample logs and statistics for context
   try {
-    const windowStart = new Date(Date.now() - rule.time_window_minutes * 60000);
+    const windowStartFormatted = mysqlUtcMinutesAgo(rule.time_window_minutes);
     const userFilter = userId ? ' AND user_id = ?' : '';
-    const params = userId ? [windowStart, userId] : [windowStart];
+    const params = userId ? [windowStartFormatted, userId] : [windowStartFormatted];
     
     // Get count and sample logs
     const tsCol = OPERATIONAL_TS;

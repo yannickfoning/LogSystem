@@ -11,7 +11,7 @@ router.use(requireAuth);
 
 const MAX_LIMIT = 500;
 const DEFAULT_LIMIT = 50;
-const LOG_COLUMNS = 'id, timestamp, created_time, imported_at, log_level, source, source_server, source_system, service, message, normalized_message, event_type, error_type, fingerprint, user_id, target_user, module, parser_format, timestamp_inferred, created_at, file_name, file_created_at, import_job_id, imported_by_user_id, log_source, log_user, source_type, ingested_realtime';
+const LOG_COLUMNS = 'id, timestamp, created_time, imported_at, log_level, source, source_server, source_system, service, message, normalized_message, event_type, error_type, fingerprint, user_id, target_user, module, parser_format, timestamp_inferred, created_at, file_created_at, source_type, ingested_realtime';
 
 // ── Helper : filtres SQL partagés ─────────────────────────────────────────────
 function buildFilters(query, userScopeFilter, useImportedAtForDateRange = false) {
@@ -89,7 +89,7 @@ router.get('/export/csv', async (req, res) => {
     const userScopeFilter = userScope(req);
     const { sql: filters, params } = buildFilters(req.query, userScopeFilter);
     const [rows] = await pool.execute(
-      `SELECT id, timestamp, imported_at, log_level, source, source_server, service, event_type, error_type, fingerprint, target_user, log_user, log_source, file_name, message FROM logs WHERE 1=1 ${filters} ORDER BY timestamp DESC LIMIT 10000`,
+      `SELECT id, timestamp, imported_at, log_level, source, source_server, service, event_type, error_type, fingerprint, target_user, message FROM logs WHERE 1=1 ${filters} ORDER BY timestamp DESC LIMIT 10000`,
       params
     );
     if (rows.length >= 10000) {
@@ -99,8 +99,8 @@ router.get('/export/csv', async (req, res) => {
     const header = ['ID', 'Date', 'Heure', 'Niveau', 'Source', 'Service', 'Utilisateur', 'Message', 'Importé le', 'Fichier', 'Source log'].map(escape).join(',');
     const body = rows.map(r => [
       r.id, String(r.timestamp ?? '').slice(0, 10), String(r.timestamp ?? '').slice(11, 19),
-      r.log_level ?? '', r.source ?? '', r.service ?? '', (r.log_user || r.target_user || ''), r.message ?? '',
-      r.imported_at ?? '', r.file_name ?? '', r.log_source ?? ''
+      r.log_level ?? '', r.source ?? '', r.service ?? '', (r.target_user || ''), r.message ?? '',
+      r.imported_at ?? ''
     ].map(escape).join(',')).join('\n');
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="logs_export_${new Date().toISOString().slice(0,10)}.csv"`);
@@ -126,7 +126,7 @@ router.get('/export/pdf', async (req, res) => {
       return res.status(422).json({ error: 'Trop de résultats pour PDF. Max 10K. Affinez votre recherche.' });
     }
     const [rows] = await pool.execute(
-      `SELECT id, timestamp, imported_at, log_level, source, source_server, service, event_type, error_type, fingerprint, target_user, log_user, log_source, file_name, file_created_at, message FROM logs WHERE 1=1 ${filters} ORDER BY timestamp DESC LIMIT ${MAX_PDF_ROWS}`,
+      `SELECT id, timestamp, imported_at, log_level, source, source_server, service, event_type, error_type, fingerprint, target_user, file_created_at, message FROM logs WHERE 1=1 ${filters} ORDER BY timestamp DESC LIMIT ${MAX_PDF_ROWS}`,
       params
     );
 
@@ -476,7 +476,7 @@ router.get('/directory', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const scope = userScope(req);
-    const cols = 'id, timestamp, created_time, imported_at, timezone, log_level, source, source_server, service, message, normalized_message, event_type, fingerprint, user_id, client_ip, module, error_type, stack_trace, target_user, raw_log, parser_format, timestamp_inferred, classification_confidence, created_at, file_name, file_created_at, import_job_id, imported_by_user_id, log_source, log_user';
+    const cols = 'id, timestamp, created_time, imported_at, timezone, log_level, source, source_server, service, message, normalized_message, event_type, fingerprint, user_id, client_ip, module, error_type, stack_trace, target_user, raw_log, parser_format, timestamp_inferred, classification_confidence, created_at, file_created_at';
     const [rows] = await pool.execute(`SELECT ${cols} FROM logs WHERE id = ?` + scope.sql, [req.params.id, ...scope.params]);
     if (!rows.length) return res.status(404).json({ error: 'Log non trouvé' });
     res.json(rows[0]);

@@ -22,7 +22,7 @@ import fs from 'fs';
 
 import { testConnection, buildSslOptions } from './config/database.js';
 import { runMigrations } from './lib/database/migrationRunner.js';
-import { requireAuth } from './middleware/auth.js';
+import { requireAuth, requireAuthPage, requireAdminPage } from './middleware/auth.js';
 import { scopeGuard } from './middleware/scopeGuard.js';
 import { csrfMiddleware, csrfValidation } from './middleware/csrf.js';
 import authRoutes from './routes/auth.js';
@@ -208,6 +208,15 @@ app.get('/health', (req, res) => {
 
 // ── Static files ──────────────────────────────────────────────────────────────
 const publicDir = path.join(__dirname, 'public');
+
+// Protect static HTML pages that require authentication
+app.get('/dashboard.html', requireAuthPage);
+app.get('/search.html', requireAuthPage);
+app.get('/import.html', requireAuthPage);
+app.get('/watchlog.html', requireAuthPage);
+app.get('/recommendations.html', requireAuthPage);
+app.get('/admin.html', requireAdminPage);
+
 app.use(createHtmlCspMiddleware(publicDir));
 app.use(express.static(publicDir, { index: false }));
 app.get('/', (req, res) => {

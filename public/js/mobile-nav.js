@@ -5,11 +5,11 @@
   'use strict';
 
   var NAV_ITEMS = [
-    { href: '/dashboard.html', label: 'Tableau de bord', icon: 'M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z' },
-    { href: '/search.html', label: 'Recherche', icon: 'M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C8.01 14 6 11.99 6 9.5S8.01 5 10.5 5 15 7.01 15 9.5 12.99 14 10.5 14z' },
-    { href: '/import.html', label: 'Import', icon: 'M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z' },
-    { href: '/watchlog.html', label: 'Watch', icon: 'M4 10v4h16v-4H4zm0-6v4h10V4H4zm0 12v4h10v-4H4z' },
-    { href: '/admin.html', label: 'Admin', icon: 'M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z', adminOnly: true }
+    { href: '/dashboard.html', labelKey: 'nav.dashboard', icon: 'M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z' },
+    { href: '/search.html', labelKey: 'nav.search', icon: 'M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C8.01 14 6 11.99 6 9.5S8.01 5 10.5 5 15 7.01 15 9.5 12.99 14 10.5 14z' },
+    { href: '/import.html', labelKey: 'nav.import', icon: 'M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z' },
+    { href: '/watchlog.html', labelKey: 'nav.watchlog', icon: 'M4 10v4h16v-4H4zm0-6v4h10V4H4zm0 12v4h10v-4H4z' },
+    { href: '/admin.html', labelKey: 'nav.admin', icon: 'M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z', adminOnly: true }
   ];
 
   function svgIcon(pathD) {
@@ -25,7 +25,9 @@
     NAV_ITEMS.forEach(function (item) {
       var a = document.createElement('a');
       a.href = item.href;
-      a.innerHTML = svgIcon(item.icon) + '<span>' + item.label + '</span>';
+      a.dataset.labelKey = item.labelKey || '';
+      var label = item.labelKey && window.i18n ? window.i18n.t(item.labelKey) : (item.label || item.labelKey);
+      a.innerHTML = svgIcon(item.icon) + '<span>' + label + '</span>';
       if (item.href === path || path.endsWith(item.href.replace(/^\//, ''))) {
         a.setAttribute('aria-current', 'page');
         a.classList.add('active');
@@ -37,6 +39,18 @@
     });
     document.body.appendChild(nav);
     document.body.classList.add('has-bottom-nav');
+  }
+
+  function refreshBottomNavLabels() {
+    var nav = document.querySelector('.bottom-nav');
+    if (!nav) return;
+    nav.querySelectorAll('a').forEach(function (a) {
+      var labelKey = a.dataset.labelKey;
+      if (labelKey && window.i18n) {
+        var span = a.querySelector('span');
+        if (span) span.textContent = window.i18n.t(labelKey);
+      }
+    });
   }
 
   function initHamburger() {
@@ -100,5 +114,9 @@
     buildBottomNav();
     initHamburger();
     hideAdminForNonAdmins();
+  });
+
+  document.addEventListener('i18n:change', function () {
+    refreshBottomNavLabels();
   });
 })();

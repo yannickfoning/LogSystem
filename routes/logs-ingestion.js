@@ -65,7 +65,6 @@ router.post('/ingest', async (req, res) => {
           error_type: logEntry.error_type || null,
           stack_trace: logEntry.stack_trace || null,
           target_user: logEntry.target_user || null,
-          log_user: logEntry.user_id || null,
           user_id: userId,
           parser_format: 'http-ingest',
           source_type: 'http',
@@ -89,12 +88,12 @@ router.post('/ingest', async (req, res) => {
 
         const insertSql = `
           INSERT INTO logs (
-            timestamp, created_time, imported_at, log_level, 
-            message, normalized_message, event_type, fingerprint, service, 
-            module, source, source_server, error_type, stack_trace, 
-            target_user, log_user, user_id, parser_format, source_type, 
+            timestamp, created_time, imported_at, log_level,
+            message, normalized_message, event_type, fingerprint, service,
+            module, source, source_server, error_type, stack_trace,
+            target_user, user_id, parser_format, source_type,
             timestamp_inferred, classification_confidence, batch_id
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ` + scope.sql;
 
         const insertParams = [
@@ -113,7 +112,6 @@ router.post('/ingest', async (req, res) => {
           enriched.error_type,
           enriched.stack_trace,
           enriched.target_user,
-          enriched.log_user,
           enriched.user_id,
           enriched.parser_format,
           enriched.source_type,
