@@ -483,6 +483,44 @@ describe('Logs CRUD and Import', () => {
       expect(logEntry).toHaveProperty('message');
     });
 
+    it('should accept importer schema fields required for DB-backed log ingestion', async () => {
+      const [result] = await dbPool.execute(
+        `INSERT INTO logs (
+          timestamp, log_level, source, service, message, user_id,
+          source_type, ingested_realtime, imported_by_user_id, log_source,
+          file_created_at, file_modified_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          '2026-01-01 10:00:00',
+          'INFO',
+          'imported-app',
+          'gateway',
+          'DB import regression',
+          testUsers.user.id,
+          'import',
+          0,
+          testUsers.user.id,
+          'imported-app',
+          '2026-01-01 08:00:00',
+          '2026-01-01 09:00:00',
+        ]
+      );
+
+      expect(result.insertId).toBeGreaterThan(0);
+
+      const [rows] = await dbPool.execute(
+        'SELECT source_type, ingested_realtime, imported_by_user_id, log_source, file_created_at, file_modified_at FROM logs WHERE id = ?',
+        [result.insertId]
+      );
+
+      expect(rows[0]).toMatchObject({
+        source_type: 'import',
+        ingested_realtime: 0,
+        imported_by_user_id: testUsers.user.id,
+        log_source: 'imported-app',
+      });
+    });
+
     it('should handle large imports with batching', async () => {
       // Test that large files are processed in batches
       const batchSize = parseInt(process.env.IMPORT_BATCH_SIZE || '500', 10);

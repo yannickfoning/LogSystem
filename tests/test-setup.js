@@ -171,14 +171,15 @@ export async function createTestLogs(userId, count = 10) {
     const timestamp = ts.toISOString().slice(0, 19).replace('T', ' ');
     const level = levels[Math.floor(Math.random() * levels.length)];
     const service = services[Math.floor(Math.random() * services.length)];
+    const source = 'test-source';
     const message = messages[Math.floor(Math.random() * messages.length)];
-    
-    testLogs.push([timestamp, level, service, message, userId]);
+
+    testLogs.push([timestamp, level, source, service, message, userId, now.toISOString().slice(0, 19).replace('T', ' ')]);
   }
 
   for (const logData of testLogs) {
     await testDbPool.execute(
-      'INSERT INTO logs (timestamp, log_level, source, service, message, user_id, imported_at) VALUES (?, ?, ?, ?, ?, ?, NOW())',
+      'INSERT INTO logs (timestamp, log_level, source, service, message, user_id, imported_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
       logData
     );
   }

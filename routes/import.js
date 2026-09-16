@@ -443,6 +443,7 @@ async function insertBatch(conn, batch, userId) {
       entry.imported_by_user_id || userId || null,
       entry.imported_at || null,
       entry.log_source || null,
+      entry.import_job_id || null,
     ]);
 
     await conn.query(
@@ -450,30 +451,50 @@ async function insertBatch(conn, batch, userId) {
         raw_log, timestamp, created_time, timezone, log_level, source, source_server, source_system, service, message, normalized_message,
         event_type, fingerprint, user_id, source_type, ingested_realtime, client_ip, module, error_type,
         stack_trace, target_user, parser_format, timestamp_inferred, classification_confidence,
-        file_created_at, file_modified_at, imported_by_user_id, imported_at, log_source
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      logValues[0],
+        file_created_at, file_modified_at, imported_by_user_id, imported_at, log_source, import_job_id
+      ) VALUES ?`,
+      [logValues],
     );
 
     // FIX: error_groups — severity_max est VARCHAR donc on compare avec FIELD()
     // pour éviter GREATEST() sur des types incompatibles
-    const errorGroupValues = batch
-      .filter(entry => ['ERROR', 'CRITICAL', 'FATAL'].includes(entry.log_level))
-      .map((entry) => [
-        entry.fingerprint,
-        (entry.message || "").slice(0, 500),
-        entry.event_type,
-        entry.log_level,
-        1,
-        entry.timestamp,
-        entry.timestamp,
-        entry.source_server,
-        entry.service,
-        entry.error_type,
-        userId || null,
+    const errorEntries = batch.filter(entry => ['ERROR', 'CRITICAL', 'FATAL'].includes(entry.log_level));
+    
+    if (errorEntries.length > 0) {
+      // Grouper par fingerprint pour n'insérer qu'une fois par fingerprint avec le bon compte
+      const fingerprintGroups = new Map();
+      for (const entry of errorEntries) {
+        if (!fingerprintGroups.has(entry.fingerprint)) {
+          fingerprintGroups.set(entry.fingerprint, {
+            fingerprint: entry.fingerprint,
+            title: (entry.message || "").slice(0, 500),
+            event_type: entry.event_type,
+            log_level: entry.log_level,
+            count: 0,
+            timestamp: entry.timestamp,
+            source_server: entry.source_server,
+            service: entry.service,
+            error_type: entry.error_type,
+            user_id: userId || null,
+          });
+        }
+        fingerprintGroups.get(entry.fingerprint).count++;
+      }
+
+      const errorGroupValues = Array.from(fingerprintGroups.values()).map(group => [
+        group.fingerprint,
+        group.title,
+        group.event_type,
+        group.log_level,
+        group.count,
+        group.timestamp,
+        group.timestamp,
+        group.source_server,
+        group.service,
+        group.error_type,
+        group.user_id,
       ]);
 
-    if (errorGroupValues.length > 0) {
       const placeholders = errorGroupValues
         .map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .join(",");
@@ -484,7 +505,7 @@ async function insertBatch(conn, batch, userId) {
         `INSERT INTO error_groups (fingerprint, title, event_type, severity_max, occurrence_count, first_seen, last_seen, source_server, service, error_type, user_id)
          VALUES ${placeholders}
          ON DUPLICATE KEY UPDATE
-           occurrence_count = occurrence_count + 1,
+           occurrence_count = occurrence_count + VALUES(occurrence_count),
            previous_seen = IF(VALUES(last_seen) > last_seen, last_seen, previous_seen),
            return_reason = IF(
              (status = 'resolved' OR TIMESTAMPDIFF(DAY, last_seen, VALUES(last_seen)) >= ?)

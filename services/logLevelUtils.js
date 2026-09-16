@@ -4,24 +4,38 @@
  */
 
 export function normalizeLevel(level) {
-  const l = String(level || 'INFO').toUpperCase();
-  
-  // Pino numeric level mapping: 10→TRACE, 20→DEBUG, 30→INFO, 40→WARN, 50→ERROR, 60→FATAL
+  const raw = String(level ?? 'INFO').trim();
+  const l = raw.toUpperCase();
+
   const numericMap = {
     '10': 'TRACE',
     '20': 'DEBUG',
     '30': 'INFO',
     '40': 'WARNING',
     '50': 'ERROR',
-    '60': 'CRITICAL'
+    '60': 'CRITICAL',
   };
-  
+
   if (numericMap[l]) {
     return numericMap[l];
   }
-  
-  const valid = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL', 'FATAL', 'SECURITY', 'TRACE'];
-  return valid.includes(l) ? l : 'INFO';
+
+  const aliases = {
+    TRACE: 'TRACE',
+    DEBUG: 'DEBUG',
+    INFO: 'INFO',
+    NOTICE: 'INFO',
+    WARN: 'WARNING',
+    WARNING: 'WARNING',
+    ERR: 'ERROR',
+    ERROR: 'ERROR',
+    CRITICAL: 'CRITICAL',
+    FATAL: 'FATAL',
+    ALERT: 'ERROR',
+    SECURITY: 'SECURITY',
+  };
+
+  return aliases[l] || 'INFO';
 }
 
 export function levelSeverity(level) {

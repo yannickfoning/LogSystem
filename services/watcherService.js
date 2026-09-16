@@ -262,41 +262,50 @@ async function processLogFile(filePath, incremental = true) {
         [logValues]
       );
 
-      // P-04: Aggregate error_groups update with ON DUPLICATE KEY UPDATE
-      // IMPORTANT: on ne peut pas se baser sur logResult.insertId avec INSERT IGNORE.
-      // On calcule plutôt sample_log_id via une sélection sûre (id réel du log correspondant).
-      const errorGroupUpdates = [];
-      const errorGroupParams = [];
-      for (let i = 0; i < entries.length; i++) {
-        const entry = entries[i];
+      const errorEntries = entries.filter(entry => ['ERROR', 'CRITICAL', 'FATAL'].includes(entry.log_level));
 
-        // sample_log_id : log_id réel le plus proche correspondant fingerprint + timestamp + user_id
-        // (on prend le max id pour coller au dernier log potentiellement inséré)
-        errorGroupUpdates.push(
-          `(?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)`
-        );
+      if (errorEntries.length > 0) {
+        const fingerprintGroups = new Map();
+        for (const entry of errorEntries) {
+          if (!fingerprintGroups.has(entry.fingerprint)) {
+            fingerprintGroups.set(entry.fingerprint, {
+              fingerprint: entry.fingerprint,
+              title: (entry.message || '').slice(0, 500),
+              event_type: entry.event_type,
+              log_level: entry.log_level,
+              count: 0,
+              timestamp: entry.timestamp,
+              source_server: entry.source_server,
+              service: entry.service,
+              error_type: entry.error_type,
+              user_id: entry.user_id || null,
+            });
+          }
+          fingerprintGroups.get(entry.fingerprint).count++;
+        }
 
-        errorGroupParams.push(
-          entry.fingerprint,
-          (entry.message || '').slice(0, 500),
-          entry.event_type,
-          entry.log_level,
-          entry.timestamp,
-          entry.timestamp,
-          entry.source_server,
-          entry.service,
-          entry.error_type,
-          entry.user_id
-        );
-      }
+        const errorGroupValues = Array.from(fingerprintGroups.values()).map(group => [
+          group.fingerprint,
+          group.title,
+          group.event_type,
+          group.log_level,
+          group.count,
+          group.timestamp,
+          group.timestamp,
+          group.source_server,
+          group.service,
+          group.error_type,
+          group.user_id,
+        ]);
 
-      // Si aucun entry => rien à faire
-      if (errorGroupUpdates.length > 0) {
+        const placeholders = errorGroupValues.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(',');
+        const flatParams = errorGroupValues.flat();
+
         await conn.query(
           `INSERT INTO error_groups (fingerprint, title, event_type, severity_max, occurrence_count, first_seen, last_seen, source_server, service, error_type, user_id)
-           VALUES ${errorGroupUpdates.join(',')}
+           VALUES ${placeholders}
            ON DUPLICATE KEY UPDATE
-             occurrence_count = occurrence_count + 1,
+             occurrence_count = occurrence_count + VALUES(occurrence_count),
              previous_seen = IF(VALUES(last_seen) > last_seen, last_seen, previous_seen),
              return_reason = IF(
                (status = 'resolved' OR TIMESTAMPDIFF(DAY, last_seen, VALUES(last_seen)) >= ?)
@@ -335,7 +344,7 @@ async function processLogFile(filePath, incremental = true) {
                VALUES(severity_max),
                severity_max
              )`,
-          [...errorGroupParams, RETURN_GAP_DAYS, RETURN_GAP_DAYS, RETURN_GAP_DAYS, RETURN_GAP_DAYS]
+          [...flatParams, RETURN_GAP_DAYS, RETURN_GAP_DAYS, RETURN_GAP_DAYS, RETURN_GAP_DAYS]
         );
       }
 
