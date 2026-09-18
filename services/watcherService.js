@@ -467,17 +467,14 @@ export async function detectAnomalies(userId, windowMinutes = 10) {
     const current = currentLogs[0] || { count: 0, errors: 0 };
     const baseline = baselineLogs[0] || { count: 0, errors: 0 };
 
-    if (!current.count || !baseline.count) {
-      return { anomaly_detected: false, reason: 'Insufficient data' };
-    }
-
-    const currentErrorRate = (current.errors / current.count) * 100;
-    const baselineErrorRate = (baseline.errors / baseline.count) * 100;
+    const currentErrorRate = current.count > 0 ? (current.errors / current.count) * 100 : 0;
+    const baselineErrorRate = baseline.count > 0 ? (baseline.errors / baseline.count) * 100 : 0;
     const rateIncrease = baselineErrorRate > 0
       ? ((currentErrorRate / baselineErrorRate) * 100 - 100)
       : currentErrorRate > 0 ? 100 : 0;
 
-    const isAnomaly = currentErrorRate > baselineErrorRate * 1.5 || currentErrorRate > 30;
+    const isAnomaly = current.count > 0 && baseline.count > 0 && 
+      (currentErrorRate > baselineErrorRate * 1.5 || currentErrorRate > 30);
 
     return {
       anomaly_detected: isAnomaly,
@@ -489,7 +486,8 @@ export async function detectAnomalies(userId, windowMinutes = 10) {
       current_rate: parseFloat(currentErrorRate.toFixed(2)),
       baseline_rate: parseFloat(baselineErrorRate.toFixed(2)),
       threshold_exceeded: currentErrorRate > 30,
-      rate_increase_percent: parseFloat(rateIncrease.toFixed(1))
+      rate_increase_percent: parseFloat(rateIncrease.toFixed(1)),
+      reason: (!current.count || !baseline.count) ? 'Insufficient data' : null
     };
   } catch (error) {
     logger.error({ event: 'anomaly_detection_error', error: error.message }, '[WATCHER]');

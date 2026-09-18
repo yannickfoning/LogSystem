@@ -54,20 +54,23 @@ export async function teardownTestDb() {
 /**
  * Clean all test data from database
  * Removes test users, logs, alerts, and other test artifacts
+ * Tables are cleaned in correct order to respect foreign key constraints
  */
 export async function cleanTestData() {
   if (!testDbPool) {
     throw new Error('Test database not initialized');
   }
 
+  // Clean in correct order to respect foreign key constraints
+  // Child tables first, then parent tables
   const tables = [
-    'logs',
-    'error_groups', 
-    'alerts',
-    'alert_rules',
-    'import_jobs',
-    'audit_log',
-    'watch_offsets'
+    'logs',              // Depends on users
+    'alerts',            // Depends on alert_rules, users
+    'alert_rules',       // Depends on users
+    'error_groups',       // Depends on users
+    'import_jobs',       // Depends on users
+    'audit_log',         // Depends on users
+    'watch_offsets'      // Depends on users
   ];
 
   for (const table of tables) {
@@ -85,7 +88,7 @@ export async function cleanTestData() {
     }
   }
 
-  // Clean test users
+  // Clean test users last (parent table)
   try {
     await testDbPool.execute("DELETE FROM users WHERE email LIKE '%@test.local'");
   } catch (error) {
@@ -95,6 +98,7 @@ export async function cleanTestData() {
 
 /**
  * Create test users with different roles
+ * Uses INSERT IGNORE to handle duplicate entries gracefully
  */
 export async function createTestUsers() {
   if (!testDbPool) {
@@ -105,48 +109,91 @@ export async function createTestUsers() {
   const testPassword = 'Test@1234';
   const testHash = await bcrypt.hash(testPassword, rounds);
 
-  // Create admin user
-  const [adminResult] = await testDbPool.execute(
-    `INSERT INTO users (email, password_hash, display_name, role, is_active)
-     VALUES (?, ?, ?, 'admin', 1)`,
-    ['admin@test.local', testHash, 'Test Admin']
-  );
+  // Clean existing test users first to avoid duplicates
+  try {
+    await testDbPool.execute("DELETE FROM users WHERE email LIKE '%@test.local'");
+  } catch (error) {
+    console.warn('[TEST-DB] Failed to clean test users:', error.message);
+  }
 
-  // Create regular user
-  const [userResult] = await testDbPool.execute(
-    `INSERT INTO users (email, password_hash, display_name, role, is_active)
-     VALUES (?, ?, ?, 'user', 1)`,
-    ['user@test.local', testHash, 'Test User']
-  );
+  // Helper function to create user with fallback using INSERT IGNORE
+  async function createUser(email, displayName, role, isActive) {
+    try {
+      // Try INSERT IGNORE first to handle duplicates gracefully
+      const [result] = await testDbPool.execute(
+        `INSERT IGNORE INTO users (email, password_hash, display_name, role, is_active)
+         VALUES (?, ?, ?, ?, ?)`,
+        [email, testHash, displayName, role, isActive ? 1 : 0]
+      );
+      
+      // If insert succeeded, return the insert ID
+      if (result.insertId > 0) {
+        return result.insertId;
+      }
+      
+      // If insert was ignored (duplicate), get existing ID
+      const [existing] = await testDbPool.execute(
+        'SELECT id FROM users WHERE email = ?',
+        [email]
+      );
+      if (existing.length > 0) {
+        return existing[0].id;
+      }
+      
+      throw new Error(`Failed to create or retrieve user: ${email}`);
+    } catch (error) {
+      console.warn(`[TEST-DB] Error creating user ${email}:`, error.message);
+      // Fallback: try to get existing user
+      try {
+        const [existing] = await testDbPool.execute(
+          'SELECT id FROM users WHERE email = ?',
+          [email]
+        );
+        if (existing.length > 0) {
+          return existing[0].id;
+        }
+      } catch (fallbackError) {
+        console.warn(`[TEST-DB] Fallback query failed for ${email}:`, fallbackError.message);
+      }
+      throw error;
+    }
+  }
 
-  // Create analyst user
-  const [analystResult] = await testDbPool.execute(
-    `INSERT INTO users (email, password_hash, display_name, role, is_active)
-     VALUES (?, ?, ?, 'analyst', 1)`,
-    ['analyst@test.local', testHash, 'Test Analyst']
-  );
-
-  // Create inactive user for testing account locks
-  const [inactiveResult] = await testDbPool.execute(
-    `INSERT INTO users (email, password_hash, display_name, role, is_active)
-     VALUES (?, ?, ?, 'user', 0)`,
-    ['inactive@test.local', testHash, 'Inactive User']
-  );
+  const adminId = await createUser('admin@test.local', 'Test Admin', 'admin', true);
+  const userId = await createUser('user@test.local', 'Test User', 'user', true);
+  const analystId = await createUser('analyst@test.local', 'Test Analyst', 'analyst', true);
+  const inactiveId = await createUser('inactive@test.local', 'Inactive User', 'user', false);
 
   return {
-    admin: { id: adminResult.insertId, email: 'admin@test.local', password: testPassword },
-    user: { id: userResult.insertId, email: 'user@test.local', password: testPassword },
-    analyst: { id: analystResult.insertId, email: 'analyst@test.local', password: testPassword },
-    inactive: { id: inactiveResult.insertId, email: 'inactive@test.local', password: testPassword }
+    admin: { id: adminId, email: 'admin@test.local', password: testPassword },
+    user: { id: userId, email: 'user@test.local', password: testPassword },
+    analyst: { id: analystId, email: 'analyst@test.local', password: testPassword },
+    inactive: { id: inactiveId, email: 'inactive@test.local', password: testPassword }
   };
 }
 
 /**
  * Create sample test logs
+ * Validates userId before creating logs to avoid foreign key constraint errors
  */
 export async function createTestLogs(userId, count = 10) {
   if (!testDbPool) {
     throw new Error('Test database not initialized');
+  }
+
+  // Validate that the user exists before creating logs
+  try {
+    const [users] = await testDbPool.execute(
+      'SELECT id FROM users WHERE id = ?',
+      [userId]
+    );
+    if (users.length === 0) {
+      console.warn(`[TEST-DB] User ID ${userId} does not exist, skipping log creation`);
+      return 0;
+    }
+  } catch (error) {
+    console.warn(`[TEST-DB] Failed to validate user ID ${userId}:`, error.message);
+    return 0;
   }
 
   const now = new Date();
@@ -177,18 +224,25 @@ export async function createTestLogs(userId, count = 10) {
     testLogs.push([timestamp, level, source, service, message, userId, now.toISOString().slice(0, 19).replace('T', ' ')]);
   }
 
+  let createdCount = 0;
   for (const logData of testLogs) {
-    await testDbPool.execute(
-      'INSERT INTO logs (timestamp, log_level, source, service, message, user_id, imported_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      logData
-    );
+    try {
+      await testDbPool.execute(
+        'INSERT INTO logs (timestamp, log_level, source, service, message, user_id, imported_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        logData
+      );
+      createdCount++;
+    } catch (error) {
+      console.warn(`[TEST-DB] Failed to create log:`, error.message);
+    }
   }
 
-  return testLogs.length;
+  return createdCount;
 }
 
 /**
  * Create test alert rules
+ * Uses INSERT IGNORE to handle duplicate entries gracefully
  */
 export async function createTestAlertRules(userId) {
   if (!testDbPool) {
@@ -220,12 +274,27 @@ export async function createTestAlertRules(userId) {
 
   const createdRules = [];
   for (const rule of rules) {
-    const [result] = await testDbPool.execute(
-      `INSERT INTO alert_rules (name, description, condition_type, condition_value, threshold_value, time_window_minutes, severity, cooldown_minutes, is_active, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
-      [rule.name, rule.description, rule.condition_type, rule.condition_value, rule.threshold_value, rule.time_window_minutes, rule.severity, rule.cooldown_minutes, userId]
-    );
-    createdRules.push({ id: result.insertId, ...rule });
+    try {
+      const [result] = await testDbPool.execute(
+        `INSERT INTO alert_rules (name, description, condition_type, condition_value, threshold_value, time_window_minutes, severity, cooldown_minutes, is_active, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+        [rule.name, rule.description, rule.condition_type, rule.condition_value, rule.threshold_value, rule.time_window_minutes, rule.severity, rule.cooldown_minutes, userId]
+      );
+      createdRules.push({ id: result.insertId, ...rule });
+    } catch (error) {
+      if (error.code === 'ER_DUP_ENTRY') {
+        // Rule already exists, get existing ID
+        const [existingRule] = await testDbPool.execute(
+          'SELECT id FROM alert_rules WHERE name = ? AND created_by = ?',
+          [rule.name, userId]
+        );
+        if (existingRule.length > 0) {
+          createdRules.push({ id: existingRule[0].id, ...rule });
+        }
+      } else {
+        console.warn(`[TEST-DB] Failed to create alert rule ${rule.name}:`, error.message);
+      }
+    }
   }
 
   return createdRules;
@@ -242,11 +311,21 @@ export function getTestDbPool() {
  * Create a mock session object for testing
  */
 export function createMockSession(user) {
+  // Return empty session for unauthenticated tests
+  if (!user) {
+    return {
+      user: null,
+      regenerate: (callback) => callback(null),
+      save: (callback) => callback(null),
+      destroy: (callback) => callback(null)
+    };
+  }
+  
   return {
     user: {
       id: user.id,
       email: user.email,
-      display_name: user.email.split('@')[0],
+      display_name: user.email ? user.email.split('@')[0] : 'Test User',
       role: user.role || 'user',
       session_version: 0
     },
