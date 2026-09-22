@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/css/responsive.css">
   <link rel="stylesheet" href="/dashboard.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" integrity="sha384-6ecfe77fd15b74da2e45b32215cadc65f2d760f2a23da1951a99556efedd2c610271c1170d6f92df38ea48a479644683+7y7v5q5z5z5q5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5.js" crossorigin="anonymous"></script>
 </head>
 <body>
 
@@ -49,37 +49,37 @@
     <!-- KPI -->
 
     <div class="kpi-row">
-      <div class="kpi-card-v2 blue">
+      <div class="kpi-card-v2 blue kpi-clickable" data-filter="all" data-help="Cliquez pour voir tous les logs">
         <div class="kpi-icon">📊</div>
         <div class="kpi-label-v2" data-i18n="kpi.total_logs">Total logs</div>
         <div class="kpi-value-v2" id="kpi-total">—</div>
         <div class="kpi-trend" id="kpi-total-trend" data-i18n="common.loading">Chargement…</div>
       </div>
-      <div class="kpi-card-v2 green">
+      <div class="kpi-card-v2 green kpi-clickable" data-filter="today" data-help="Cliquez pour voir les logs d'aujourd'hui">
         <div class="kpi-icon">📅</div>
         <div class="kpi-label-v2" data-i18n="kpi.today_logs">Logs aujourd'hui</div>
         <div class="kpi-value-v2" id="kpi-today">—</div>
         <div class="kpi-trend" id="kpi-today-trend" data-i18n="common.loading">Chargement…</div>
       </div>
-      <div class="kpi-card-v2 red">
+      <div class="kpi-card-v2 red kpi-clickable" data-filter="error" data-help="Cliquez pour voir uniquement les erreurs">
         <div class="kpi-icon">⚠️</div>
         <div class="kpi-label-v2" data-i18n="kpi.error_count">Erreurs (7j)</div>
         <div class="kpi-value-v2" id="kpi-errors">—</div>
         <div class="kpi-trend" id="kpi-errors-trend" data-i18n="common.loading">Chargement…</div>
       </div>
-      <div class="kpi-card-v2 amber">
+      <div class="kpi-card-v2 amber kpi-clickable" data-filter="alerts" data-help="Cliquez pour voir vos alertes">
         <div class="kpi-icon">🔔</div>
         <div class="kpi-label-v2" data-i18n="kpi.unread_alerts">Alertes non lues</div>
         <div class="kpi-value-v2" id="kpi-alerts">—</div>
         <div class="kpi-trend" id="kpi-alerts-trend" data-i18n="common.loading">Chargement…</div>
       </div>
-      <div class="kpi-card-v2 purple">
+      <div class="kpi-card-v2 purple kpi-clickable" data-filter="critical" data-help="Cliquez pour voir les problèmes critiques">
         <div class="kpi-icon">💀</div>
         <div class="kpi-label-v2" data-i18n="dashboard.fatal_critical">FATAL/CRITICAL</div>
         <div class="kpi-value-v2" id="kpi-fatal">—</div>
         <div class="kpi-trend" id="kpi-fatal-trend" data-i18n="common.loading">Chargement…</div>
       </div>
-      <div class="kpi-card-v2 cyan">
+      <div class="kpi-card-v2 cyan kpi-clickable" data-filter="sources" data-help="Cliquez pour voir les sources actives">
         <div class="kpi-icon">📁</div>
         <div class="kpi-label-v2" data-i18n="dashboard.active_sources">Sources actives</div>
         <div class="kpi-value-v2" id="kpi-sources">—</div>
@@ -128,10 +128,80 @@
             </div>
             <a href="/search.html" class="btn btn-xs btn-secondary" data-i18n="dashboard.view_all">Voir tout →</a>
           </div>
+          <!-- Filtres avancés pour non-développeurs -->
+          <div class="filter-toolbar-v2">
+            <select id="logLevelFilter" class="form-select form-select-sm" data-placeholder="Niveau">
+              <option value="">Tous les niveaux</option>
+              <option value="FATAL">⚠️ Critique</option>
+              <option value="CRITICAL">🔴 Critique</option>
+              <option value="ERROR">❌ Erreur</option>
+              <option value="WARNING">⚠️ Attention</option>
+              <option value="INFO">ℹ️ Information</option>
+              <option value="DEBUG">🔧 Technique</option>
+            </select>
+            
+            <select id="logSourceFilter" class="form-select form-select-sm" data-placeholder="Source">
+              <option value="">Toutes les sources</option>
+              <option value="Splunk">🔍 Splunk</option>
+              <option value="Info">ℹ️ Info</option>
+              <option value="WAF">🛡️ WAF</option>
+              <option value="Apache">🌐 Apache</option>
+              <option value="Nginx">🌐 Nginx</option>
+              <option value="Application">💻 Application</option>
+            </select>
+            
+            <select id="logPlatformFilter" class="form-select form-select-sm" data-placeholder="Plateforme">
+              <option value="">Toutes les plateformes</option>
+              <option value="Production">🏭 Production</option>
+              <option value="Staging">🧪 Staging</option>
+              <option value="Development">💻 Développement</option>
+              <option value="Testing">🧪 Test</option>
+              <option value="Pre-production">🚀 Pré-production</option>
+              <option value="QA">✅ QA</option>
+            </select>
+            
+            <select id="logSourceTypeFilter" class="form-select form-select-sm" data-placeholder="Type de source">
+              <option value="">Tous les types</option>
+              <option value="import">📥 Import</option>
+              <option value="watchlog">👁️ Watchlog</option>
+              <option value="realtime">⚡ Temps réel</option>
+              <option value="file">📁 Fichier</option>
+              <option value="api">🌐 API</option>
+              <option value="database">🗄️ Base de données</option>
+              <option value="system">⚙️ Système</option>
+              <option value="network">🌡️ Réseau</option>
+            </select>
+            
+            <select id="logDirectoryFilter" class="form-select form-select-sm" data-placeholder="Répertoire">
+              <option value="">Tous les répertoires</option>
+              <option value="/var/log">📁 /var/log</option>
+              <option value="/app/logs">📁 /app/logs</option>
+              <option value="/tmp">📁 /tmp</option>
+              <option value="uploads">📁 uploads</option>
+              <option value="extracted">📁 extracted</option>
+            </select>
+            
+            <select id="logServiceFilter" class="form-select form-select-sm" data-placeholder="Service">
+              <option value="">Tous les services</option>
+            </select>
+            
+            <select id="logTimeFilter" class="form-select form-select-sm" data-placeholder="Période">
+              <option value="">Toutes les périodes</option>
+              <option value="1h">Dernière heure</option>
+              <option value="24h">Dernières 24h</option>
+              <option value="7d">7 derniers jours</option>
+              <option value="30d">30 derniers jours</option>
+            </select>
+            
+            <input type="search" id="logSearchInput" class="form-control form-control-sm" placeholder="🔍 Rechercher dans les messages...">
+            
+            <button id="resetFilters" class="btn btn-xs btn-secondary">🔄 Réinitialiser</button>
+          </div>
+          
           <div class="scroll-y">
             <table class="log-table">
               <thead>
-                <tr><th data-i18n="dashboard.table.time">Heure</th><th data-i18n="dashboard.table.level">Niveau</th><th data-i18n="dashboard.table.source">Source</th><th class="col-hide-mobile" data-i18n="dashboard.table.user">User</th><th class="col-hide-mobile" data-i18n="dashboard.table.import">Import</th><th data-i18n="dashboard.table.message">Message</th></tr>
+                <tr><th data-i18n="dashboard.table.time">Heure</th><th data-i18n="dashboard.table.level">Niveau</th><th data-i18n="dashboard.table.source">Source</th><th class="col-hide-mobile" data-i18n="dashboard.table.import_user">Importé par</th><th class="col-hide-mobile" data-i18n="dashboard.table.import">Import</th><th data-i18n="dashboard.table.message">Message</th></tr>
               </thead>
               <tbody id="logs-tbody">
                 <tr><td colspan="6"><div class="skeleton skeleton-line"></div></td></tr>
@@ -144,8 +214,38 @@
         <div class="card-v2">
           <div class="card-v2-header">
             <div class="card-v2-title">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span data-i18n="dashboard.level_distribution">Répartition par niveau</span>
+            </div>
+          </div>
+          <div class="card-v2-body card-v2-body-tight">
+            <div class="chart-box-sm">
+              <canvas id="level-chart" role="img" aria-label="Répartition des niveaux">Aucune donnée.</canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- TOP ERRORS (same width as level distribution) -->
+        <div class="card-v2">
+          <div class="card-v2-header">
+            <div class="card-v2-title">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
               <span data-i18n="dashboard.top_errors">Groupes d'erreurs fréquentes</span>
+            </div>
+            <div class="filter-toolbar">
+              <select id="timeRangeFilter" class="form-select form-select-sm">
+                <option value="24h">Dernières 24h</option>
+                <option value="7d">7 derniers jours</option>
+                <option value="30d">30 derniers jours</option>
+              </select>
+              <select id="severityFilter" class="form-select form-select-sm">
+                <option value="all">Toutes gravités</option>
+                <option value="critical">🔴 Critique</option>
+                <option value="high">🟠 Élevée</option>
+                <option value="medium">🟡 Moyenne</option>
+              </select>
+              <input type="search" id="errorSearch" class="form-control form-control-sm" placeholder="Rechercher..." aria-label="Rechercher des erreurs">
+              <button class="btn btn-xs btn-secondary" id="exportErrors" data-i18n="dashboard.export">📥 Exporter</button>
             </div>
           </div>
           <div class="card-v2-body">
@@ -157,7 +257,7 @@
         </div>
       </div>
 
-      <div class="col-stack">
+      <div class="col-stack alerts-large">
         <div class="card-v2">
           <div class="card-v2-header">
             <div class="card-v2-title">
@@ -188,20 +288,8 @@
             </div>
           </div>
         </div>
-
-        <div class="card-v2">
-          <div class="card-v2-header">
-            <div class="card-v2-title">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              <span data-i18n="dashboard.level_distribution">Répartition par niveau</span>
-            </div>
-          </div>
-          <div class="card-v2-body card-v2-body-tight">
-            <div class="chart-box-sm">
-              <canvas id="level-chart" role="img" aria-label="Répartition des niveaux">Aucune donnée.</canvas>
-            </div>
-          </div>
-        </div>
+      </div>
+    </div>
 
         <!-- ── ADMIN ONLY: Watchdogs + état système ────────────────── -->
         <div class="card-v2 admin-only">
@@ -268,6 +356,7 @@
   <script src="/api.js"></script>
   <script src="/i18n.js"></script>
   <script src="/app-common.js"></script>
+  <script src="/js/user-guide.js"></script>
   <script>
   (function() {
     'use strict';
@@ -626,6 +715,73 @@
       });
     }
 
+    // ── System status (admin) ──
+    function loadSystemStatus() {
+      if (!isAdmin()) return;
+      
+      api.get('/api/admin/system/status').then(function(status){
+        var dbEl = document.getElementById('status-db');
+        var redisEl = document.getElementById('status-redis');
+        var redisDot = document.getElementById('status-redis-dot');
+        var sseEl = document.getElementById('status-sse');
+        var watcherEl = document.getElementById('status-watcher');
+        
+        if (dbEl) {
+          dbEl.textContent = status.database?.connected ? '✅ ' + t('dashboard.status.connected') : '❌ ' + t('dashboard.status.error');
+        }
+        
+        if (redisEl && redisDot) {
+          if (status.redis?.connected) {
+            redisEl.textContent = '✅ ' + t('dashboard.status.active');
+            redisDot.className = 'status-dot ok';
+          } else if (status.redis?.mode === 'degraded') {
+            redisEl.textContent = '⚠️ ' + t('dashboard.status.degraded');
+            redisDot.className = 'status-dot warning';
+          } else {
+            redisEl.textContent = '❌ ' + t('dashboard.status.error');
+            redisDot.className = 'status-dot error';
+          }
+        }
+        
+        if (sseEl) {
+          sseEl.textContent = '🟢 ' + t('dashboard.status.connected');
+        }
+        
+        if (watcherEl) {
+          watcherEl.textContent = status.watcher?.running ? '✅ ' + t('dashboard.status.active') : '❌ ' + t('dashboard.status.inactive');
+        }
+      }).catch(function(e){
+        console.error('[ERROR] System status load failed:', e);
+        // Fallback to old endpoint for compatibility
+        fetch('/api/dashboard/system', { credentials: 'same-origin' })
+          .then(function(r){
+            if (r.status === 403) {
+              document.body.classList.remove('is-admin');
+              document.querySelectorAll('.admin-only').forEach(function(el){ el.style.display = 'none'; });
+              return null;
+            }
+            if (!r.ok) return null;
+            return r.json();
+          })
+          .then(function(d){
+            if (!d) return;
+            var sys = d.system || d;
+            var dbEl = document.getElementById('status-db');
+            if (dbEl) dbEl.textContent = sys.db === 'ok' ? '✅ Connectée' : '❌ ' + (sys.db || '—');
+            var redisEl = document.getElementById('status-redis');
+            var redisDot = document.getElementById('status-redis-dot');
+            if (redisEl) redisEl.textContent = sys.redis === 'ok' ? '✅ Actif' : (sys.redis === 'unavailable' ? '— Indisponible' : '❌ Erreur');
+            if (redisDot) redisDot.className = 'status-dot ' + (sys.redis === 'ok' ? 'ok' : 'warn');
+            var wEl = document.getElementById('status-watcher');
+            if (wEl && sys.watcher) {
+              wEl.textContent = sys.watcher.mode === 'polling-db'
+                ? 'Polling DB (Render)'
+                : (sys.watcher.running !== false ? '✅ Actif' : '⏸ Arrêté');
+            }
+          });
+      });
+    }
+
     // ── KPI ──
     function loadSummary() {
       return api.get('/api/dashboard/summary').then(function(d){
@@ -671,42 +827,220 @@
       })();
     }
 
+    // ── Gestion des filtres avancés pour non-développeurs ──
+    function setupAdvancedFilters() {
+      // Filtre par niveau
+      document.getElementById('logLevelFilter')?.addEventListener('change', function(e) {
+        applyFilters({ level: e.target.value });
+      });
+      
+      // Filtre par source
+      document.getElementById('logSourceFilter')?.addEventListener('change', function(e) {
+        applyFilters({ source: e.target.value });
+      });
+      
+      // Filtre par plateforme
+      document.getElementById('logPlatformFilter')?.addEventListener('change', function(e) {
+        applyFilters({ platform: e.target.value });
+      });
+      
+      // Filtre par type de source
+      document.getElementById('logSourceTypeFilter')?.addEventListener('change', function(e) {
+        applyFilters({ sourceType: e.target.value });
+      });
+      
+      // Filtre par répertoire
+      document.getElementById('logDirectoryFilter')?.addEventListener('change', function(e) {
+        applyFilters({ directory: e.target.value });
+      });
+      
+      // Filtre par service
+      document.getElementById('logServiceFilter')?.addEventListener('change', function(e) {
+        applyFilters({ service: e.target.value });
+      });
+      
+      // Filtre par période
+      document.getElementById('logTimeFilter')?.addEventListener('change', function(e) {
+        applyFilters({ timeRange: e.target.value });
+      });
+      
+      // Recherche avec debounce
+      var searchTimeout;
+      document.getElementById('logSearchInput')?.addEventListener('input', function(e) {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(function() {
+          applyFilters({ search: e.target.value });
+        }, 500);
+      });
+      
+      // Réinitialiser les filtres
+      document.getElementById('resetFilters')?.addEventListener('click', function() {
+        document.getElementById('logLevelFilter').value = '';
+        document.getElementById('logSourceFilter').value = '';
+        document.getElementById('logPlatformFilter').value = '';
+        document.getElementById('logSourceTypeFilter').value = '';
+        document.getElementById('logDirectoryFilter').value = '';
+        document.getElementById('logServiceFilter').value = '';
+        document.getElementById('logTimeFilter').value = '';
+        document.getElementById('logSearchInput').value = '';
+        applyFilters({});
+      });
+    }
+    
+    function applyFilters(filters) {
+      loadRecentLogs(filters);
+      
+      // Mettre à jour l'indicateur de filtres actifs
+      var activeFilters = Object.keys(filters).filter(function(k) {
+        return filters[k] && filters[k] !== '';
+      }).length;
+      
+      var filterIndicator = document.getElementById('activeFiltersIndicator');
+      if (activeFilters > 0) {
+        if (!filterIndicator) {
+          filterIndicator = document.createElement('span');
+          filterIndicator.id = 'activeFiltersIndicator';
+          filterIndicator.className = 'active-filters-badge';
+          filterIndicator.textContent = activeFilters + ' filtre(s) actif(s)';
+          filterIndicator.style.cssText = 'background: var(--accent-blue); color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-left: 8px;';
+          document.querySelector('.card-v2-title').appendChild(filterIndicator);
+        } else {
+          filterIndicator.textContent = activeFilters + ' filtre(s) actif(s)';
+        }
+      } else if (filterIndicator) {
+        filterIndicator.remove();
+      }
+    }
+    
+    // ── KPI cards cliquables ──
+    function setupClickableKPIs() {
+      document.querySelectorAll('.kpi-clickable').forEach(function(card) {
+        card.addEventListener('click', function() {
+          var filterType = this.getAttribute('data-filter');
+          var filters = {};
+          
+          switch(filterType) {
+            case 'all':
+              // Afficher tous les logs sans filtre
+              break;
+            case 'today':
+              filters.timeRange = '24h';
+              break;
+            case 'error':
+              filters.level = 'ERROR';
+              break;
+            case 'alerts':
+              // Scroller vers la section alertes
+              document.querySelector('.alerts-large')?.scrollIntoView({ behavior: 'smooth' });
+              return;
+            case 'critical':
+              filters.level = 'CRITICAL';
+              break;
+            case 'sources':
+              // Afficher les sources actives
+              loadActiveSources();
+              return;
+          }
+          
+          // Appliquer les filtres et scroller vers les logs récents
+          applyFilters(filters);
+          document.querySelector('.card-v2')?.scrollIntoView({ behavior: 'smooth' });
+        });
+      });
+    }
+    
+    function loadActiveSources() {
+      api.get('/api/admin/watchlog/active-sources').then(function(d) {
+        if (d.success && d.activeSources) {
+          var message = d.activeSources.map(function(s) {
+            return s.name + ': ' + s.logsCount + ' logs (' + s.status + ')';
+          }).join('\n');
+          alert('Sources actives:\n\n' + message);
+        }
+      }).catch(function() {
+        toast.error('Erreur lors du chargement des sources actives');
+      });
+    }
+
     // ── Logs récents ──
-    function loadRecentLogs() {
-      return api.get('/api/logs?limit=20&sort=id&order=desc').then(function(d){
-        var rows = d && d.data ? d.data : [];
+    function loadRecentLogs(filters) {
+      filters = filters || {};
+      var url = '/api/dashboard/recent-logs?limit=20';
+      
+      // Apply filters to URL
+      if (filters.level) url += '&level=' + encodeURIComponent(filters.level);
+      if (filters.source) url += '&source=' + encodeURIComponent(filters.source);
+      if (filters.platform) url += '&platform=' + encodeURIComponent(filters.platform);
+      if (filters.sourceType) url += '&sourceType=' + encodeURIComponent(filters.sourceType);
+      if (filters.directory) url += '&directory=' + encodeURIComponent(filters.directory);
+      if (filters.service) url += '&service=' + encodeURIComponent(filters.service);
+      if (filters.timeRange) url += '&timeRange=' + encodeURIComponent(filters.timeRange);
+      if (filters.search) url += '&search=' + encodeURIComponent(filters.search);
+      
+      return api.get(url).then(function(d){
+        var logs = d && d.recentLogs ? d.recentLogs : (d && d.logs ? d.logs : []);
         var tbody = document.getElementById('logs-tbody');
-        if (!rows.length) { tbody.innerHTML='<tr><td colspan="6" class="cell-empty">' + t('dashboard.no_logs') + '</td></tr>'; return; }
-        tbody.innerHTML = rows.map(function(r){
-          return '<tr class="log-row-link" data-log-id="'+r.id+'">'
-            + '<td class="cell-muted cell-nowrap">'+timeAgo(r.timestamp)+'</td>'
-            + '<td>'+lvlBadge(r.log_level)+'</td>'
-            + '<td class="cell-muted cell-ellipsis-sm" title="'+esc(r.source_server||r.source||'—')+'">'+esc(r.source_server||r.source||'Non spécifiée')+'</td>'
-            + '<td class="col-hide-mobile cell-muted">'+esc(r.target_user||'—')+'</td>'
-            + '<td class="col-hide-mobile cell-muted">'+esc(r.imported_at ? timeAgo(r.imported_at) : '—')+'</td>'
-            + '<td class="cell-ellipsis-lg" title="'+esc(r.message)+'">'+esc(r.message||'—')+'</td>'
+        
+        if (!logs.length) {
+          tbody.innerHTML = '<tr><td colspan="6" class="cell-empty">' + t('dashboard.no_logs') + '</td></tr>';
+          return;
+        }
+        
+        tbody.innerHTML = logs.map(function(log){
+          var dt = log.timestamp ? new Date(log.timestamp) : null;
+          var timeStr = dt ? dt.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '—';
+          var dateStr = dt ? dt.toLocaleDateString('fr-FR') : '—';
+          var source = log.source || log.source_server || '—';
+          var importedBy = log.imported_by_user_id || '—';
+          var importedAt = log.imported_at ? new Date(log.imported_at).toLocaleString('fr-FR') : '—';
+          var message = log.message || '';
+          var truncated = message.length > 80 ? message.substring(0, 80) + '…' : message;
+          
+          return '<tr data-log-id="'+escAttr(String(log.id))+'">'
+            + '<td>'+timeStr+'</td>'
+            + '<td>'+lvlBadge(log.log_level)+'</td>'
+            + '<td title="'+escAttr(source)+'">'+esc(source.length>12?source.substring(0,12)+'…':source)+'</td>'
+            + '<td class="col-hide-mobile">'+esc(String(importedBy))+'</td>'
+            + '<td class="col-hide-mobile">'+esc(importedAt)+'</td>'
+            + '<td title="'+escAttr(message)+'">'+esc(truncated)+'</td>'
             + '</tr>';
         }).join('');
+      }).catch(function(e){
+        var tbody = document.getElementById('logs-tbody');
+        tbody.innerHTML = '<tr><td colspan="6" class="cell-error">Erreur: '+esc(e&&e.message||'')+'</td></tr>';
       });
     }
 
     // ── Top erreurs ──
     function loadTopErrors() {
-      return api.get('/api/dashboard/top-errors?limit=5').then(function(d){
+      var timeRange = document.getElementById('timeRangeFilter')?.value || '24h';
+      var severity = document.getElementById('severityFilter')?.value || 'all';
+      var search = document.getElementById('errorSearch')?.value || '';
+      
+      var url = '/api/dashboard/top-errors/top-errors-grouped?limit=10';
+      if (timeRange !== '24h') url += '&timeRange=' + timeRange;
+      if (severity !== 'all') url += '&severity=' + severity;
+      if (search) url += '&search=' + encodeURIComponent(search);
+      
+      return api.get(url).then(function(d){
         var list = document.getElementById('top-errors-list');
-        d = d && (d.topErrors || d.errors || d);
-        if (!Array.isArray(d) || !d.length) { list.innerHTML='<p class="cell-empty">' + t('dashboard.no_error_groups') + '</p>'; return; }
-        list.innerHTML = d.map(function(g){
-          var samples = g.sampleLogs || [];
+        if (!d || !d.success || !Array.isArray(d.data) || !d.data.length) { 
+          list.innerHTML='<p class="cell-empty">' + t('dashboard.no_error_groups') + '</p>'; 
+          return; 
+        }
+        list.innerHTML = d.data.map(function(g){
+          var samples = g.samples || [];
           var sampleId = String(g.sample_log_id || g.log_id || g.first_log_id || (samples[0] && samples[0].id) || '');
           var fp = String(g.fingerprint || '');
-          return '<div class="err-group" data-sample-log-id="'+escAttr(sampleId)+'" data-fingerprint="'+escAttr(fp)+'" title="Details du groupe">'
-            + '<div class="err-count">'+(g.occurrence_count||1)+'</div>'
+          var occCount = g.occurrenceCount || { value: g.occurrence_count || 1, color: '#fbc02d' };
+          var colorStyle = 'color: ' + occCount.color + '; background-color: ' + occCount.color + '20; border: 1px solid ' + occCount.color + '40;';
+          return '<div class="err-group" data-sample-log-id="'+esc(sampleId)+'" data-fingerprint="'+esc(fp)+'" title="Details du groupe">'
+            + '<div class="err-count" style="'+colorStyle+'">🔴 '+occCount.value+'</div>'
             + '<div class="flex-1 overflow-hidden">'
-            + '<div class="err-title" title="'+escAttr(g.title)+'">'+esc(g.title||'Erreur inconnue')+'</div>'
+            + '<div class="err-title" title="'+esc(g.title)+'">'+esc(g.title||'Erreur inconnue')+'</div>'
             + '<div class="err-meta">'+esc(g.event_type||'')+' · '+lvlBadge(g.severity_max)+'</div>'
             + '<div class="err-meta text-kpi-trend">' +
-              '1re: '+esc(fmtDateTime(g.first_seen)||'–')+' · Dernière: '+esc(fmtDateTime(g.last_seen)||'–')+
+              '1re: '+esc(fmtDateTime(g.firstSeen)||'–')+' · Dernière: '+esc(fmtDateTime(g.lastSeen)||'–')+
             '</div>'
             + '</div></div>';
         }).join('');
@@ -954,6 +1288,28 @@ function showLogDetail(logId){
       }).catch(function(e){ toast.error('Erreur: '+(e&&e.message||e)); });
     });
 
+    // ── Top Errors filter toolbar ──
+    document.getElementById('timeRangeFilter')?.addEventListener('change', function() {
+      loadTopErrors();
+    });
+    document.getElementById('severityFilter')?.addEventListener('change', function() {
+      loadTopErrors();
+    });
+    document.getElementById('errorSearch')?.addEventListener('keyup', function(e) {
+      if (e.key === 'Enter') {
+        loadTopErrors();
+      }
+    });
+    document.getElementById('exportErrors')?.addEventListener('click', function() {
+      var timeRange = document.getElementById('timeRangeFilter')?.value || '24h';
+      var severity = document.getElementById('severityFilter')?.value || 'all';
+      var search = document.getElementById('errorSearch')?.value || '';
+      var url = '/api/logs/export/csv?timeRange=' + timeRange;
+      if (severity !== 'all') url += '&severity=' + severity;
+      if (search) url += '&search=' + encodeURIComponent(search);
+      window.open(url, '_blank');
+    });
+
     // ── Trends nav ──
     document.getElementById('trends-prev').addEventListener('click', function(){ trendsState.offset += trendsState.windowDays; loadTrends(); });
     document.getElementById('trends-next').addEventListener('click', function(){ trendsState.offset = Math.max(0, trendsState.offset - trendsState.windowDays); loadTrends(); });
@@ -965,38 +1321,12 @@ function showLogDetail(logId){
     });
 
     // ── Watchdogs + système (admin) ──
-    function loadSystemStatus(){
+    function initSystemStatus(){
       if (!isAdmin()) {
         document.querySelectorAll('.admin-only').forEach(function(el){ el.style.display = 'none'; });
         return;
       }
-      fetch('/api/dashboard/system', { credentials: 'same-origin' })
-        .then(function(r){
-          if (r.status === 403) {
-            document.body.classList.remove('is-admin');
-            document.querySelectorAll('.admin-only').forEach(function(el){ el.style.display = 'none'; });
-            return null;
-          }
-          if (!r.ok) return null;
-          return r.json();
-        })
-        .then(function(d){
-          if (!d) return;
-          var sys = d.system || d;
-          var dbEl = document.getElementById('status-db');
-          if (dbEl) dbEl.textContent = sys.db === 'ok' ? '✅ Connectée' : '❌ ' + (sys.db || '—');
-          var redisEl = document.getElementById('status-redis');
-          var redisDot = document.getElementById('status-redis-dot');
-          if (redisEl) redisEl.textContent = sys.redis === 'ok' ? '✅ Actif' : (sys.redis === 'unavailable' ? '— Indisponible' : '❌ Erreur');
-          if (redisDot) redisDot.className = 'status-dot ' + (sys.redis === 'ok' ? 'ok' : 'warn');
-          var wEl = document.getElementById('status-watcher');
-          if (wEl && sys.watcher) {
-            wEl.textContent = sys.watcher.mode === 'polling-db'
-              ? 'Polling DB (Render)'
-              : (sys.watcher.running !== false ? '✅ Actif' : '⏸ Arrêté');
-          }
-        })
-        .catch(function(){});
+      loadSystemStatus();
     }
 
     function loadWatchdogs(){
@@ -1021,7 +1351,7 @@ function showLogDetail(logId){
     }
 
     var rwBtn = document.getElementById('refresh-watchdogs');
-    if (rwBtn) rwBtn.addEventListener('click', loadWatchdogs);
+    if (rwBtn) rwBtn.addEventListener('click', function(){ loadWatchdogs(); initSystemStatus(); });
 
     // ── Refresh global ──
     var ind = document.getElementById('refresh-indicator');
@@ -1036,6 +1366,9 @@ function showLogDetail(logId){
       Promise.all([loadSummary(), loadRecentLogs(), loadTopErrors(), loadAlerts()])
         .then(function(){
           console.log('[DEBUG] Non-chart functions completed, loading charts sequentially');
+          // Initialiser les nouvelles fonctionnalités pour non-développeurs
+          setupAdvancedFilters();
+          setupClickableKPIs();
           return loadTrends().then(function(){
             console.log('[DEBUG] Trends chart loaded, now loading level chart');
             return loadLevelChart();
@@ -1043,7 +1376,7 @@ function showLogDetail(logId){
         })
         .then(function(){ 
           console.log('[DEBUG] All dashboard functions completed');
-          if (isAdmin()) { loadWatchdogs(); loadSystemStatus(); } 
+          if (isAdmin()) { loadWatchdogs(); initSystemStatus(); } 
           updateLastRefresh(); 
         })
         .catch(function(e){

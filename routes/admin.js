@@ -17,9 +17,115 @@ import {
   resetPasswordSchema,
   purgeSchema,
 } from "../middleware/validation.js";
+import { shareLogsByEmail, shareLogsByWhatsApp } from "../services/emailShareService.js";
+import { getRedisClient } from "../services/cacheService.js";
 
 const router = Router();
 router.use(requireAuth, requireAdmin);
+
+// ─── SYSTEM STATUS ────────────────────────────────────────
+
+router.get("/system/status", async (req, res) => {
+  try {
+    const systemStatus = {
+      database: { connected: false, status: 'unknown' },
+      redis: { connected: false, mode: 'unknown' },
+      watcher: { running: false, status: 'unknown' },
+      cache: { enabled: false, status: 'unknown' }
+    };
+
+    // Check database status
+    try {
+      await pool.execute('SELECT 1');
+      systemStatus.database = { 
+        connected: true, 
+        status: 'ok',
+        connections: pool.pool?.pool?._allConnections?.length || 0,
+        free: pool.pool?.pool?._freeConnections?.length || 0
+      };
+    } catch (dbError) {
+      systemStatus.database = { 
+        connected: false, 
+        status: 'error',
+        error: dbError.message 
+      };
+    }
+
+    // Check Redis status
+    try {
+      const redisClient = getRedisClient();
+      if (redisClient) {
+        await redisClient.ping();
+        systemStatus.redis = { 
+          connected: true, 
+          mode: 'active',
+          status: 'ok'
+        };
+        systemStatus.cache = { 
+          enabled: true, 
+          status: 'active'
+        };
+      } else {
+        systemStatus.redis = { 
+          connected: false, 
+          mode: 'degraded',
+          status: 'disabled'
+        };
+        systemStatus.cache = { 
+          enabled: false, 
+          status: 'disabled'
+        };
+      }
+    } catch (redisError) {
+      systemStatus.redis = { 
+        connected: false, 
+        mode: 'degraded',
+        status: 'error',
+        error: redisError.message 
+      };
+      systemStatus.cache = { 
+        enabled: false, 
+        status: 'degraded'
+      };
+    }
+
+    // Check watcher status
+    try {
+      const { getWatcherStatus } = await import("../services/watcherService.js");
+      const watcherStatus = getWatcherStatus();
+      systemStatus.watcher = { 
+        running: watcherStatus.running || false,
+        status: watcherStatus.running ? 'active' : 'inactive',
+        watchedDirectories: watcherStatus.watchedDirectories || []
+      };
+    } catch (watcherError) {
+      systemStatus.watcher = { 
+        running: false, 
+        status: 'error',
+        error: watcherError.message 
+      };
+    }
+
+    // Overall system health
+    const isHealthy = systemStatus.database.connected && 
+                      (systemStatus.redis.connected || systemStatus.redis.mode === 'degraded');
+    
+    systemStatus.overall = {
+      status: isHealthy ? 'healthy' : 'degraded',
+      timestamp: new Date().toISOString()
+    };
+
+    res.json(systemStatus);
+  } catch (e) {
+    logger.error({ event: 'system_status_error', error: e.message }, '[ADMIN]');
+    res.status(500).json({ 
+      error: "Erreur lors de la récupération du statut système",
+      database: { connected: false, status: 'error' },
+      redis: { connected: false, status: 'error' },
+      overall: { status: 'error', timestamp: new Date().toISOString() }
+    });
+  }
+});
 
 // ─── USERS CRUD ────────────────────────────────────────
 
@@ -259,7 +365,7 @@ router.post("/alert-rules", validateBody(alertRuleSchema), async (req, res) => {
       ipAddress: req.ip,
     });
 
-    res.json({ success: true, id: result.insertId });
+    res.status(201).json({ success: true, id: result.insertId });
   } catch (e) {
     res.status(500).json({ error: "Erreur serveur" });
   }
@@ -329,7 +435,7 @@ router.put("/alert-rules/:id", async (req, res) => {
     if (result.affectedRows === 0)
       return res.status(404).json({ error: "Règle non trouvée" });
 
-    res.json({ success: true });
+    res.status(200).json({ success: true });
   } catch (e) {
     res.status(500).json({ error: "Erreur serveur" });
   }
@@ -363,7 +469,7 @@ router.delete("/alert-rules/:id", async (req, res) => {
       ipAddress: req.ip,
     });
 
-    res.json({ success: true });
+    res.status(204).end();
   } catch (e) {
     res.status(500).json({ error: "Erreur serveur" });
   }
@@ -527,6 +633,109 @@ router.get("/retention/stats", async (req, res) => {
   }
 });
 
+// ─── Week 4: Fonctionnalités Avancées ─────────────────────
+
+// GET /platforms/check-health - Multi-platform health check
+router.get("/platforms/check-health", async (req, res) => {
+  try {
+    const [platforms] = await pool.execute(
+      `SELECT * FROM external_platforms WHERE user_id = ?`,
+      [req.session.user.id]
+    );
+
+    const health = await Promise.all(platforms.map(async (platform) => {
+      try {
+        const response = await fetch(`${platform.url}/health`, {
+          headers: { 'Authorization': `Bearer ${platform.api_key}` }
+        });
+        const status = response.ok ? 'online' : 'offline';
+        
+        // Mettre à jour le status
+        await pool.execute(
+          `UPDATE external_platforms SET status = ?, last_check = NOW() WHERE id = ?`,
+          [status, platform.id]
+        );
+        
+        return { name: platform.name, status, url: platform.url };
+      } catch (e) {
+        return { name: platform.name, status: 'error', error: e.message };
+      }
+    }));
+
+    res.json({ platforms: health });
+  } catch (e) {
+    logger.error({ event: 'platform_health_check_error', error: e.message }, '[ADMIN]');
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// GET /watchlog/active-sources - Active sources monitoring
+router.get("/watchlog/active-sources", async (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    
+    // Récupérer les sources ayant importé des logs dans les 24 dernières heures
+    const [sources] = await pool.execute(
+      `SELECT DISTINCT
+        ij.user_id,
+        ij.import_source,
+        COUNT(l.id) as log_count,
+        MAX(l.timestamp) as last_import,
+        COUNT(DISTINCT l.log_level) as level_diversity
+       FROM import_jobs ij
+       LEFT JOIN logs l ON l.import_job_id = ij.id
+       WHERE ij.user_id = ?
+       AND ij.created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+       AND ij.status = 'completed'
+       GROUP BY ij.import_source
+       ORDER BY last_import DESC`,
+      [userId]
+    );
+
+    res.json({
+      success: true,
+      activeSources: sources.map(source => ({
+        name: source.import_source,
+        logsCount: source.log_count,
+        lastImport: source.last_import,
+        status: new Date() - new Date(source.last_import) < 3600000 ? 'active' : 'inactive',
+        diversity: source.level_diversity
+      }))
+    });
+  } catch (e) {
+    logger.error({ event: 'active_sources_error', error: e.message }, '[ADMIN]');
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// POST /share/email - Share logs via email
+router.post("/share/email", async (req, res) => {
+  try {
+    const { emailTo, logIds, subject } = req.body;
+    const userId = req.session.user.id;
+
+    const result = await shareLogsByEmail(userId, emailTo, logIds, subject);
+    res.json(result);
+  } catch (e) {
+    logger.error({ event: 'email_share_error', error: e.message }, '[ADMIN]');
+    res.status(500).json({ error: e.message || 'Erreur serveur' });
+  }
+});
+
+// POST /share/whatsapp - Share logs via WhatsApp
+router.post("/share/whatsapp", async (req, res) => {
+  try {
+    const { phoneNumber, logIds, message } = req.body;
+    const userId = req.session.user.id;
+
+    const result = await shareLogsByWhatsApp(userId, phoneNumber, logIds, message);
+    res.json(result);
+  } catch (e) {
+    logger.error({ event: 'whatsapp_share_error', error: e.message }, '[ADMIN]');
+    res.status(500).json({ error: e.message || 'Erreur serveur' });
+  }
+});
+
 router.post("/retention/run", async (req, res) => {
   try {
     const user = req.session.user;
@@ -581,6 +790,43 @@ router.post("/purge", validateBody(purgeSchema), async (req, res) => {
 });
 
 // ─── SYSTEM STATS ──────────────────────────────────────
+
+router.get("/db-stats", async (req, res) => {
+  try {
+    const [tableStats] = await pool.execute(`
+      SELECT 
+        table_name, 
+        table_rows, 
+        ROUND(data_length / 1024 / 1024, 2) as data_mb,
+        ROUND(index_length / 1024 / 1024, 2) as index_mb,
+        ROUND((data_length + index_length) / 1024 / 1024, 2) as total_mb
+      FROM information_schema.tables
+      WHERE table_schema = DATABASE()
+      ORDER BY (data_length + index_length) DESC
+    `);
+    
+    const [totalSize] = await pool.execute(
+      "SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) as total_size_mb FROM information_schema.tables WHERE table_schema = DATABASE()",
+    );
+    
+    const [connectionStats] = await pool.execute("SHOW STATUS LIKE 'Threads_connected'");
+    const [connectionPool] = await pool.execute("SHOW STATUS LIKE 'Max_used_connections'");
+    
+    res.json({
+      success: true,
+      tables: tableStats,
+      total_size_mb: totalSize[0]?.total_size_mb || 0,
+      connections: {
+        current: parseInt(connectionStats[0]?.Value || 0),
+        max_used: parseInt(connectionPool[0]?.Value || 0)
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (e) {
+    logger.error({ event: 'db_stats_error', error: e.message }, '[ADMIN]');
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
 
 router.get("/system-stats", async (req, res) => {
   try {
@@ -745,6 +991,50 @@ router.post("/alert-rules/seed-defaults", async (req, res) => {
   } catch (e) {
     logger.error({ event: "seed_defaults_error", error: e.message });
     res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+// ─── DATABASE STATS ────────────────────────────────────────
+
+router.get('/db-stats', async (req, res) => {
+  try {
+    // Get table sizes
+    const [tableSizes] = await pool.execute(`
+      SELECT 
+        table_name,
+        table_rows,
+        ROUND((data_length / 1024 / 1024), 2) AS data_mb,
+        ROUND((index_length / 1024 / 1024), 2) AS index_mb,
+        ROUND(((data_length + index_length) / 1024 / 1024), 2) AS total_mb
+      FROM information_schema.tables
+      WHERE table_schema = DATABASE()
+      ORDER BY (data_length + index_length) DESC
+    `);
+
+    // Get database size
+    const [dbSize] = await pool.execute(`
+      SELECT 
+        ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS total_size_mb
+      FROM information_schema.tables
+      WHERE table_schema = DATABASE()
+    `);
+
+    // Get connection pool stats
+    const poolStats = {
+      current: pool.pool._allConnections?.length || 0,
+      max_used: pool.pool._allConnections?.length || 0
+    };
+
+    res.json({
+      success: true,
+      tables: tableSizes,
+      total_size_mb: dbSize[0]?.total_size_mb || 0,
+      connections: poolStats,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error({ event: 'db_stats_error', error: error.message });
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 

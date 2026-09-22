@@ -12,6 +12,7 @@ import {
   utcBoundsForCalendarDate,
   utcTodayBounds,
 } from '../lib/operationalTime.js';
+import alertWorker from '../workers/alertWorker.js';
 
 // Helper function to safely parse integers from query parameters
 function asInt(v, def = 10) {
@@ -140,6 +141,21 @@ router.get('/summary', async (req, res) => {
       'SELECT COUNT(DISTINCT source) as cnt FROM logs WHERE source IS NOT NULL AND source != \'\'' + scope.sql,
       scope.params
     );
+    
+    // Log size control - Calculate total log size
+    var [logSizeStats] = await pool.execute(
+      `SELECT 
+        COUNT(*) as total_logs,
+        SUM(LENGTH(raw_log)) as total_bytes,
+        AVG(LENGTH(raw_log)) as avg_bytes_per_log
+       FROM logs WHERE 1=1` + scope.sql,
+      scope.params
+    );
+    
+    const totalBytes = logSizeStats[0]?.total_bytes || 0;
+    const totalMB = (totalBytes / (1024 * 1024)).toFixed(2);
+    const avgBytes = logSizeStats[0]?.avg_bytes_per_log || 0;
+    
     var [levelRows] = await pool.execute(
       'SELECT log_level, COUNT(*) as cnt FROM logs WHERE log_level IS NOT NULL' + scope.sql + ' GROUP BY log_level',
       scope.params
@@ -155,10 +171,9 @@ router.get('/summary', async (req, res) => {
     }
 
     const data = {
-      // camelCase pour le frontend Next.js
+      // Standardized camelCase format
       totalLogs: Number(total[0].cnt),
-      todayCount: Number(importedToday[0].cnt), // FIX: Use importedTodayCount as logs today
-      todayLogs: Number(importedToday[0].cnt), // FIX: Use importedTodayCount as logs today
+      todayLogs: Number(importedToday[0].cnt),
       importedTodayCount: Number(importedToday[0].cnt),
       errorCount: Number(errorCount[0].cnt),
       unreadAlerts: Number(unreadAlerts[0].cnt),
@@ -168,25 +183,31 @@ router.get('/summary', async (req, res) => {
       warningCount: Number(levels['WARNING'] || 0),
       userCount: Number(userCount[0].cnt),
       sourceCount: Number(sourceCount[0].cnt),
-      // snake_case pour compatibilité
+      // Log size control
+      totalLogSizeMB: totalMB,
+      totalLogSizeBytes: totalBytes,
+      avgLogSizeBytes: avgBytes,
+      // Levels breakdown
+      levels: levels,
+      levelDebug: Number(levels['DEBUG'] || 0),
+      levelInfo: Number(levels['INFO'] || 0),
+      levelWarning: Number(levels['WARNING'] || 0),
+      levelError: Number(levels['ERROR'] || 0),
+      levelCritical: Number(levels['CRITICAL'] || 0),
+      levelFatal: Number(levels['FATAL'] || 0),
+      // snake_case for frontend compatibility
       total_logs: Number(total[0].cnt),
-      today_logs: Number(importedToday[0].cnt), // FIX: Use importedTodayCount as logs today
+      today_logs: Number(importedToday[0].cnt),
       imported_today_count: Number(importedToday[0].cnt),
       error_count: Number(errorCount[0].cnt),
       unread_alerts: Number(unreadAlerts[0].cnt),
       fatal_count: Number(fatalCount[0].cnt),
       critical_count: Number(criticalCount[0].cnt),
+      total_log_size_mb: totalMB,
+      total_log_size_bytes: totalBytes,
+      avg_log_size_bytes: avgBytes,
+      levels_breakdown: levels,
     };
-
-    // Ensure all level fields are present, even if count is 0
-    const allLevels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL', 'FATAL'];
-    allLevels.forEach(level => {
-      const key = 'level_' + level.toLowerCase();
-      data[key] = Number(levels[level] || 0);
-    });
-
-    // Add levels_breakdown for frontend compatibility
-    data.levels_breakdown = levels;
 
     // P-09: Cache the result with 30s TTL
     await setCachedDashboard(userId, data);
@@ -269,10 +290,20 @@ router.get('/trends', async (req, res) => {
       }
       const dailyTotal = labels.map((_, i) => levels.reduce((sum, level) => sum + seriesData[level][i], 0));
       return res.json({
-        dates: labels, labels, series: seriesData,
-        info: seriesData.INFO, warning: seriesData.WARNING, error: seriesData.ERROR,
-        critical: seriesData.CRITICAL, fatal: seriesData.FATAL, debug: seriesData.DEBUG,
-        daily_total: dailyTotal, days: 1, interval: 'hour'
+        dates: labels, 
+        labels: labels, 
+        series: seriesData,
+        info: seriesData.INFO, 
+        warning: seriesData.WARNING, 
+        error: seriesData.ERROR,
+        critical: seriesData.CRITICAL, 
+        fatal: seriesData.FATAL, 
+        debug: seriesData.DEBUG,
+        dailyTotal: dailyTotal, 
+        days: 1, 
+        interval: 'hour',
+        // snake_case for frontend compatibility
+        daily_total: dailyTotal
       });
     }
 
@@ -319,6 +350,14 @@ router.get('/trends', async (req, res) => {
       levels.forEach(l => { dailyTotal[i] += seriesData[l][i]; });
     }
 
+    // Ensure we always return arrays, even if empty
+    const safeDailyTotal = dailyTotal.length > 0 ? dailyTotal : [];
+    const safeDates = dates.length > 0 ? dates : [];
+    const safeSeriesData = {};
+    levels.forEach(l => { 
+      safeSeriesData[l] = seriesData[l]?.length > 0 ? seriesData[l] : [];
+    });
+
     // Stats globales sur la période (avec vraies dates)
     const [stats] = await pool.execute(
       `SELECT COUNT(*) as total_logs,
@@ -349,31 +388,37 @@ router.get('/trends', async (req, res) => {
       logger.warn({ event: 'dashboard_trends_fingerprints_skipped', error: fpErr.message }, '[DASHBOARD]');
     }
 
-    // Format attendu par le frontend Next.js
-    const trendsArray = dates.map((date, i) => ({
+    // Format with consistent camelCase and safe arrays
+    const trendsArray = safeDates.map((date, i) => ({
       date,
-      count: dailyTotal[i],
-      errorCount: (seriesData['ERROR']?.[i] || 0) + (seriesData['CRITICAL']?.[i] || 0) + (seriesData['FATAL']?.[i] || 0),
+      count: safeDailyTotal[i] || 0,
+      errorCount: (safeSeriesData['ERROR']?.[i] || 0) + (safeSeriesData['CRITICAL']?.[i] || 0) + (safeSeriesData['FATAL']?.[i] || 0),
     }));
 
     res.json({
       trends: trendsArray,
-      dates,
-      labels: dates,
-      series: seriesData,
-      info: seriesData.INFO,
-      warning: seriesData.WARNING,
-      error: seriesData.ERROR,
-      critical: seriesData.CRITICAL,
-      fatal: seriesData.FATAL,
-      debug: seriesData.DEBUG,
-      daily_total: dailyTotal,
-      days: dates.length,
+      dates: safeDates,
+      labels: safeDates,
+      series: safeSeriesData,
+      info: safeSeriesData.INFO,
+      warning: safeSeriesData.WARNING,
+      error: safeSeriesData.ERROR,
+      critical: safeSeriesData.CRITICAL,
+      fatal: safeSeriesData.FATAL,
+      debug: safeSeriesData.DEBUG,
+      dailyTotal: safeDailyTotal,
+      days: safeDates.length,
       stats: {
-        total_logs: stats[0]?.total_logs || 0,
-        unique_services: stats[0]?.unique_services || 0,
-        unique_sources: stats[0]?.unique_sources || 0
+        totalLogs: stats[0]?.total_logs || 0,
+        uniqueServices: stats[0]?.unique_services || 0,
+        uniqueSources: stats[0]?.unique_sources || 0
       },
+      topFingerprints: topFingerprints,
+      // snake_case for frontend compatibility
+      daily_total: safeDailyTotal,
+      total_logs: stats[0]?.total_logs || 0,
+      unique_services: stats[0]?.unique_services || 0,
+      unique_sources: stats[0]?.unique_sources || 0,
       top_fingerprints: topFingerprints
     });
   } catch (e) {
@@ -431,7 +476,7 @@ router.get('/top-errors', async (req, res) => {
       }
     }
     
-    // Format attendu par le frontend Next.js with sample logs
+    // Format with consistent camelCase
     const normalized = rows.map(r => {
       const samples = sampleLogsMap.get(r.fingerprint) || [];
       return {
@@ -440,10 +485,17 @@ router.get('/top-errors', async (req, res) => {
         message: r.title || r.event_type,
         source: r.source_server,
         lastSeen: r.last_seen,
+        sampleLogId: r.sample_log_id || (samples[0] && samples[0].id) || null,
+        sampleLogs: samples,
+        // Add snake_case for compatibility
         sample_log_id: r.sample_log_id || (samples[0] && samples[0].id) || null,
-        sampleLogs: samples
+        occurrence_count: r.occurrence_count,
+        source_server: r.source_server,
+        first_seen: r.first_seen,
+        last_seen: r.last_seen
       };
     });
+    // Return both formats for compatibility
     res.json({ topErrors: normalized, errors: normalized });
   } catch (e) {
     logger.error({ event: 'dashboard_top_errors_error', error: e.message, stack: e.stack }, '[DASHBOARD]');
@@ -464,27 +516,92 @@ router.get('/recent-logs', async (req, res) => {
   try {
     const scope = userScope(req);
     const limit = asInt(req.query.limit, 10);
+    // Build filter conditions
+    let filterSql = '';
+    let filterParams = [];
+    
+    if (req.query.level) {
+      filterSql += ' AND log_level = ?';
+      filterParams.push(req.query.level);
+    }
+    
+    if (req.query.source) {
+      filterSql += ' AND source = ?';
+      filterParams.push(req.query.source);
+    }
+    
+    if (req.query.platform) {
+      filterSql += ' AND source_system = ?';
+      filterParams.push(req.query.platform);
+    }
+    
+    if (req.query.sourceType) {
+      filterSql += ' AND source_type = ?';
+      filterParams.push(req.query.sourceType);
+    }
+    
+    if (req.query.directory) {
+      filterSql += ' AND source LIKE ?';
+      filterParams.push(req.query.directory + '%');
+    }
+    
+    if (req.query.service) {
+      filterSql += ' AND service = ?';
+      filterParams.push(req.query.service);
+    }
+    
+    if (req.query.timeRange) {
+      const timeBounds = getTimeBounds(req.query.timeRange);
+      if (timeBounds) {
+        filterSql += ' AND timestamp >= ? AND timestamp <= ?';
+        filterParams.push(timeBounds.start, timeBounds.end);
+      }
+    }
+    
+    if (req.query.search) {
+      filterSql += ' AND message LIKE ?';
+      filterParams.push(`%${req.query.search}%`);
+    }
+    
     const [rows] = await pool.query(
       `SELECT id, raw_log, timestamp, log_level, message, source, source_server, source_system,
-              service, target_user, imported_at
-       FROM logs WHERE 1=1${scope.sql}
+              service, target_user, imported_at, imported_by_user_id
+       FROM logs WHERE 1=1${scope.sql}${filterSql}
        ORDER BY ${OPERATIONAL_TS_EXPR} DESC LIMIT ?`,
-      [...scope.params, limit]
+      [...scope.params, ...filterParams, limit]
     );
-    // Normaliser les champs pour le frontend Next.js (camelCase)
+    // Normalize fields to consistent camelCase
     const normalized = rows.map(r => ({
       ...r,
       logLevel: r.log_level || r.logLevel,
       importedAt: r.imported_at || r.importedAt,
+      importedByUserId: r.imported_by_user_id || r.imported_by_user_id,
       createdAt: r.created_at || r.createdAt,
     }));
-    // Retourner les deux formats pour compatibilité
+    // Return both formats for compatibility
     res.json({ recentLogs: normalized, logs: normalized });
   } catch (e) {
     logger.error({ event: 'recent_logs_error', error: e.message }, '[DASHBOARD]');
     if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur', details: e.message });
   }
 });
+
+// Helper function to get time bounds for filter
+function getTimeBounds(range) {
+  const now = new Date();
+  switch (range) {
+    case '1h':
+      return { start: new Date(now - 60 * 60 * 1000), end: now };
+    case '24h':
+      return { start: new Date(now - 24 * 60 * 60 * 1000), end: now };
+    case '7d':
+      return { start: new Date(now - 7 * 24 * 60 * 60 * 1000), end: now };
+    case '30d':
+      return { start: new Date(now - 30 * 24 * 60 * 60 * 1000), end: now };
+    default:
+      return null;
+  }
+}
 
 // GET /alerts
 router.get('/alerts', async (req, res) => {
@@ -500,10 +617,128 @@ router.get('/alerts', async (req, res) => {
     sql += ' ORDER BY created_at DESC LIMIT ?';
     params.push(limit);
     const [rows] = await pool.query(sql, params);
-    res.json(rows);
+    
+    // Add snake_case fields for compatibility
+    const normalized = rows.map(r => ({
+      ...r,
+      alert_type: r.alert_type,
+      created_at: r.created_at,
+      read_at: r.read_at,
+      occurrence_count: r.occurrence_count
+    }));
+    
+    res.json(normalized);
   } catch (e) {
     logger.error({ event: 'alerts_error', error: e.message, sql: e.sql }, '[DASHBOARD ALERTS]');
     if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur', details: e.message });
+  }
+});
+
+// GET /alerts/critical-only - Week 3: Alertes Automatisées
+router.get('/alerts/critical-only', async (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    
+    // Retourner SEULEMENT les alertes critiques non lues
+    const [alerts] = await pool.execute(
+      `SELECT * FROM alerts
+       WHERE user_id = ?
+       AND severity = 'critical'
+       AND status = 'new'
+       ORDER BY created_at DESC
+       LIMIT 10`,
+      [userId]
+    );
+
+    res.json({ alerts });
+  } catch (e) {
+    logger.error({ event: 'critical_alerts_error', error: e.message }, '[DASHBOARD]');
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// GET /alerts/grouped - Week 3: Alertes Automatisées
+router.get('/alerts/grouped', async (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    
+    const [grouped] = await pool.execute(
+      `SELECT 
+        alert_type,
+        severity,
+        COUNT(*) as count,
+        MAX(created_at) as latest,
+        MIN(created_at) as earliest
+       FROM alerts
+       WHERE user_id = ?
+       AND status = 'new'
+       GROUP BY alert_type, severity
+       ORDER BY count DESC`,
+      [userId]
+    );
+
+    res.json({ 
+      summary: grouped,
+      message: `${grouped.reduce((sum, g) => sum + g.count, 0)} new alerts` 
+    });
+  } catch (e) {
+    logger.error({ event: 'grouped_alerts_error', error: e.message }, '[DASHBOARD]');
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// GET /alerts/system-only - Filtre pour grouper les alertes qui affectent directement le système
+router.get('/alerts/system-only', async (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    
+    // Retourner SEULEMENT les alertes qui affectent le système (CRITICAL, FATAL, et alertes d'infrastructure)
+    const [alerts] = await pool.execute(
+      `SELECT * FROM alerts
+       WHERE user_id = ?
+       AND severity IN ('critical', 'fatal')
+       AND (alert_type LIKE '%system%' OR alert_type LIKE '%infrastructure%' OR alert_type LIKE '%database%')
+       AND status = 'new'
+       ORDER BY created_at DESC
+       LIMIT 15`,
+      [userId]
+    );
+
+    res.json({ alerts });
+  } catch (e) {
+    logger.error({ event: 'system_alerts_error', error: e.message }, '[DASHBOARD]');
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// POST /alerts/:id/retry - Week 3: Alertes Automatisées
+router.post('/alerts/:id/retry', async (req, res) => {
+  try {
+    const alertId = parseInt(req.params.id);
+    const userId = req.session.user.id;
+
+    const [alert] = await pool.execute(
+      `SELECT * FROM alerts WHERE id = ? AND user_id = ?`,
+      [alertId, userId]
+    );
+
+    if (!alert.length) {
+      return res.status(404).json({ error: 'Alerte non trouvée' });
+    }
+
+    // Marquer comme NEW et relancer
+    await pool.execute(
+      `UPDATE alerts SET status = 'new', created_at = NOW() WHERE id = ?`,
+      [alertId]
+    );
+
+    // Notifier via SSE
+    alertWorker.broadcast('alert_retry', { alertId });
+
+    res.json({ success: true, message: 'Alerte renvoyée' });
+  } catch (e) {
+    logger.error({ event: 'alert_retry_error', error: e.message }, '[DASHBOARD]');
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 

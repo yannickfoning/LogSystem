@@ -66,7 +66,6 @@
     if (log.stack_trace) {
       html += '<p style="margin-top:8px"><strong>Stack trace:</strong></p><pre style="background:#1a0000;color:#ff6b6b;padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-all;font-size:11px;max-height:200px;overflow:auto">' + esc(log.stack_trace) + '</pre>';
     }
-    if (log.file_name) html += '<p><strong>Fichier:</strong> ' + esc(log.file_name) + '</p>';
     if (log.import_job_id) html += '<p><strong>Job import:</strong> #' + esc(log.import_job_id) + '</p>';
     html += '</div>';
     return html;

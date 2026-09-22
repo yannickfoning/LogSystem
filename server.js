@@ -35,8 +35,12 @@ import dashboardRoutes from './routes/dashboard.js';
 import adminRoutes from './routes/admin.js';
 import searchApiRoutes from './routes/api/search.js';
 import recommendationsRoutes from './routes/recommendations.js';
+import shareRoutes from './routes/share.js';
 import { alertWorker } from './workers/alertWorker.js';
+import { importWorker } from './workers/import-worker.js';
 import { startAlertEngine, setAlertWorker, stopAlertEngine } from './services/alertEngine.js';
+import { startAlertAutomation } from './services/alert-automation.js';
+import { startRetryScheduler } from './services/alertRetryService.js';
 import { ensureDefaultRecommendations } from './services/recommendationsSeed.js';
 import { startRetentionScheduler } from './services/retentionService.js';
 import { startWatcher, stopWatcher, getWatcherStatus } from './services/watcherService.js';
@@ -61,7 +65,9 @@ process.on('unhandledRejection', (reason) => {
 // ── Express app ────────────────────────────────────────────────────────────────
 const app = express();
 app.set('trust proxy', 1);
-const PORT = parseInt(process.env.PORT || '3002', 10);
+
+// ── Database health tracking ────────────────────────────────────────────────────
+let databaseReady = false;
 
 
 // ── HTTPS redirect ────────────────────────────────────────────────────────────
@@ -192,6 +198,7 @@ app.use('/api/admin', requireAuth, scopeGuard, adminRoutes);
 app.use('/api/search', requireAuth, scopeGuard, searchApiRoutes);
 app.use('/api/error-suggestions', requireAuth, scopeGuard, errorSuggestionsRoutes);
 app.use('/api/recommendations', requireAuth, scopeGuard, recommendationsRoutes);
+app.use('/api/share', requireAuth, scopeGuard, shareRoutes);
 app.use('/api/recommendations/advanced', requireAuth, scopeGuard, recommendationsAdvancedRoutes);
 app.use('/api/dashboard/top-errors', requireAuth, scopeGuard, topErrorsAdvancedRoutes);
 
@@ -202,14 +209,53 @@ app.get('/api/alerts/stream', alertsStreamLimiter, requireAuth, (req, res) => {
   const userId = req.session?.user?.id;
   alertWorker.addClient(res, req);
   
-  // Clean up connection when client disconnects
-  req.on('close', () => {
-    if (userId) untrackSSEConnection(userId);
+  // Enhanced SSE cleanup for multiple disconnection scenarios
+  const cleanup = () => {
+    if (userId) {
+      untrackSSEConnection(userId);
+      logger.info({ event: 'sse_connection_closed', userId }, '[SSE] Connection cleaned up');
+    }
+  };
+  
+  req.on('close', cleanup);
+  req.on('end', cleanup);
+  res.on('close', cleanup);
+  req.on('error', (err) => {
+    logger.error({ event: 'sse_error', userId, error: err.message }, '[SSE] Connection error');
+    cleanup();
   });
 });
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
+app.get('/health', async (req, res) => {
+  if (!databaseReady) {
+    return res.status(503).json({
+      status: 'degraded',
+      database: 'unavailable',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime()
+    });
+  }
+
+  // Optional: Execute a simple database query to verify connectivity
+  try {
+    await pool.execute('SELECT 1');
+  } catch (error) {
+    databaseReady = false;
+    return res.status(503).json({
+      status: 'degraded',
+      database: 'query_failed',
+      error: error.message,
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime()
+    });
+  }
+
+  res.json({
+    status: 'ok',
+    database: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
 });
 
 // ── Static files ──────────────────────────────────────────────────────────────
@@ -242,13 +288,22 @@ app.use((err, req, res, next) => {
 async function start() {
   try {
     await testConnection();
+    databaseReady = true;
     logger.info({ event: 'db_connected' }, '[DB] Connected');
   } catch (e) {
     logger.error({ event: 'db_connection_failed', error: e.message }, '[DB] Connection failed — check env vars');
     return; // Don't run migrations if DB unreachable
   }
 
-  await runMigrations().catch(e => logger.error({ event: 'migration_failed', error: e.message }));
+  try {
+    await runMigrations();
+  } catch (error) {
+    logger.fatal({
+      event: 'migration_failed',
+      error: error.message
+    });
+    process.exit(1);
+  }
 
   await startCacheService().catch(() => {});
   setAlertWorker(alertWorker);
@@ -269,6 +324,12 @@ async function start() {
   }, 5 * 60 * 1000);
 
   await startAlertEngine().catch(e => logger.error({ event: 'alertEngineStartFailed', message: e.message }));
+  
+  // Week 3: Alertes Automatisées - Start automatic error evaluation with severity-based timing
+  startAlertAutomation(); // Uses default 1-minute interval for faster critical detection
+  
+  // Alert retry scheduler
+  startRetryScheduler();
   await ensureDefaultRecommendations().catch(e => logger.error({ event: 'recommendationsSeedFailed', message: e.message }));
   startRetentionScheduler();
   // Skip file watcher on Render (ephemeral filesystem)
@@ -282,12 +343,12 @@ async function start() {
 }
 
 // Listen (persistent server for Render)
-const PORT_NUM = parseInt(process.env.PORT || '3001', 10);
-const server = app.listen(PORT_NUM, async () => {
+const PORT = parseInt(process.env.PORT || '3001', 10);
+const server = app.listen(PORT, async () => {
   server.timeout = 300000;
   server.keepAliveTimeout = 310000;
   server.headersTimeout = 320000;
-  logger.info({ event: 'server_started', port: PORT_NUM }, `[LogSystem] Running on http://localhost:${PORT_NUM}`);
+  logger.info({ event: 'server_started', port: PORT }, `[LogSystem] Running on http://localhost:${PORT}`);
   await start();
 });
 
