@@ -18,11 +18,11 @@
     </div>
     <button class="hamburger" id="hamburger-btn" aria-label="Menu" aria-expanded="false"><span></span><span></span><span></span></button>
     <ul class="nav-links" id="nav-links">
-      <li><a href="/dashboard.html" aria-current="page" data-i18n="nav.dashboard">Tableau de bord</a></li>
-      <li><a href="/search.html" data-i18n="nav.search">Recherche</a></li>
-      <li><a href="/import.html" data-i18n="nav.import">Import</a></li>
-      <li><a href="/watchlog.html" data-i18n="nav.watchlog">Watch Log</a></li>
-      <li><a href="/admin.html" id="admin-link" data-i18n="nav.admin">Administration</a></li>
+      <li><a href="/dashboard.html" aria-current="page" data-i18n="nav.dashboard">📊 Vue d'ensemble</a></li>
+      <li><a href="/search.html" data-i18n="nav.search">🔍 Rechercher</a></li>
+      <li><a href="/import.html" data-i18n="nav.import">📥 Importer</a></li>
+      <li><a href="/watchlog.html" data-i18n="nav.watchlog">👁️ Monitoring</a></li>
+      <li><a href="/admin.html" id="admin-link" data-i18n="nav.admin">⚙️ Administration</a></li>
     </ul>
     <div class="nav-right">
       <a href="#" id="lang-toggle" class="lang-toggle-link">EN</a>
@@ -128,7 +128,7 @@
             </div>
             <a href="/search.html" class="btn btn-xs btn-secondary" data-i18n="dashboard.view_all">Voir tout →</a>
           </div>
-          <!-- Filtres avancés pour non-développeurs -->
+          <!-- Filtres simplifiés pour non-développeurs -->
           <div class="filter-toolbar-v2">
             <select id="logLevelFilter" class="form-select form-select-sm" data-placeholder="Niveau">
               <option value="">Tous les niveaux</option>
@@ -150,41 +150,6 @@
               <option value="Application">💻 Application</option>
             </select>
             
-            <select id="logPlatformFilter" class="form-select form-select-sm" data-placeholder="Plateforme">
-              <option value="">Toutes les plateformes</option>
-              <option value="Production">🏭 Production</option>
-              <option value="Staging">🧪 Staging</option>
-              <option value="Development">💻 Développement</option>
-              <option value="Testing">🧪 Test</option>
-              <option value="Pre-production">🚀 Pré-production</option>
-              <option value="QA">✅ QA</option>
-            </select>
-            
-            <select id="logSourceTypeFilter" class="form-select form-select-sm" data-placeholder="Type de source">
-              <option value="">Tous les types</option>
-              <option value="import">📥 Import</option>
-              <option value="watchlog">👁️ Watchlog</option>
-              <option value="realtime">⚡ Temps réel</option>
-              <option value="file">📁 Fichier</option>
-              <option value="api">🌐 API</option>
-              <option value="database">🗄️ Base de données</option>
-              <option value="system">⚙️ Système</option>
-              <option value="network">🌡️ Réseau</option>
-            </select>
-            
-            <select id="logDirectoryFilter" class="form-select form-select-sm" data-placeholder="Répertoire">
-              <option value="">Tous les répertoires</option>
-              <option value="/var/log">📁 /var/log</option>
-              <option value="/app/logs">📁 /app/logs</option>
-              <option value="/tmp">📁 /tmp</option>
-              <option value="uploads">📁 uploads</option>
-              <option value="extracted">📁 extracted</option>
-            </select>
-            
-            <select id="logServiceFilter" class="form-select form-select-sm" data-placeholder="Service">
-              <option value="">Tous les services</option>
-            </select>
-            
             <select id="logTimeFilter" class="form-select form-select-sm" data-placeholder="Période">
               <option value="">Toutes les périodes</option>
               <option value="1h">Dernière heure</option>
@@ -201,11 +166,11 @@
           <div class="scroll-y">
             <table class="log-table">
               <thead>
-                <tr><th data-i18n="dashboard.table.time">Heure</th><th data-i18n="dashboard.table.level">Niveau</th><th data-i18n="dashboard.table.source">Source</th><th class="col-hide-mobile" data-i18n="dashboard.table.import_user">Importé par</th><th class="col-hide-mobile" data-i18n="dashboard.table.import">Import</th><th data-i18n="dashboard.table.message">Message</th></tr>
+                <tr><th data-i18n="dashboard.table.time">Heure</th><th data-i18n="dashboard.table.level">Niveau</th><th data-i18n="dashboard.table.source">Source</th><th data-i18n="dashboard.table.user">Utilisateur responsable</th><th data-i18n="dashboard.table.message">Message</th></tr>
               </thead>
               <tbody id="logs-tbody">
-                <tr><td colspan="6"><div class="skeleton skeleton-line"></div></td></tr>
-                <tr><td colspan="6"><div class="skeleton skeleton-line w-80"></div></td></tr>
+                <tr><td colspan="5"><div class="skeleton skeleton-line"></div></td></tr>
+                <tr><td colspan="5"><div class="skeleton skeleton-line w-80"></div></td></tr>
               </tbody>
             </table>
           </div>
@@ -245,7 +210,6 @@
                 <option value="medium">🟡 Moyenne</option>
               </select>
               <input type="search" id="errorSearch" class="form-control form-control-sm" placeholder="Rechercher..." aria-label="Rechercher des erreurs">
-              <button class="btn btn-xs btn-secondary" id="exportErrors" data-i18n="dashboard.export">📥 Exporter</button>
             </div>
           </div>
           <div class="card-v2-body">
@@ -885,6 +849,41 @@
         document.getElementById('logSearchInput').value = '';
         applyFilters({});
       });
+      
+      // Export logs
+      document.getElementById('exportLogs')?.addEventListener('click', function() {
+        var currentFilters = getActiveFilters();
+        var exportUrl = '/api/logs/export/csv';
+        var params = [];
+        
+        if (currentFilters.level) params.push('level=' + encodeURIComponent(currentFilters.level));
+        if (currentFilters.source) params.push('source=' + encodeURIComponent(currentFilters.source));
+        if (currentFilters.platform) params.push('platform=' + encodeURIComponent(currentFilters.platform));
+        if (currentFilters.sourceType) params.push('sourceType=' + encodeURIComponent(currentFilters.sourceType));
+        if (currentFilters.directory) params.push('directory=' + encodeURIComponent(currentFilters.directory));
+        if (currentFilters.service) params.push('service=' + encodeURIComponent(currentFilters.service));
+        if (currentFilters.timeRange) params.push('timeRange=' + encodeURIComponent(currentFilters.timeRange));
+        if (currentFilters.search) params.push('search=' + encodeURIComponent(currentFilters.search));
+        
+        if (params.length > 0) {
+          exportUrl += '?' + params.join('&');
+        }
+        
+        window.open(exportUrl, '_blank');
+      });
+    }
+    
+    function getActiveFilters() {
+      return {
+        level: document.getElementById('logLevelFilter')?.value || '',
+        source: document.getElementById('logSourceFilter')?.value || '',
+        platform: document.getElementById('logPlatformFilter')?.value || '',
+        sourceType: document.getElementById('logSourceTypeFilter')?.value || '',
+        directory: document.getElementById('logDirectoryFilter')?.value || '',
+        service: document.getElementById('logServiceFilter')?.value || '',
+        timeRange: document.getElementById('logTimeFilter')?.value || '',
+        search: document.getElementById('logSearchInput')?.value || ''
+      };
     }
     
     function applyFilters(filters) {
@@ -991,8 +990,8 @@
           var timeStr = dt ? dt.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '—';
           var dateStr = dt ? dt.toLocaleDateString('fr-FR') : '—';
           var source = log.source || log.source_server || '—';
-          var importedBy = log.imported_by_user_id || '—';
-          var importedAt = log.imported_at ? new Date(log.imported_at).toLocaleString('fr-FR') : '—';
+          var service = log.service || '—';
+          var user = log.target_user || '—';
           var message = log.message || '';
           var truncated = message.length > 80 ? message.substring(0, 80) + '…' : message;
           
@@ -1000,8 +999,8 @@
             + '<td>'+timeStr+'</td>'
             + '<td>'+lvlBadge(log.log_level)+'</td>'
             + '<td title="'+escAttr(source)+'">'+esc(source.length>12?source.substring(0,12)+'…':source)+'</td>'
-            + '<td class="col-hide-mobile">'+esc(String(importedBy))+'</td>'
-            + '<td class="col-hide-mobile">'+esc(importedAt)+'</td>'
+            + '<td class="col-hide-mobile">'+esc(service)+'</td>'
+            + '<td class="col-hide-mobile">'+esc(user)+'</td>'
             + '<td title="'+escAttr(message)+'">'+esc(truncated)+'</td>'
             + '</tr>';
         }).join('');
@@ -1299,15 +1298,6 @@ function showLogDetail(logId){
       if (e.key === 'Enter') {
         loadTopErrors();
       }
-    });
-    document.getElementById('exportErrors')?.addEventListener('click', function() {
-      var timeRange = document.getElementById('timeRangeFilter')?.value || '24h';
-      var severity = document.getElementById('severityFilter')?.value || 'all';
-      var search = document.getElementById('errorSearch')?.value || '';
-      var url = '/api/logs/export/csv?timeRange=' + timeRange;
-      if (severity !== 'all') url += '&severity=' + severity;
-      if (search) url += '&search=' + encodeURIComponent(search);
-      window.open(url, '_blank');
     });
 
     // ── Trends nav ──

@@ -2,8 +2,8 @@
 .search-filters-card { padding: 14px; margin-bottom: 16px; }
 .filter-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
   margin-bottom: 10px;
 }
 .filter-label {
@@ -57,6 +57,16 @@
 }
 .facet-badge strong { color: var(--text); margin-left: 4px; }
 .results-live { min-height: 1px; }
+
+/* Export actions at bottom of table */
+.export-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+  margin-top: 12px;
+}
 
 @media (max-width: 768px) {
   .filter-grid { grid-template-columns: repeat(2, 1fr); }

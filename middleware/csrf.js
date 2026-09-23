@@ -55,33 +55,32 @@ export function csrfValidation(req, res, next) {
 
   const cookieToken = req.cookies && req.cookies.csrf_token;
   const headerToken = req.headers['x-csrf-token'];
+  const hasSession = req.session && req.session.user;
 
-  // FIX: Si un cookie CSRF est présent (navigateur avec session), le header est OBLIGATOIRE.
-  // Si aucun des deux n'est présent (client API pur sans cookies), on laisse passer.
-  if (!cookieToken && !headerToken) {
-    return next(); // Client API sans cookies — pas de protection CSRF nécessaire
-  }
+  // For authenticated requests, CSRF protection is mandatory
+  if (hasSession) {
+    if (!cookieToken || !headerToken) {
+      return res.status(403).json({ error: 'Token CSRF manquant pour requête authentifiée' });
+    }
 
-  if (!cookieToken || !headerToken) {
-    // Cookie présent sans header → tentative cross-site probable
-    return res.status(403).json({ error: 'Token CSRF manquant' });
-  }
+    const bc = Buffer.from(cookieToken, 'utf8');
+    const bh = Buffer.from(headerToken, 'utf8');
 
-  const bc = Buffer.from(cookieToken, 'utf8');
-  const bh = Buffer.from(headerToken, 'utf8');
-
-  if (bc.length !== bh.length) {
-    return res.status(403).json({ error: 'Token CSRF invalide' });
-  }
-
-  try {
-    const match = crypto.timingSafeEqual(bc, bh);
-    if (!match) {
+    if (bc.length !== bh.length) {
       return res.status(403).json({ error: 'Token CSRF invalide' });
     }
-  } catch (_e) {
-    return res.status(403).json({ error: 'Token CSRF invalide' });
+
+    try {
+      const match = crypto.timingSafeEqual(bc, bh);
+      if (!match) {
+        return res.status(403).json({ error: 'Token CSRF invalide' });
+      }
+    } catch (_e) {
+      return res.status(403).json({ error: 'Token CSRF invalide' });
+    }
   }
+  // For unauthenticated requests, allow without CSRF (for public endpoints like login)
+  // These should implement their own rate limiting and validation
 
   next();
 }

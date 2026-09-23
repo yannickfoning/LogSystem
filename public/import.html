@@ -29,23 +29,23 @@
             <ul class="nav-links" id="nav-links">
                 <li>
                     <a href="/dashboard.html" data-i18n="nav.dashboard"
-                        >Tableau de bord</a
+                        >📊 Vue d'ensemble</a
                     >
                 </li>
                 <li>
-                    <a href="/search.html" data-i18n="nav.search">Recherche</a>
+                    <a href="/search.html" data-i18n="nav.search">🔍 Rechercher</a>
                 </li>
                 <li>
                     <a href="/import.html" aria-current="page" data-i18n="nav.import"
-                        >Import</a
+                        >📥 Importer</a
                     >
                 </li>
                 <li>
-                    <a href="/watchlog.html" data-i18n="nav.watchlog">Watch Log</a>
+                    <a href="/watchlog.html" data-i18n="nav.watchlog">👁️ Monitoring</a>
                 </li>
                 <li>
                     <a href="/admin.html" id="admin-link" data-i18n="nav.admin"
-                        >Administration</a
+                        >⚙️ Administration</a
                     >
                 </li>
             </ul>
@@ -66,10 +66,10 @@
             <h1 class="page-title" data-i18n="import.title">Import de logs</h1>
 
             <div class="card mb-24">
-                <div class="drop-zone" id="drop-zone">
+                <div class="drop-zone-simple" id="drop-zone">
                     <svg
-                        width="48"
-                        height="48"
+                        width="64"
+                        height="64"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
@@ -81,85 +81,58 @@
                         <polyline points="17 8 12 3 7 8" />
                         <line x1="12" y1="3" x2="12" y2="15" />
                     </svg>
-                    <p data-i18n="import.drop">
-                        Glissez un fichier ici ou cliquez pour sélectionner
+                    <h2 data-i18n="import.drop_simple">Déposez vos fichiers ici</h2>
+                    <p class="text-hint">
+                        Glissez-déposez vos fichiers ou cliquez pour sélectionner
                     </p>
                     <p class="text-hint" data-i18n="import.formats">
-                        Formats supportés : .log, .txt, .json, .jsonl, .csv,
-                        .xml, .zip, .gz, .tar, .rar, <strong>.7z</strong> (max 100 Mo)
+                        Formats supportés : .log, .txt, .json, .jsonl, .csv, .xml, 
+                        <strong>.zip, .rar, .7z, .gz, .tar</strong> (max 500 Mo)
+                    </p>
+                    <p class="text-info" data-i18n="import.multi_files">
+                        💡 Les archives (ZIP, RAR, 7z) sont extraites automatiquement
                     </p>
                     <input
                         type="file"
                         class="file-input"
                         id="file-input"
                         accept=".log,.txt,.json,.jsonl,.csv,.xml,.zip,.gz,.gzip,.tar,.tgz,.rar,.7z"
+                        multiple
                     />
                 </div>
 
-                <div class="form-row mt-16">
-                    <div class="form-group">
-                        <label data-i18n="import.source"
-                            >Source (optionnel)</label
-                        >
-                        <input
-                            type="text"
-                            id="import-source"
-                            data-i18n-placeholder="import.source.placeholder"
-                            placeholder="ex: production"
-                        />
-                    </div>
-                    <div class="form-group">
-                        <label data-i18n="import.service"
-                            >Service (optionnel)</label
-                        >
-                        <input
-                            type="text"
-                            id="import-service"
-                            data-i18n-placeholder="import.service.placeholder"
-                            placeholder="ex: api-gateway"
-                        />
-                    </div>
+                <div class="selected-files-container" id="selected-files-container" style="display: none;">
+                    <h3 data-i18n="import.selected_files">Fichiers sélectionnés :</h3>
+                    <div id="selected-files-list"></div>
                 </div>
 
-                <div class="form-row mt-16">
-                    <div class="form-group">
-                        <label data-i18n="import.date_format">Format des dates dans le fichier</label>
-                        <select id="date-locale" name="locale">
-                            <option value="fr" selected data-i18n="import.locale.fr">
-                                Français (JJ/MM/AAAA)
-                            </option>
-                            <option value="us" data-i18n="import.locale.us">Américain (MM/JJ/AAAA)</option>
-                            <option value="iso" data-i18n="import.locale.iso">ISO 8601 (AAAA-MM-JJ)</option>
-                        </select>
-                    </div>
+                <div class="import-actions">
+                    <button id="import-btn" class="btn btn-primary btn-large" disabled>
+                        <span class="btn-icon">🚀</span>
+                        <span data-i18n="import.start_import">Importer</span>
+                    </button>
+                    <button id="clear-btn" class="btn btn-secondary" style="display: none;">
+                        <span data-i18n="import.clear">Effacer</span>
+                    </button>
                 </div>
 
-                <div id="progress-section" class="mt-16 is-hidden">
-                    <div class="flex items-center justify-between mb-16">
-                        <span
-                            class="text-muted"
-                            id="progress-text"
-                            data-i18n="import.processing"
-                            >Traitement en cours...</span
-                        >
-                        <span class="text-muted font-semibold" id="progress-pct"
-                            >0%</span
-                        >
+                <div class="import-progress" id="import-progress" style="display: none;">
+                    <div class="progress-header">
+                        <span data-i18n="import.processing">Traitement en cours...</span>
+                        <span id="progress-percentage">0%</span>
                     </div>
                     <div class="progress-bar">
                         <div class="progress-fill" id="progress-fill"></div>
                     </div>
-                    <p class="text-hint mt-8" id="progress-detail"></p>
+                    <div class="progress-status" id="progress-status">Initialisation...</div>
                 </div>
 
-                <div class="mt-16">
-                    <button
-                        class="btn btn-primary"
-                        id="upload-btn"
-                        disabled
-                        data-i18n="import.upload"
-                    >
-                        Importer
+                <div class="import-success" id="import-success" style="display: none;">
+                    <div class="success-icon">✅</div>
+                    <h3 data-i18n="import.success_title">Import terminé !</h3>
+                    <p id="import-success-message"></p>
+                    <button id="view-results-btn" class="btn btn-secondary">
+                        <span data-i18n="import.view_results">Voir les résultats</span>
                     </button>
                 </div>
             </div>
@@ -207,7 +180,8 @@
 
                 var dropZone = document.getElementById("drop-zone");
                 var fileInput = document.getElementById("file-input");
-                var uploadBtn = document.getElementById("upload-btn");
+                var importBtn = document.getElementById("import-btn");
+                var clearBtn = document.getElementById("clear-btn");
 
                 dropZone.addEventListener("click", function () {
                     fileInput.click();
@@ -228,6 +202,14 @@
                 });
                 fileInput.addEventListener("change", function () {
                     if (fileInput.files.length) selectFile(fileInput.files[0]);
+                });
+
+                clearBtn.addEventListener("click", function () {
+                    selectedFile = null;
+                    fileInput.value = "";
+                    dropZone.querySelector("p").textContent = "Glissez-déposez vos fichiers ou cliquez pour sélectionner";
+                    importBtn.disabled = true;
+                    clearBtn.style.display = "none";
                 });
 
                 function selectFile(file) {
@@ -262,27 +244,21 @@
                         " (" +
                         (file.size / 1024 / 1024).toFixed(2) +
                         " Mo)";
-                    uploadBtn.disabled = false;
+                    importBtn.disabled = false;
+                    clearBtn.style.display = "inline-block";
                 }
 
-                uploadBtn.addEventListener("click", async function () {
+                importBtn.addEventListener("click", async function () {
                     if (!selectedFile) return;
-                    uploadBtn.disabled = true;
-                    uploadBtn.innerHTML =
+                    importBtn.disabled = true;
+                    importBtn.innerHTML =
                         '<span class="spinner"></span> ' +
                         (window.i18n
                             ? window.i18n.t("import.uploading")
                             : "Import...");
 
                     var formData = new FormData();
-                    formData.append("file", selectedFile);
-                    var source = document.getElementById("import-source").value;
-                    var service =
-                        document.getElementById("import-service").value;
-                    var locale = document.getElementById("date-locale").value; // FIX 4b
-                    if (source) formData.append("source", source);
-                    if (service) formData.append("service", service);
-                    formData.append("locale", locale); // FIX 4b
+                    formData.append("files", selectedFile);
 
                     try {
                         var result = await api.upload(
@@ -291,8 +267,11 @@
                         );
                         currentJobId = result.job_id;
                         document
-                            .getElementById("progress-section")
-                            .classList.remove("is-hidden");
+                            .getElementById("import-progress")
+                            .style.display = "block";
+                        document
+                            .getElementById("import-success")
+                            .style.display = "none";
                         window.toast.success(
                             "Import démarré : " + selectedFile.name,
                         );
@@ -301,8 +280,8 @@
                         window.toast.error(
                             err.error || "Erreur lors de l'upload",
                         );
-                        uploadBtn.disabled = false;
-                        uploadBtn.textContent = "Importer";
+                        importBtn.disabled = false;
+                        importBtn.innerHTML = '<span class="btn-icon">🚀</span><span>Importer</span>';
                     }
                 });
 
@@ -318,15 +297,13 @@
                                 var total = job.total_lines || 1;
                                 var processed = job.processed_lines || 0;
                                 var pct = Math.round((processed / total) * 100);
-                                document.getElementById(
-                                    "progress-fill",
-                                ).style.width = pct + "%";
-                                document.getElementById(
-                                    "progress-pct",
-                                ).textContent = pct + "%";
-                                document.getElementById(
-                                    "progress-detail",
-                                ).textContent =
+                                var progressFill = document.getElementById("progress-fill");
+                                var progressPercentage = document.getElementById("progress-percentage");
+                                var progressStatus = document.getElementById("progress-status");
+                                
+                                if (progressFill) progressFill.style.width = pct + "%";
+                                if (progressPercentage) progressPercentage.textContent = pct + "%";
+                                if (progressStatus) progressStatus.textContent =
                                     processed +
                                     " / " +
                                     total +
@@ -336,17 +313,15 @@
 
                                 if (job.status === "completed") {
                                     clearInterval(pollTimer);
-                                    document.getElementById(
-                                        "progress-text",
-                                    ).textContent = "Import terminé !";
-                                    document.getElementById(
-                                        "progress-fill",
-                                    ).style.width = "100%";
-                                    document.getElementById(
-                                        "progress-pct",
-                                    ).textContent = "100%";
+                                    var progressFill = document.getElementById("progress-fill");
+                                    var progressPercentage = document.getElementById("progress-percentage");
+                                    var progressStatus = document.getElementById("progress-status");
+                                    
+                                    if (progressStatus) progressStatus.textContent = "Import terminé !";
+                                    if (progressFill) progressFill.style.width = "100%";
+                                    if (progressPercentage) progressPercentage.textContent = "100%";
 
-                                    // FIX 4a: Display quality summary
+                                    // Display quality summary
                                     if (job.import_summary) {
                                         var s = job.import_summary;
                                         var total = job.total_lines || 0;
@@ -421,7 +396,7 @@
                                                 "</p>";
                                         summaryHtml += "</div>";
                                         document
-                                            .getElementById("progress-section")
+                                            .getElementById("import-progress")
                                             .insertAdjacentHTML(
                                                 "afterend",
                                                 summaryHtml,
@@ -431,18 +406,19 @@
                                     window.toast.success(
                                         "Import terminé avec succès",
                                     );
-                                    uploadBtn.disabled = false;
-                                    uploadBtn.textContent = "Importer";
+                                    importBtn.disabled = false;
+                                    importBtn.innerHTML = '<span class="btn-icon">🚀</span><span data-i18n="import.start_import">Importer</span>';
+                                    clearBtn.style.display = "none";
                                     selectedFile = null;
                                     currentJobId = null;
+                                    document.getElementById("import-progress").style.display = "none";
                                     loadJobs();
                                 } else if (job.status === "failed") {
                                     clearInterval(pollTimer);
-                                    document.getElementById(
-                                        "progress-text",
-                                    ).textContent = "Import échoué";
+                                    var progressStatus = document.getElementById("progress-status");
+                                    if (progressStatus) progressStatus.textContent = "Import échoué";
                                     
-                                    // [FIX] Afficher un message d'erreur clair pour RAR sur Vercel
+                                    // Afficher un message d'erreur clair pour RAR sur Vercel
                                     var errorMsg = job.error_message || "Erreur inconnue";
                                     if (errorMsg && (errorMsg.includes("RAR") || errorMsg.includes("rar") || errorMsg.includes("unrar") || errorMsg.includes("archive"))) {
                                         errorMsg = "Extraction RAR non disponible sur cette plateforme. Veuillez utiliser ZIP ou décompresser localement avant import.";
@@ -451,24 +427,25 @@
                                     window.toast.error(
                                         "Import échoué : " + errorMsg,
                                     );
-                                    uploadBtn.disabled = false;
-                                    uploadBtn.textContent = "Importer";
+                                    importBtn.disabled = false;
+                                    importBtn.innerHTML = '<span class="btn-icon">🚀</span><span data-i18n="import.start_import">Importer</span>';
                                     currentJobId = null;
+                                    document.getElementById("import-progress").style.display = "none";
                                     loadJobs();
                                 }
                             })
                             .catch(function (err) {
                                 clearInterval(pollTimer);
-                                document.getElementById(
-                                    "progress-text",
-                                ).textContent = "Erreur de polling import";
+                                var progressStatus = document.getElementById("progress-status");
+                                if (progressStatus) progressStatus.textContent = "Erreur de polling import";
                                 window.toast.error(
                                     err.error ||
                                         "Erreur de communication avec le serveur",
                                 );
-                                uploadBtn.disabled = false;
-                                uploadBtn.textContent = "Importer";
+                                importBtn.disabled = false;
+                                importBtn.innerHTML = '<span class="btn-icon">🚀</span><span data-i18n="import.start_import">Importer</span>';
                                 currentJobId = null;
+                                document.getElementById("import-progress").style.display = "none";
                                 loadJobs();
                             });
                     }, 1500);

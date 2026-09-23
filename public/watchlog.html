@@ -16,11 +16,11 @@
     </div>
     <button class="hamburger" id="hamburger-btn" aria-label="Menu" aria-expanded="false"><span></span><span></span><span></span></button>
     <ul class="nav-links" id="nav-links">
-      <li><a href="/dashboard.html" data-i18n="nav.dashboard">Tableau de bord</a></li>
-      <li><a href="/search.html" data-i18n="nav.search">Recherche</a></li>
-      <li><a href="/import.html" data-i18n="nav.import">Import</a></li>
-      <li><a href="/watchlog.html" aria-current="page" data-i18n="nav.watchlog">Watch Log</a></li>
-      <li><a href="/admin.html" id="admin-link" data-i18n="nav.admin">Administration</a></li>
+      <li><a href="/dashboard.html" data-i18n="nav.dashboard">📊 Vue d'ensemble</a></li>
+      <li><a href="/search.html" data-i18n="nav.search">🔍 Rechercher</a></li>
+      <li><a href="/import.html" data-i18n="nav.import">📥 Importer</a></li>
+      <li><a href="/watchlog.html" aria-current="page" data-i18n="nav.watchlog">👁️ Monitoring</a></li>
+      <li><a href="/admin.html" id="admin-link" data-i18n="nav.admin">⚙️ Administration</a></li>
     </ul>
     <div class="nav-right">
       <a href="#" id="lang-toggle" class="lang-toggle-link">EN</a>
@@ -54,20 +54,20 @@
     <!-- Metrics -->
     <div class="watch-metrics">
       <div class="metric-card">
-        <div class="metric-label" data-i18n="watchlog.metric.logs_min">Logs/min</div>
-        <div class="metric-value" id="metricsLogsPerMin">0</div>
+        <div class="metric-label" data-i18n="watchlog.metric.logs_processed">Logs traités</div>
+        <div class="metric-value" id="metricsLogsProcessed">0</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label" data-i18n="watchlog.metric.errors">Erreurs</div>
-        <div class="metric-value" id="metricsErrors">0</div>
+        <div class="metric-label" data-i18n="watchlog.metric.processing_errors">Erreurs de traitement</div>
+        <div class="metric-value" id="metricsProcessingErrors">0</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label" data-i18n="watchlog.metric.services">Services</div>
-        <div class="metric-value" id="metricsServices">0</div>
+        <div class="metric-label" data-i18n="watchlog.metric.files_processed">Fichiers traités</div>
+        <div class="metric-value" id="metricsFilesProcessed">0</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label" data-i18n="watchlog.metric.error_rate">Taux d'erreur</div>
-        <div class="metric-value" id="metricsErrorRate">0%</div>
+        <div class="metric-label" data-i18n="watchlog.metric.processing_rate">Taux de traitement</div>
+        <div class="metric-value" id="metricsProcessingRate">0/s</div>
       </div>
     </div>
 
@@ -417,18 +417,16 @@
       const fatal = Number(stats.fatal_count || 0);
       const services = Number(stats.services || 0);
 
-      document.getElementById('metricsErrors').textContent = errors + critical + fatal;
-      document.getElementById('metricsServices').textContent = services;
+      document.getElementById('metricsLogsProcessed').textContent = total;
+      document.getElementById('metricsProcessingErrors').textContent = errors + critical + fatal;
+      document.getElementById('metricsFilesProcessed').textContent = services;
 
       // logs_per_min (fourni par backend) sinon calcul fallback
       const logsPerMin = stats.logs_per_min != null
         ? Number(stats.logs_per_min)
         : (STATE.metrics.total / Math.max((Date.now() - STATE.sessionStartTime) / 60000, 0.0167));
 
-      document.getElementById('metricsLogsPerMin').textContent = Math.round(logsPerMin) || 0;
-
-      const errorRate = total > 0 ? Math.round(((errors + critical + fatal) / total) * 100) : 0;
-      document.getElementById('metricsErrorRate').textContent = errorRate + '%';
+      document.getElementById('metricsProcessingRate').textContent = Math.round(logsPerMin) + '/min';
     }
 
     // AMÉLIORATION 4: Show anomaly alert
@@ -632,15 +630,17 @@
       const chart = document.getElementById('levelChart');
       if (!chart) return;
       const max = Math.max(...Object.values(STATE.metrics.levelCount), 1);
-      // Ensure the container has a defined height for percentage bars to work
-      chart.style.cssText = 'display:flex;align-items:flex-end;gap:4px;height:80px;width:100%;';
+      // Bar chart horizontal (diagramme en bâtons) propre et proportionnel
+      chart.style.cssText = 'display:flex;flex-direction:column;gap:8px;width:100%;padding:8px;background:var(--surface2);border-radius:8px;';
       chart.innerHTML = Object.entries(STATE.metrics.levelCount).map(([level, count]) => {
-        const height = Math.max(Math.round((count / max) * 100), count > 0 ? 2 : 0);
+        const width = Math.max(Math.round((count / max) * 100), count > 0 ? 2 : 0);
         const color  = LEVEL_COLORS[level] || '#6b7280';
-        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
-          <div style="width:100%;height:${height}%;background:${color};border-radius:3px 3px 0 0;min-height:${count>0?'3px':'0'};transition:height 0.3s"></div>
-          <div style="font-size:8px;color:var(--text2,#888);white-space:nowrap">${level.slice(0,3)}</div>
-          <div style="font-size:8px;color:${color};font-weight:600">${count}</div>
+        return `<div style="display:flex;align-items:center;gap:10px">
+          <div style="font-size:11px;color:var(--text2,#888);white-space:nowrap;width:50px;text-align:right;font-weight:500">${level}</div>
+          <div style="flex:1;display:flex;align-items:center;gap:6px">
+            <div style="width:${width}%;height:20px;background:${color};border-radius:4px;min-width:${count>0?'6px':'0'};transition:width 0.4s ease-out;box-shadow:0 2px 4px rgba(0,0,0,0.1)"></div>
+            <div style="font-size:11px;color:${color};font-weight:700;min-width:25px;text-align:right">${count}</div>
+          </div>
         </div>`;
       }).join('');
     }
@@ -653,7 +653,19 @@
       if (!entries.length) { list.innerHTML = '<li style="color:var(--text2);font-size:12px">Aucun service</li>'; return; }
       // Sort by count descending
       entries.sort(function(a, b) { return (b[1] || 0) - (a[1] || 0); });
-      list.innerHTML = entries.slice(0, 10).map(function(entry) {
+      
+      // Afficher le top service en premier avec un style différent
+      var topService = entries[0];
+      var topServiceName = Array.isArray(topService) ? topService[0] : topService;
+      var topServiceCount = Array.isArray(topService) ? topService[1] : '';
+      
+      var html = '<li style="font-size:13px;padding:6px 0;color:var(--text1);display:flex;justify-content:space-between;background:rgba(79,142,247,0.1);border-radius:4px;padding:8px;margin-bottom:8px">'
+        + '<span style="font-weight:600;color:var(--accent-blue)">🏆 ' + esc(String(topServiceName)) + '</span>'
+        + '<span style="font-weight:700;color:var(--accent-blue)">' + topServiceCount + '</span>'
+        + '</li>';
+      
+      // Afficher les autres services
+      html += entries.slice(1, 10).map(function(entry) {
         var svcName  = Array.isArray(entry) ? entry[0] : entry;
         var svcCount = Array.isArray(entry) ? entry[1] : '';
         return '<li style="font-size:12px;padding:3px 0;color:var(--text1);display:flex;justify-content:space-between">'
@@ -661,16 +673,17 @@
           + (svcCount ? '<span style="color:var(--text2)">' + svcCount + '</span>' : '')
           + '</li>';
       }).join('');
+      
+      list.innerHTML = html;
     }
     function updateUI() {
-      // Update metrics
+      // Update processing metrics
       const elapsedMin = Math.max((Date.now() - STATE.sessionStartTime) / 60000, 0.0167); // min 1s
       const logsPerMin = Math.round(STATE.metrics.total / elapsedMin) || 0;
-      document.getElementById('metricsLogsPerMin').textContent = logsPerMin;
-      document.getElementById('metricsErrors').textContent = STATE.metrics.errors;
-      document.getElementById('metricsServices').textContent = STATE.metrics.services.size;
-      const errorRate = STATE.metrics.total > 0 ? Math.round((STATE.metrics.errors / STATE.metrics.total) * 100) : 0;
-      document.getElementById('metricsErrorRate').textContent = errorRate + '%';
+      document.getElementById('metricsLogsProcessed').textContent = STATE.metrics.total;
+      document.getElementById('metricsProcessingErrors').textContent = STATE.metrics.errors;
+      document.getElementById('metricsFilesProcessed').textContent = STATE.metrics.services.size; // Reuse as files count
+      document.getElementById('metricsProcessingRate').textContent = logsPerMin + '/min';
 
       // Update components
       updateLogStream();

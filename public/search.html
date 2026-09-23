@@ -16,11 +16,11 @@
     </div>
     <button class="hamburger" id="hamburger-btn" aria-label="Menu" aria-expanded="false"><span></span><span></span><span></span></button>
     <ul class="nav-links" id="nav-links">
-      <li><a href="/dashboard.html" data-i18n="nav.dashboard">Tableau de bord</a></li>
-      <li><a href="/search.html" aria-current="page" data-i18n="nav.search">Recherche</a></li>
-      <li><a href="/import.html" data-i18n="nav.import">Import</a></li>
-      <li><a href="/watchlog.html" data-i18n="nav.watchlog">Watch Log</a></li>
-      <li><a href="/admin.html" id="admin-link" data-i18n="nav.admin">Administration</a></li>
+      <li><a href="/dashboard.html" data-i18n="nav.dashboard">📊 Vue d'ensemble</a></li>
+      <li><a href="/search.html" aria-current="page" data-i18n="nav.search">🔍 Rechercher</a></li>
+      <li><a href="/import.html" data-i18n="nav.import">📥 Importer</a></li>
+      <li><a href="/watchlog.html" data-i18n="nav.watchlog">👁️ Monitoring</a></li>
+      <li><a href="/admin.html" id="admin-link" data-i18n="nav.admin">⚙️ Administration</a></li>
     </ul>
     <div class="nav-right">
       <a href="#" id="lang-toggle" class="lang-toggle-link">EN</a>
@@ -39,6 +39,10 @@
       <button class="chip" data-chip="7j" data-i18n="search.chip.7j">7 jours</button>
       <button class="chip" data-chip="errors" data-i18n="search.chip.errors">Erreurs</button>
       <button class="chip" data-chip="warnings" data-i18n="search.chip.warnings">Warnings</button>
+      <button class="chip" data-chip="critical" data-i18n="search.chip.critical">Critiques</button>
+      <button class="chip" data-chip="fatal" data-i18n="search.chip.fatal">Fatals</button>
+      <button class="chip" data-chip="info" data-i18n="search.chip.info">Info</button>
+      <button class="chip" data-chip="debug" data-i18n="search.chip.debug">Debug</button>
     </div>
 
     <!-- Filtres simplifiés v6 -->
@@ -62,20 +66,17 @@
         </div>
         <div class="form-group">
           <label class="filter-label" for="f-source" data-i18n="search.source">Source</label>
-          <input type="text" id="f-source" data-i18n-placeholder="search.source" placeholder="Source">
+          <select id="f-source">
+            <option value="" data-i18n="search.all_sources">Toutes les sources</option>
+          </select>
         </div>
         <div class="form-group">
-          <label class="filter-label" for="f-service" data-i18n="search.service">Service</label>
-          <input type="text" id="f-service" data-i18n-placeholder="search.service" placeholder="Service">
+          <label class="filter-label" for="f-user" data-i18n="search.user">Utilisateur</label>
+          <select id="f-user">
+            <option value="" data-i18n="search.all_users">Tous les utilisateurs</option>
+          </select>
         </div>
-        <div class="form-group">
-          <label class="filter-label" for="f-main-service" data-i18n="search.main_service">Service principal</label>
-          <input type="text" id="f-main-service" data-i18n-placeholder="search.main_service" placeholder="Authentication, Database...">
-        </div>
-        <div class="form-group">
-          <label class="filter-label" for="f-hostname" data-i18n="search.hostname">Hôte</label>
-          <input type="text" id="f-hostname" data-i18n-placeholder="search.hostname" placeholder="hostname">
-        </div>
+
         <div class="form-group">
           <label class="filter-label" for="f-date-from" data-i18n="search.date_from">Date log (de)</label>
           <input type="date" id="f-date-from">
@@ -97,10 +98,6 @@
 
     <div class="flex items-center justify-between mb-16">
       <span class="text-muted" id="results-count"></span>
-      <div class="flex gap-8">
-        <button class="btn btn-sm btn-secondary" id="export-csv" data-i18n="search.export_csv">Export CSV</button>
-        <button class="btn btn-sm btn-secondary" id="export-pdf" data-i18n="search.export_pdf">Export PDF</button>
-      </div>
     </div>
     <div id="facets-bar" class="facets-bar" aria-live="polite"></div>
     <div class="text-hint mb-8">
@@ -116,10 +113,7 @@
               <th data-i18n="search.table.date">Date log</th>
               <th data-i18n="common.level">Niveau</th>
               <th data-i18n="common.source">Source</th>
-              <th class="col-hide-mobile" data-i18n="search.table.service">Service princ.</th>
-              <th class="col-hide-mobile" data-i18n="search.table.hostname">Hôte</th>
-              <th class="col-hide-mobile" data-i18n="search.table.user">Utilisateur</th>
-              <th class="col-hide-mobile" data-i18n="search.table.import">Import</th>
+              <th data-i18n="search.table.user">Utilisateur responsable</th>
               <th data-i18n="common.message">Message</th>
             </tr>
           </thead>
@@ -127,6 +121,10 @@
         </table>
       </div>
       <div id="logs-pagination"></div>
+      <div class="export-actions">
+        <button class="btn btn-sm btn-secondary" id="export-csv" data-i18n="search.export_csv">Export CSV</button>
+        <button class="btn btn-sm btn-secondary" id="export-pdf" data-i18n="search.export_pdf">Export PDF</button>
+      </div>
     </div>
   </main>
 
@@ -193,7 +191,7 @@
           renderFacets(resp.facets);
           var tb = document.getElementById('logs-body');
           if (!rows.length) {
-            tb.innerHTML = '<tr><td colspan="8" class="no-data" data-i18n="search.no_results">Aucun résultat</td></tr>';
+            tb.innerHTML = '<tr><td colspan="5" class="no-data" data-i18n="search.no_results">Aucun résultat</td></tr>';
             document.getElementById('logs-pagination').innerHTML = '';
             return;
           }
@@ -203,19 +201,13 @@
               ? '<td><span class="ts-inferred" title="Date inférée">' + fmtDT(eventTs) + ' <small>~</small></span></td>'
               : '<td>' + fmtDT(eventTs) + '</td>';
             var userCell = r.target_user
-              ? '<td class="col-hide-mobile"><span class="user-badge">' + esc(r.target_user) + '</span></td>'
-              : '<td class="col-hide-mobile"><span class="user-empty">—</span></td>';
-            var importCell = r.imported_at
-              ? '<td class="col-hide-mobile cell-muted">' + fmtDT(r.imported_at) + '</td>'
-              : '<td class="col-hide-mobile"><span class="user-empty">—</span></td>';
+              ? '<td><span class="user-badge">' + esc(r.target_user) + '</span></td>'
+              : '<td><span class="user-empty">—</span></td>';
             return '<tr data-id="'+r.id+'">'
               + tsCell
               + '<td>'+badge(r.log_level)+'</td>'
               + '<td>'+esc(r.source || r.log_source || '—')+'</td>'
-              + '<td class="col-hide-mobile">'+esc(r.service || '—')+'</td>'
-              + '<td class="col-hide-mobile">'+esc(r.source_server || '—')+'</td>'
               + userCell
-              + importCell
               + '<td class="text-truncate">'+esc(r.message)+'</td>'
               + '</tr>';
           }).join('');
@@ -238,10 +230,8 @@
         };
         if (p.search) apiParams.query = p.search;
         if (p.log_level) apiParams.level = p.log_level;
-        if (p.source) apiParams.source_system = p.source;
-        if (p.service) apiParams.service = p.service;
-        if (p.main_service) apiParams.main_service = p.main_service;
-        if (p.hostname) apiParams.hostname = p.hostname;
+        if (p.source) apiParams.source = p.source;
+        if (p.user) apiParams.target_user = p.user;
         if (p.date_from) apiParams.from_timestamp = p.date_from + 'T00:00:00';
         if (p.date_to) apiParams.to_timestamp = p.date_to + 'T23:59:59';
         return apiParams;
@@ -251,9 +241,7 @@
         document.getElementById('f-search').value = '';
         document.getElementById('f-level').value = '';
         document.getElementById('f-source').value = '';
-        document.getElementById('f-service').value = '';
-        document.getElementById('f-main-service').value = '';
-        document.getElementById('f-hostname').value = '';
+        document.getElementById('f-user').value = '';
         document.getElementById('f-date-from').value = '';
         document.getElementById('f-date-to').value = '';
         currentPage = 1;
@@ -264,18 +252,14 @@
         var p = { page: currentPage, limit: 50 };
         var search = document.getElementById('f-search').value.trim();
         var level = document.getElementById('f-level').value;
-        var source = document.getElementById('f-source').value.trim();
-        var service = document.getElementById('f-service').value.trim();
-        var mainService = document.getElementById('f-main-service').value.trim();
-        var hostname = document.getElementById('f-hostname').value.trim();
+        var source = document.getElementById('f-source').value;
+        var user = document.getElementById('f-user').value;
         var dateFrom = document.getElementById('f-date-from').value;
         var dateTo = document.getElementById('f-date-to').value;
         if (search) p.search = search;
         if (level) p.log_level = level;
         if (source) p.source = source;
-        if (service) p.service = service;
-        if (mainService) p.main_service = mainService;
-        if (hostname) p.hostname = hostname;
+        if (user) p.user = user;
         if (dateFrom) p.date_from = dateFrom;
         if (dateTo) p.date_to = dateTo;
         return p;
@@ -289,8 +273,8 @@
         if (params.has('source')) {
           document.getElementById('f-source').value = params.get('source');
         }
-        if (params.has('service')) {
-          document.getElementById('f-service').value = params.get('service');
+        if (params.has('user')) {
+          document.getElementById('f-user').value = params.get('user');
         }
         if (params.has('search')) {
           document.getElementById('f-search').value = params.get('search');
@@ -303,6 +287,50 @@
         }
       }
 
+      function loadDropdownOptions() {
+        // Priorité des sources les plus courantes
+        var sourcePriority = ['Splunk', 'Info', 'WAF', 'Apache', 'Nginx', 'Application'];
+        
+        // Load metadata from the correct API endpoint
+        api.get('/api/search/metadata').then(function(data) {
+          // Load sources
+          var sourceSelect = document.getElementById('f-source');
+          if (data && data.sources && Array.isArray(data.sources)) {
+            // Trier : sources prioritaires en premier, puis alphabétique
+            var sortedSources = data.sources.sort(function(a, b) {
+              var indexA = sourcePriority.indexOf(a);
+              var indexB = sourcePriority.indexOf(b);
+              if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+              if (indexA !== -1) return -1;
+              if (indexB !== -1) return 1;
+              return a.localeCompare(b);
+            });
+            
+            sortedSources.forEach(function(source) {
+              var option = document.createElement('option');
+              option.value = source;
+              option.textContent = source;
+              sourceSelect.appendChild(option);
+            });
+          }
+
+          // Load users
+          var userSelect = document.getElementById('f-user');
+          if (data && data.target_users && Array.isArray(data.target_users)) {
+            // Trier alphabétiquement
+            var sortedUsers = data.target_users.sort();
+            sortedUsers.forEach(function(user) {
+              var option = document.createElement('option');
+              option.value = user;
+              option.textContent = user;
+              userSelect.appendChild(option);
+            });
+          }
+        }).catch(function() {
+          // Silently fail if API doesn't support metadata
+        });
+      }
+
       document.querySelectorAll('.chip').forEach(function(chip) {
         chip.addEventListener('click', function() {
           document.querySelectorAll('.chip').forEach(function(c) { c.classList.remove('active'); });
@@ -310,7 +338,7 @@
           document.getElementById('f-level').value = '';
           document.getElementById('f-search').value = '';
           document.getElementById('f-source').value = '';
-          document.getElementById('f-service').value = '';
+          document.getElementById('f-user').value = '';
           document.getElementById('f-date-from').value = '';
           document.getElementById('f-date-to').value = '';
 
@@ -332,6 +360,14 @@
             document.getElementById('f-level').value = 'ERROR';
           } else if (type === 'warnings') {
             document.getElementById('f-level').value = 'WARNING';
+          } else if (type === 'critical') {
+            document.getElementById('f-level').value = 'CRITICAL';
+          } else if (type === 'fatal') {
+            document.getElementById('f-level').value = 'FATAL';
+          } else if (type === 'info') {
+            document.getElementById('f-level').value = 'INFO';
+          } else if (type === 'debug') {
+            document.getElementById('f-level').value = 'DEBUG';
           }
           currentPage = 1;
           doSearch();
@@ -386,11 +422,9 @@
               html += '</p>';
               if (log.imported_at) html += '<p><strong>Date d\'import:</strong> ' + fmtDT(log.imported_at) + '</p>';
               html += '<p><strong data-i18n="modal.level">Importance:</strong> ' + badge(log.log_level) + '</p>';
-              html += '<p><strong data-i18n="modal.source">Source:</strong> ' + esc(log.source_system || log.log_source || log.source) + '</p>';
-              html += '<p><strong>Service principal:</strong> ' + esc(log.main_service || '—') + '</p>';
-              html += '<p><strong>Hôte:</strong> ' + esc(log.hostname || log.source_server || '—') + '</p>';
-              html += '<p><strong data-i18n="modal.service">Service:</strong> ' + esc(log.service) + '</p>';
-              html += '<p><strong>Utilisateur (log):</strong> ' + esc(log.target_user || '—') + '</p>';
+              html += '<p><strong data-i18n="modal.source">Source:</strong> ' + esc(log.source || log.log_source || '—') + '</p>';
+              html += '<p><strong data-i18n="modal.service">Service:</strong> ' + esc(log.service || '—') + '</p>';
+              html += '<p><strong>Utilisateur responsable du log:</strong> ' + esc(log.target_user || '—') + '</p>';
               if (log.log_origin) html += '<p><strong>Origine:</strong> ' + esc(log.log_origin) + '</p>';
               html += '<hr style="border-color:var(--border);margin:12px 0">';
               html += '<p><strong data-i18n="modal.message">Message:</strong></p><pre style="background:var(--surface2);padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-all;font-size:12px;max-height:200px;overflow:auto">' + esc(log.message) + '</pre>';
@@ -424,11 +458,9 @@
               html += '</p>';
               if (log.imported_at) html += '<p><strong>Date d\'import:</strong> ' + fmtDT(log.imported_at) + '</p>';
               html += '<p><strong data-i18n="modal.level">Importance:</strong> ' + badge(log.log_level) + '</p>';
-              html += '<p><strong data-i18n="modal.source">Source:</strong> ' + esc(log.source_system || log.log_source || log.source) + '</p>';
-              html += '<p><strong>Service principal:</strong> ' + esc(log.main_service || '—') + '</p>';
-              html += '<p><strong>Hôte:</strong> ' + esc(log.hostname || log.source_server || '—') + '</p>';
-              html += '<p><strong data-i18n="modal.service">Service:</strong> ' + esc(log.service) + '</p>';
-              html += '<p><strong>Utilisateur (log):</strong> ' + esc(log.target_user || '—') + '</p>';
+              html += '<p><strong data-i18n="modal.source">Source:</strong> ' + esc(log.source || log.log_source || '—') + '</p>';
+              html += '<p><strong data-i18n="modal.service">Service:</strong> ' + esc(log.service || '—') + '</p>';
+              html += '<p><strong>Utilisateur responsable du log:</strong> ' + esc(log.target_user || '—') + '</p>';
               if (log.log_origin) html += '<p><strong>Origine:</strong> ' + esc(log.log_origin) + '</p>';
               html += '<hr style="border-color:var(--border);margin:12px 0">';
               html += '<p><strong data-i18n="modal.message">Message:</strong></p><pre style="background:var(--surface2);padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-all;font-size:12px;max-height:200px;overflow:auto">' + esc(log.message) + '</pre>';
@@ -454,6 +486,7 @@
       });
 
       applyUrlFilters();
+      loadDropdownOptions();
       doSearch();
     })();
   </script>

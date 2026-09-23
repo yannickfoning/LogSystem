@@ -72,6 +72,7 @@ export async function updateRecommendationFrequency(userId) {
       `SELECT error_type, log_level, COUNT(*) as cnt, MAX(timestamp) as last_ts
        FROM logs
        WHERE user_id = ? AND timestamp >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+       AND error_type IS NOT NULL
        GROUP BY error_type, log_level`,
       [userId]
     );

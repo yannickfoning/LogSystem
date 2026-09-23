@@ -232,7 +232,7 @@ body { font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe 
 /* Right column: Alerts (LARGE) */
 .alerts-large {
   grid-row: 1 / 3;
-  min-height: 500px;
+  min-height: 800px;
 }
 
 /* ── Card v2 ────────────────────────────────────────────────────────── */
@@ -497,20 +497,20 @@ body { font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe 
 .alert-widget-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 13px;
 }
 .alert-widget-table th {
   text-align: left;
-  padding: 6px 8px;
+  padding: 10px 12px;
   color: var(--text2);
   font-weight: 600;
   border-bottom: 1px solid var(--border);
-  font-size: 11px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.4px;
 }
 .alert-widget-table td {
-  padding: 7px 8px;
+  padding: 12px 12px;
   border-bottom: 1px solid rgba(255,255,255,0.04);
   color: var(--text);
   vertical-align: middle;

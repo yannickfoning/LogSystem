@@ -10,11 +10,18 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "create-admin": "node scripts/setup/create-default-users.js",
-    "secret": "node scripts/tools/generate-secret.js",
+    "create-admin": "node scripts/create-default-users.js",
+    "secret": "node scripts/generate-secret.js",
     "lint": "eslint .",
     "build": "node scripts/validate-build.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "diagnose:alerts": "node scripts/diagnostics/check-alert-rules.js",
+    "diagnose:admin": "node scripts/diagnostics/check-admin-user.js",
+    "diagnose:counts": "node scripts/diagnostics/check-counts.js",
+    "diagnose:rules": "node scripts/diagnostics/check-rule-time-window.js",
+    "diagnose:comprehensive": "node scripts/comprehensive-diagnostic.js",
+    "maintenance:cleanup": "node scripts/cleanup-database.js",
+    "maintenance:sessions": "node scripts/fix-sessions-table.js"
   },
   "dependencies": {
     "7zip-bin": "^5.2.0",

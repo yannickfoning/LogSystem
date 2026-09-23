@@ -342,8 +342,7 @@ router.get('/imported-today', async (req, res) => {
         source,
         service,
         imported_at,
-        import_job_id,
-        file_name
+        import_job_id
        FROM logs
        WHERE imported_at >= ? AND imported_at < ?${scope.sql}
        ORDER BY imported_at DESC
@@ -390,7 +389,7 @@ router.get('/import-jobs/:jobId/live', async (req, res) => {
     const [logs] = await pool.execute(
       `SELECT 
         id, timestamp, log_level, message, service,
-        source_server, file_name
+        source_server
        FROM logs
        WHERE import_job_id = ?
        ORDER BY timestamp DESC

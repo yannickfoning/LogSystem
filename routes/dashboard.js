@@ -116,77 +116,69 @@ router.get('/summary', async (req, res) => {
      * importedTodayCount: logs imported today (ingestion activity).
      */
     const { start: todayStartSql } = utcTodayBounds();
-    var [importedToday] = await pool.execute(
-      `SELECT COUNT(*) as cnt FROM logs WHERE ${OPERATIONAL_TS} >= ?` + scope.sql,
+    
+    // Optimisation: requête combinée pour les statistiques du jour
+    var [todayStats] = await pool.execute(
+      `SELECT 
+        COUNT(*) as imported_today_count,
+        SUM(CASE WHEN log_level IN ('ERROR', 'CRITICAL', 'FATAL') THEN 1 ELSE 0 END) as error_count
+       FROM logs WHERE ${OPERATIONAL_TS} >= ?` + scope.sql,
       [todayStartSql, ...scope.params]
     );
-    var [errorCount] = await pool.execute(
-      `SELECT COUNT(*) as cnt FROM logs WHERE ${OPERATIONAL_TS} >= ? AND log_level IN ('ERROR', 'CRITICAL', 'FATAL')` + scope.sql,
-      [todayStartSql, ...scope.params]
-    );
+    
     const alertFilter = alertScope(req);
     var [unreadAlerts] = await pool.execute(
       "SELECT COUNT(*) as cnt FROM alerts WHERE status = 'new'" + alertFilter.sql,
       alertFilter.params
     );
-    var [fatalCount] = await pool.execute(
-      "SELECT COUNT(*) as cnt FROM logs WHERE log_level = 'FATAL'" + scope.sql,
-      scope.params
-    );
-    var [criticalCount] = await pool.execute(
-      "SELECT COUNT(*) as cnt FROM logs WHERE log_level = 'CRITICAL'" + scope.sql,
-      scope.params
-    );
-    var [sourceCount] = await pool.execute(
-      'SELECT COUNT(DISTINCT source) as cnt FROM logs WHERE source IS NOT NULL AND source != \'\'' + scope.sql,
-      scope.params
-    );
     
-    // Log size control - Calculate total log size
-    var [logSizeStats] = await pool.execute(
+    // Optimisation: requête combinée pour les niveaux de log
+    var [levelStats] = await pool.execute(
       `SELECT 
-        COUNT(*) as total_logs,
-        SUM(LENGTH(raw_log)) as total_bytes,
-        AVG(LENGTH(raw_log)) as avg_bytes_per_log
-       FROM logs WHERE 1=1` + scope.sql,
+        log_level,
+        COUNT(*) as cnt,
+        SUM(CASE WHEN log_level = 'FATAL' THEN 1 ELSE 0 END) as fatal_count,
+        SUM(CASE WHEN log_level = 'CRITICAL' THEN 1 ELSE 0 END) as critical_count
+       FROM logs WHERE log_level IS NOT NULL` + scope.sql + ' GROUP BY log_level',
       scope.params
     );
     
-    const totalBytes = logSizeStats[0]?.total_bytes || 0;
-    const totalMB = (totalBytes / (1024 * 1024)).toFixed(2);
-    const avgBytes = logSizeStats[0]?.avg_bytes_per_log || 0;
-    
-    var [levelRows] = await pool.execute(
-      'SELECT log_level, COUNT(*) as cnt FROM logs WHERE log_level IS NOT NULL' + scope.sql + ' GROUP BY log_level',
+    var [sourceCount] = await pool.execute(
+      'SELECT COUNT(DISTINCT COALESCE(source, source_server, log_source)) as cnt FROM logs WHERE COALESCE(source, source_server, log_source) IS NOT NULL AND COALESCE(source, source_server, log_source) != \'\'' + scope.sql,
       scope.params
     );
-
+    
     // Compter les utilisateurs
     var [userCount] = await pool.execute('SELECT COUNT(*) as cnt FROM users WHERE is_active = 1');
-
+    
     // Niveaux par clé
     const levels = {};
-    for (const row of levelRows) {
-      levels[String(row.log_level || '').toUpperCase()] = Number(row.cnt);
+    let fatalCount = 0;
+    let criticalCount = 0;
+    
+    for (const row of levelStats) {
+      const levelKey = String(row.log_level || '').toUpperCase();
+      levels[levelKey] = Number(row.cnt);
+      fatalCount += Number(row.fatal_count || 0);
+      criticalCount += Number(row.critical_count || 0);
     }
+
+    const importedTodayCount = Number(todayStats[0]?.imported_today_count || 0);
+    const errorCount = Number(todayStats[0]?.error_count || 0);
 
     const data = {
       // Standardized camelCase format
-      totalLogs: Number(total[0].cnt),
-      todayLogs: Number(importedToday[0].cnt),
-      importedTodayCount: Number(importedToday[0].cnt),
-      errorCount: Number(errorCount[0].cnt),
-      unreadAlerts: Number(unreadAlerts[0].cnt),
-      fatalCount: Number(fatalCount[0].cnt),
-      criticalCount: Number(criticalCount[0].cnt),
+      totalLogs: Number(total[0]?.cnt || 0),
+      todayLogs: importedTodayCount,
+      importedTodayCount: importedTodayCount,
+      errorCount: errorCount,
+      unreadAlerts: Number(unreadAlerts[0]?.cnt || 0),
+      fatalCount: fatalCount,
+      criticalCount: criticalCount,
       infoCount: Number(levels['INFO'] || 0),
       warningCount: Number(levels['WARNING'] || 0),
-      userCount: Number(userCount[0].cnt),
-      sourceCount: Number(sourceCount[0].cnt),
-      // Log size control
-      totalLogSizeMB: totalMB,
-      totalLogSizeBytes: totalBytes,
-      avgLogSizeBytes: avgBytes,
+      userCount: Number(userCount[0]?.cnt || 0),
+      sourceCount: Number(sourceCount[0]?.cnt || 0),
       // Levels breakdown
       levels: levels,
       levelDebug: Number(levels['DEBUG'] || 0),
@@ -196,16 +188,13 @@ router.get('/summary', async (req, res) => {
       levelCritical: Number(levels['CRITICAL'] || 0),
       levelFatal: Number(levels['FATAL'] || 0),
       // snake_case for frontend compatibility
-      total_logs: Number(total[0].cnt),
-      today_logs: Number(importedToday[0].cnt),
-      imported_today_count: Number(importedToday[0].cnt),
-      error_count: Number(errorCount[0].cnt),
-      unread_alerts: Number(unreadAlerts[0].cnt),
-      fatal_count: Number(fatalCount[0].cnt),
-      critical_count: Number(criticalCount[0].cnt),
-      total_log_size_mb: totalMB,
-      total_log_size_bytes: totalBytes,
-      avg_log_size_bytes: avgBytes,
+      total_logs: Number(total[0]?.cnt || 0),
+      today_logs: importedTodayCount,
+      imported_today_count: importedTodayCount,
+      error_count: errorCount,
+      unread_alerts: Number(unreadAlerts[0]?.cnt || 0),
+      fatal_count: fatalCount,
+      critical_count: criticalCount,
       levels_breakdown: levels,
     };
 

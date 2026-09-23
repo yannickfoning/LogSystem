@@ -16,11 +16,11 @@
     </div>
     <button class="hamburger" id="hamburger-btn" aria-label="Menu" aria-expanded="false"><span></span><span></span><span></span></button>
     <ul class="nav-links" id="nav-links">
-      <li><a href="/dashboard.html" data-i18n="nav.dashboard">Tableau de bord</a></li>
-      <li><a href="/search.html" data-i18n="nav.search">Recherche</a></li>
-      <li><a href="/import.html" data-i18n="nav.import">Import</a></li>
-      <li><a href="/watchlog.html" data-i18n="nav.watchlog">Watch Log</a></li>
-      <li><a href="/admin.html" aria-current="page" data-i18n="nav.admin">Administration</a></li>
+      <li><a href="/dashboard.html" data-i18n="nav.dashboard">📊 Vue d'ensemble</a></li>
+      <li><a href="/search.html" data-i18n="nav.search">🔍 Rechercher</a></li>
+      <li><a href="/import.html" data-i18n="nav.import">📥 Importer</a></li>
+      <li><a href="/watchlog.html" data-i18n="nav.watchlog">👁️ Monitoring</a></li>
+      <li><a href="/admin.html" aria-current="page" data-i18n="nav.admin">⚙️ Administration</a></li>
     </ul>
     <div class="nav-right">
       <a href="#" id="lang-toggle" class="lang-toggle-link">EN</a>
@@ -98,6 +98,46 @@
         <span class="text-muted" id="recommendations-count"></span>
         <button class="btn btn-primary btn-sm" id="btn-create-recommendation">Créer une recommandation</button>
       </div>
+      
+      <!-- Inline Recommendation Form -->
+      <div class="card" id="recommendation-form-card" style="display: none; margin-bottom: 16px;">
+        <div class="card-header">
+          <h3 id="recommendation-form-title">Créer une recommandation</h3>
+          <button class="btn btn-xs btn-secondary" id="btn-cancel-recommendation">Annuler</button>
+        </div>
+        <form id="recommendation-form">
+          <input type="hidden" id="rec-id">
+          <div class="form-group">
+            <label data-i18n="admin.rec.error_type">Type d'erreur</label>
+            <select id="rec-error-type" required>
+              <option value="">Sélectionner un type d'erreur...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label data-i18n="admin.rec.recommendation">Recommandation</label>
+            <textarea id="rec-recommendation" rows="4" required></textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label data-i18n="admin.rec.priority">Priorité</label>
+              <select id="rec-priority">
+                <option value="1" data-i18n="admin.rec.priority_low">Basse</option>
+                <option value="5" data-i18n="admin.rec.priority_medium">Moyenne</option>
+                <option value="10" data-i18n="admin.rec.priority_high">Haute</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>
+                <input type="checkbox" id="rec-active" checked> Active
+              </label>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Enregistrer</button>
+          </div>
+        </form>
+      </div>
+      
       <div class="card">
         <div class="table-wrapper">
           <table class="admin-table-rules">
@@ -264,7 +304,9 @@
           </div>
           <div class="form-group">
             <label data-i18n="admin.condition_value">Valeur</label>
-            <input type="text" id="rf-condition-value" required>
+            <select id="rf-condition-value" required>
+              <option value="">Sélectionner une valeur...</option>
+            </select>
           </div>
         </div>
         <div class="form-row">
@@ -282,16 +324,6 @@
             </select>
           </div>
         </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label data-i18n="admin.time_window">Fenêtre (min)</label>
-            <input type="number" id="rf-time-window" value="60" min="1">
-          </div>
-          <div class="form-group">
-            <label data-i18n="admin.cooldown">Cooldown (min)</label>
-            <input type="number" id="rf-cooldown" value="30" min="0">
-          </div>
-        </div>
         <div class="form-group">
           <label>
             <input type="checkbox" id="rf-active" checked> <span data-i18n="admin.active">Active</span>
@@ -300,46 +332,6 @@
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" id="rule-modal-cancel" data-i18n="admin.cancel2">Annuler</button>
           <button type="submit" class="btn btn-primary" data-i18n="admin.save">Enregistrer</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- RECOMMENDATION MODAL -->
-  <div class="modal-overlay" id="recommendation-modal">
-    <div class="modal">
-      <div class="modal-header">
-        <h3 id="recommendation-modal-title" data-i18n="admin.create_recommendation">Créer une recommandation</h3>
-        <button class="modal-close" id="recommendation-modal-close">&times;</button>
-      </div>
-      <form id="recommendation-form">
-        <input type="hidden" id="rec-id">
-        <div class="form-group">
-          <label data-i18n="admin.rec.error_type">Type d'erreur</label>
-          <input type="text" id="rec-error-type" placeholder="ex: ECONNREFUSED, TypeError, etc." required>
-        </div>
-        <div class="form-group">
-          <label data-i18n="admin.rec.recommendation">Recommandation</label>
-          <textarea id="rec-recommendation" rows="4" required></textarea>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label data-i18n="admin.rec.priority">Priorité</label>
-            <select id="rec-priority">
-              <option value="1" data-i18n="admin.rec.priority_low">Basse</option>
-              <option value="5" data-i18n="admin.rec.priority_medium">Moyenne</option>
-              <option value="10" data-i18n="admin.rec.priority_high">Haute</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>
-              <input type="checkbox" id="rec-active" checked> Active
-            </label>
-          </div>
-        </div>
-        <div class="modal-actions">
-          <button type="button" class="btn btn-secondary" id="recommendation-modal-cancel">Annuler</button>
-          <button type="submit" class="btn btn-primary">Enregistrer</button>
         </div>
       </form>
     </div>
@@ -418,7 +410,10 @@
           if (tab === 'audit') loadAudit();
           if (tab === 'retention') loadRetention();
           if (tab === 'system') loadSystem();
-          if (tab === 'recommendations') loadRecommendations();
+          if (tab === 'recommendations') {
+            loadRecommendations();
+            loadErrorTypes();
+          }
         });
       });
 
@@ -645,14 +640,37 @@
         });
       }
 
+      // Load error types for recommendation dropdown
+      function loadErrorTypes() {
+        api.get('/api/search/metadata').then(function(data) {
+          var errorTypeSelect = document.getElementById('rec-error-type');
+          if (data && data.error_types && Array.isArray(data.error_types)) {
+            // Sort alphabetically
+            var sortedErrorTypes = data.error_types.sort();
+            sortedErrorTypes.forEach(function(errorType) {
+              var option = document.createElement('option');
+              option.value = errorType;
+              option.textContent = errorType;
+              errorTypeSelect.appendChild(option);
+            });
+          }
+        }).catch(function() {
+          // Silently fail if metadata API doesn't support error_types
+        });
+      }
+
       document.getElementById('btn-create-recommendation').addEventListener('click', function() {
         document.getElementById('rec-id').value = '';
         document.getElementById('rec-error-type').value = '';
         document.getElementById('rec-recommendation').value = '';
         document.getElementById('rec-priority').value = '5';
         document.getElementById('rec-active').checked = true;
-        document.getElementById('recommendation-modal-title').textContent = 'Créer une recommandation';
-        document.getElementById('recommendation-modal').classList.add('active');
+        document.getElementById('recommendation-form-title').textContent = 'Créer une recommandation';
+        document.getElementById('recommendation-form-card').style.display = 'block';
+      });
+
+      document.getElementById('btn-cancel-recommendation').addEventListener('click', function() {
+        document.getElementById('recommendation-form-card').style.display = 'none';
       });
 
       document.getElementById('recommendations-body').addEventListener('click', function(e) {
@@ -665,8 +683,8 @@
           document.getElementById('rec-recommendation').value = r.recommendation;
           document.getElementById('rec-priority').value = r.priority;
           document.getElementById('rec-active').checked = !!r.is_active;
-          document.getElementById('recommendation-modal-title').textContent = 'Modifier la recommandation';
-          document.getElementById('recommendation-modal').classList.add('active');
+          document.getElementById('recommendation-form-title').textContent = 'Modifier la recommandation';
+          document.getElementById('recommendation-form-card').style.display = 'block';
         }
         if (btn.classList.contains('act-delete-rec')) {
           if (!confirm('Confirmer la suppression ?')) return;
@@ -689,14 +707,8 @@
         var promise = id ? api.put('/api/recommendations/' + id, payload) : api.post('/api/recommendations', payload);
         promise.then(function() {
           window.toast.success(id ? 'Recommandation modifiée' : 'Recommandation créée');
-          document.getElementById('recommendation-modal').classList.remove('active');
+          document.getElementById('recommendation-form-card').style.display = 'none';
           loadRecommendations();
-        });
-      });
-
-      ['recommendation-modal-close','recommendation-modal-cancel'].forEach(function(id) {
-        document.getElementById(id).addEventListener('click', function() {
-          document.getElementById('recommendation-modal').classList.remove('active');
         });
       });
 
@@ -729,8 +741,6 @@
           document.getElementById('rf-condition-value').value = r.condition_value;
           document.getElementById('rf-threshold').value = r.threshold_value || '';
           document.getElementById('rf-severity').value = r.severity;
-          document.getElementById('rf-time-window').value = r.time_window_minutes;
-          document.getElementById('rf-cooldown').value = r.cooldown_minutes;
           document.getElementById('rf-active').checked = !!r.is_active;
           document.getElementById('rule-modal-title').textContent = 'Modifier la règle';
           document.getElementById('rule-modal').classList.add('active');
@@ -750,8 +760,51 @@
         document.getElementById('rf-active').checked = true;
         document.getElementById('rule-modal-title').textContent = 'Créer une règle';
         document.getElementById('rule-modal').classList.add('active');
+        // Reset condition value dropdown
+        updateConditionValueOptions();
       });
 
+      // Dynamic condition value options based on condition type
+      function updateConditionValueOptions() {
+        var conditionType = document.getElementById('rf-condition-type').value;
+        var valueSelect = document.getElementById('rf-condition-value');
+        
+        // Clear existing options
+        valueSelect.innerHTML = '<option value="">Sélectionner une valeur...</option>';
+        
+        var options = [];
+        
+        switch(conditionType) {
+          case 'level':
+            options = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL', 'FATAL'];
+            break;
+          case 'count':
+            options = ['1', '5', '10', '50', '100', '500', '1000'];
+            break;
+          case 'fingerprint':
+            options = ['Pattern match', 'Exact match', 'Regex'];
+            break;
+          case 'threshold':
+            options = ['High', 'Medium', 'Low', 'Custom'];
+            break;
+          case 'silence':
+            options = ['1h', '6h', '12h', '24h', '48h'];
+            break;
+          default:
+            options = ['Custom'];
+        }
+        
+        options.forEach(function(opt) {
+          var option = document.createElement('option');
+          option.value = opt;
+          option.textContent = opt;
+          valueSelect.appendChild(option);
+        });
+      }
+      
+      // Listen for condition type changes
+      document.getElementById('rf-condition-type').addEventListener('change', updateConditionValueOptions);
+      
       document.getElementById('rule-form').addEventListener('submit', function(e) {
         e.preventDefault();
         var id = document.getElementById('rf-id').value;
@@ -762,8 +815,8 @@
           condition_value: document.getElementById('rf-condition-value').value,
           threshold_value: parseInt(document.getElementById('rf-threshold').value) || null,
           severity: document.getElementById('rf-severity').value,
-          time_window_minutes: parseInt(document.getElementById('rf-time-window').value) || 60,
-          cooldown_minutes: parseInt(document.getElementById('rf-cooldown').value) || 30,
+          time_window_minutes: 60, // Default value
+          cooldown_minutes: 30, // Default value
           is_active: document.getElementById('rf-active').checked
         };
         var promise = id ? api.put('/api/admin/alert-rules/' + id, data) : api.post('/api/admin/alert-rules', data);

@@ -6,9 +6,23 @@ import fs from 'fs';
 dotenv.config();
 
 export function normalizeLevel(level) {
-  const l = String(level || 'INFO').toUpperCase();
-  const valid = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL', 'FATAL', 'SECURITY'];
-  return valid.includes(l) ? l : 'INFO';
+  const raw = String(level ?? 'INFO').trim();
+  const l = raw.toUpperCase();
+  const aliases = {
+    TRACE: 'TRACE',
+    DEBUG: 'DEBUG',
+    INFO: 'INFO',
+    NOTICE: 'INFO',
+    WARN: 'WARNING',
+    WARNING: 'WARNING',
+    ERR: 'ERROR',
+    ERROR: 'ERROR',
+    CRITICAL: 'CRITICAL',
+    FATAL: 'FATAL',
+    ALERT: 'ERROR',
+    SECURITY: 'SECURITY',
+  };
+  return aliases[l] || 'INFO';
 }
 
 export function levelSeverity(level) {
@@ -79,7 +93,9 @@ const dbConfig = {
   port: parseInt(process.env.DB_PORT || '3306', 10),
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'logsystem',
+  database: process.env.NODE_ENV === 'test'
+    ? (process.env.TEST_DB_NAME || process.env.DB_NAME || 'logsystem_test')
+    : (process.env.DB_NAME || 'logsystem'),
   waitForConnections: true,
   connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || String(defaultConnLimit), 10),
   queueLimit: 10,
@@ -91,7 +107,9 @@ const dbConfig = {
   timezone: 'Z',
   // Memory leak protection
   maxIdle: Math.max(1, Math.floor(parseInt(process.env.DB_CONNECTION_LIMIT || String(defaultConnLimit), 10) / 2)),
-  idleTimeout: 60000
+  idleTimeout: 60000,
+  // Named placeholders support
+  namedPlaceholders: true
 };
 
 const pool = mysql.createPool(dbConfig);
@@ -129,6 +147,55 @@ export async function testConnection() {
   const conn = await pool.getConnection();
   conn.release();
   return true;
+}
+
+/**
+ * Retry wrapper for database operations with exponential backoff
+ * Handles transient connection errors
+ */
+export async function withRetry(operation, maxRetries = 3, baseDelay = 1000) {
+  let lastError;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      
+      // Only retry on transient errors
+      const transientErrors = [
+        'ETIMEDOUT',
+        'ECONNREFUSED',
+        'ECONNRESET',
+        'PROTOCOL_CONNECTION_LOST',
+        'ER_HOST_NOT_PRIVILEGED',
+        'ER_ACCESS_DENIED_ERROR'
+      ];
+      
+      const isTransient = transientErrors.some(code => 
+        error.code === code || 
+        (error.message && error.message.includes(code))
+      );
+      
+      if (!isTransient || attempt === maxRetries - 1) {
+        throw error;
+      }
+      
+      // Exponential backoff
+      const delay = baseDelay * Math.pow(2, attempt);
+      logger.warn({ 
+        event: 'db_retry', 
+        attempt: attempt + 1, 
+        maxRetries, 
+        delay, 
+        error: error.message 
+      }, '[DB] Retrying database operation...');
+      
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  throw lastError;
 }
 
 export function buildSslOptions() {

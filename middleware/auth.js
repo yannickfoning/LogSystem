@@ -2,7 +2,7 @@ import pool from "../config/database.js";
 
 const SESSION_VERSION_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-async function checkSessionVersion(req) {
+async function checkSessionVersion(req, strict = false) {
   const user = req.session?.user;
   if (!user || user.session_version === undefined) return true; // pas de version stockée → OK (rétrocompat)
 
@@ -20,8 +20,23 @@ async function checkSessionVersion(req) {
     }
     req.session._svCheckedAt = now;
     return true;
-  } catch {
-    return true; // fail-open sur erreur DB pour éviter déni de service
+  } catch (error) {
+    if (strict) {
+      // Fail-closed for sensitive routes (admin, password changes, etc.)
+      logger.error({
+        event: 'session_validation_failed_strict',
+        error: error.message,
+        userId: user.id
+      });
+      return false;
+    }
+    // Fail-open for read-only routes to avoid denial of service
+    logger.warn({
+      event: 'session_validation_failed_lax',
+      error: error.message,
+      userId: user.id
+    });
+    return true;
   }
 }
 
@@ -43,12 +58,13 @@ export async function requireAdmin(req, res, next) {
   if (!req.session || !req.session.user) {
     return res.status(401).json({ error: "Authentification requise" });
   }
-  const valid = await checkSessionVersion(req);
+  // Use strict mode for admin routes - fail-closed on DB errors
+  const valid = await checkSessionVersion(req, true);
   if (!valid) {
     req.session.destroy(() => {});
     return res
       .status(401)
-      .json({ error: "Session révoquée. Veuillez vous reconnecter." });
+      .json({ error: "Session révoquée ou base de données indisponible. Veuillez vous reconnecter." });
   }
   if (req.session.user.role !== "admin") {
     return res.status(403).json({ error: "Accès refusé. Rôle admin requis." });
@@ -72,13 +88,30 @@ export async function requireAdminPage(req, res, next) {
   if (!req.session || !req.session.user) {
     return res.redirect("/login.html");
   }
-  const valid = await checkSessionVersion(req);
+  // Use strict mode for admin pages - fail-closed on DB errors
+  const valid = await checkSessionVersion(req, true);
   if (!valid) {
     req.session.destroy(() => {});
     return res.redirect("/login.html");
   }
   if (req.session.user.role !== "admin") {
     return res.redirect("/dashboard.html");
+  }
+  next();
+}
+
+// Strict authentication for sensitive operations (password changes, data deletion, etc.)
+export async function requireAuthStrict(req, res, next) {
+  if (!req.session || !req.session.user) {
+    return res.status(401).json({ error: "Authentification requise" });
+  }
+  // Use strict mode - fail-closed on DB errors
+  const valid = await checkSessionVersion(req, true);
+  if (!valid) {
+    req.session.destroy(() => {});
+    return res
+      .status(401)
+      .json({ error: "Session révoquée ou base de données indisponible. Veuillez vous reconnecter." });
   }
   next();
 }

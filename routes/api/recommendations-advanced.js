@@ -6,8 +6,8 @@ import logger from '../../config/logger.js';
 const router = Router();
 
 /**
- * GET /api/recommendations/by-frequency
- * Retourne les recommandations groupées par fréquence d'erreurs
+ * GET /api/recommendations/advanced/by-frequency
+ * Retourne les recommandations groupées par fréquence d'erreurs pour l'utilisateur connecté
  */
 router.get('/by-frequency', requireAuth, async (req, res) => {
   try {
@@ -55,7 +55,7 @@ router.get('/by-frequency', requireAuth, async (req, res) => {
 });
 
 /**
- * GET /api/recommendations/by-category/:category
+ * GET /api/recommendations/advanced/by-category/:category
  * Filtrer les recommandations par catégorie
  */
 router.get('/by-category/:category', requireAuth, async (req, res) => {
@@ -93,7 +93,7 @@ router.get('/by-category/:category', requireAuth, async (req, res) => {
 });
 
 /**
- * POST /api/recommendations/analyze-pattern
+ * POST /api/recommendations/advanced/analyze-pattern
  * Analyser les patterns d'erreurs et suggérer des recommandations
  */
 router.post('/analyze-pattern', requireAuth, async (req, res) => {

@@ -28,6 +28,228 @@
 .import-stat-label { font-size: 11px; color: var(--text2); }
 .import-skipped { font-size: 12px; color: var(--accent-red); margin: 8px 0 0; }
 
+/* ── Simplified Drop Zone for Non-Developers ─────────────────────────── */
+.drop-zone-simple {
+  border: 3px dashed var(--border);
+  border-radius: 16px;
+  padding: 48px 24px;
+  text-align: center;
+  background: var(--surface2);
+  transition: all 0.3s ease;
+  cursor: pointer;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.drop-zone-simple:hover {
+  border-color: var(--accent-blue);
+  background: rgba(79,142,247,0.05);
+  transform: scale(1.02);
+}
+
+.drop-zone-simple.dragover {
+  border-color: var(--accent-green);
+  background: rgba(16,185,129,0.1);
+  transform: scale(1.05);
+}
+
+.drop-zone-simple svg {
+  color: var(--text2);
+  transition: color 0.3s;
+}
+
+.drop-zone-simple:hover svg {
+  color: var(--accent-blue);
+}
+
+.drop-zone-simple h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.drop-zone-simple .text-hint {
+  color: var(--text2);
+  font-size: 14px;
+  margin: 4px 0;
+}
+
+.drop-zone-simple .text-info {
+  color: var(--accent-blue);
+  font-size: 13px;
+  margin: 8px 0 0;
+  font-weight: 500;
+}
+
+.drop-zone-simple .file-input {
+  display: none;
+}
+
+/* ── Selected Files Container ─────────────────────────────────────────── */
+.selected-files-container {
+  margin-top: 24px;
+  padding: 16px;
+  background: var(--surface2);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.selected-files-container h3 {
+  margin: 0 0 12px;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+#selected-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.selected-file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background: var(--surface);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.selected-file-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.selected-file-icon {
+  font-size: 24px;
+}
+
+.selected-file-name {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.selected-file-size {
+  font-size: 12px;
+  color: var(--text2);
+}
+
+.selected-file-remove {
+  background: var(--accent-red);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.2s;
+}
+
+.selected-file-remove:hover {
+  background: #dc2626;
+}
+
+/* ── Import Actions ─────────────────────────────────────────────────────── */
+.import-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+  justify-content: center;
+}
+
+.btn-large {
+  padding: 16px 32px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 8px;
+  min-width: 200px;
+}
+
+.btn-icon {
+  margin-right: 8px;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Import Progress ───────────────────────────────────────────────────── */
+.import-progress {
+  margin-top: 24px;
+  padding: 20px;
+  background: var(--surface2);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.progress-bar {
+  height: 8px;
+  background: var(--surface);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-blue), var(--accent-green));
+  border-radius: 4px;
+  transition: width 0.3s ease;
+  width: 0%;
+}
+
+.progress-status {
+  font-size: 13px;
+  color: var(--text2);
+  text-align: center;
+}
+
+/* ── Import Success ─────────────────────────────────────────────────────── */
+.import-success {
+  margin-top: 24px;
+  padding: 32px;
+  background: rgba(16,185,129,0.1);
+  border-radius: 12px;
+  border: 1px solid var(--accent-green);
+  text-align: center;
+}
+
+.success-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.import-success h3 {
+  margin: 0 0 12px;
+  color: var(--accent-green);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.import-success p {
+  color: var(--text);
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
 @media (max-width: 480px) {
   .import-page .form-row { grid-template-columns: 1fr; }
   .import-page .drop-zone { min-height: 120px; padding: 24px 16px; }

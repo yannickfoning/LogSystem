@@ -420,7 +420,7 @@ router.get('/metadata', async (req, res) => {
     );
 
     const [sources] = await pool.execute(
-      `SELECT DISTINCT source_server FROM logs WHERE source_server IS NOT NULL ${scope.sql || ''} LIMIT 100`,
+      `SELECT DISTINCT COALESCE(source, source_server, log_source) as source FROM logs WHERE COALESCE(source, source_server, log_source) IS NOT NULL ${scope.sql || ''} LIMIT 100`,
       scope.params || []
     );
 
@@ -437,7 +437,7 @@ router.get('/metadata', async (req, res) => {
     res.json({
       services: services.map(r => r.service).filter(Boolean),
       modules: modules.map(r => r.module).filter(Boolean),
-      sources: sources.map(r => r.source_server).filter(Boolean),
+      sources: sources.map(r => r.source).filter(Boolean),
       error_types: errorTypes.map(r => r.error_type).filter(Boolean),
       target_users: users.map(r => r.target_user).filter(Boolean)
     });
