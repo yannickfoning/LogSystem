@@ -248,6 +248,28 @@
         doSearch();
       });
 
+      // Charge dynamiquement toutes les sources et tous les utilisateurs
+      // réellement présents dans les logs stockés pour remplir les menus déroulants.
+      function loadMetadata() {
+        api.get('/api/search/metadata').then(function(meta) {
+          var sourceSelect = document.getElementById('f-source');
+          (meta.sources || []).forEach(function(s) {
+            var opt = document.createElement('option');
+            opt.value = s;
+            opt.textContent = s;
+            sourceSelect.appendChild(opt);
+          });
+          var userSelect = document.getElementById('f-user');
+          (meta.target_users || []).forEach(function(u) {
+            var opt = document.createElement('option');
+            opt.value = u;
+            opt.textContent = u;
+            userSelect.appendChild(opt);
+          });
+        }).catch(function() { /* menus restent sur "Toutes/Tous" si la requête échoue */ });
+      }
+      loadMetadata();
+
       function getParams() {
         var p = { page: currentPage, limit: 50 };
         var search = document.getElementById('f-search').value.trim();
@@ -378,6 +400,9 @@
         var params = getParams();
         delete params.page;
         delete params.limit;
+        // L'export attend des dates ISO complètes (avec heure), pas juste "AAAA-MM-JJ".
+        if (params.date_from) params.date_from = params.date_from + 'T00:00:00';
+        if (params.date_to) params.date_to = params.date_to + 'T23:59:59';
         window.open('/api/logs/export/csv?' + buildQuery(params), '_blank');
       });
 
@@ -385,6 +410,8 @@
         var params = getParams();
         delete params.page;
         delete params.limit;
+        if (params.date_from) params.date_from = params.date_from + 'T00:00:00';
+        if (params.date_to) params.date_to = params.date_to + 'T23:59:59';
         window.open('/api/logs/export/pdf?' + buildQuery(params), '_blank');
       });
 

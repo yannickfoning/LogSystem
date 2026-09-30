@@ -498,8 +498,10 @@ router.get('/metadata', async (req, res) => {
       scope.params || []
     );
 
+    // "sources" reflects the real `source` column (origin of the log), not the
+    // host/server (`source_server`), which was a frequent source of confusion.
     const [sources] = await pool.execute(
-      `SELECT DISTINCT source_server FROM logs WHERE source_server IS NOT NULL ${scope.sql || ''} LIMIT 100`,
+      `SELECT DISTINCT source FROM logs WHERE source IS NOT NULL AND source != '' ${scope.sql || ''} ORDER BY source LIMIT 200`,
       scope.params || []
     );
 
@@ -516,7 +518,7 @@ router.get('/metadata', async (req, res) => {
     res.json({
       services: services.map(r => r.service).filter(Boolean),
       modules: modules.map(r => r.module).filter(Boolean),
-      sources: sources.map(r => r.source_server).filter(Boolean),
+      sources: sources.map(r => r.source).filter(Boolean),
       error_types: errorTypes.map(r => r.error_type).filter(Boolean),
       target_users: users.map(r => r.target_user).filter(Boolean)
     });

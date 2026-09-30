@@ -166,11 +166,11 @@
           <div class="scroll-y">
             <table class="log-table">
               <thead>
-                <tr><th data-i18n="dashboard.table.time">Heure</th><th data-i18n="dashboard.table.level">Niveau</th><th data-i18n="dashboard.table.source">Source</th><th data-i18n="dashboard.table.user">Utilisateur responsable</th><th data-i18n="dashboard.table.message">Message</th></tr>
+                <tr><th data-i18n="dashboard.table.time">Heure</th><th data-i18n="dashboard.table.level">Niveau</th><th data-i18n="dashboard.table.source">Source</th><th class="col-hide-mobile" data-i18n="dashboard.table.service">Service</th><th class="col-hide-mobile" data-i18n="dashboard.table.user">Utilisateur responsable du log</th><th class="col-hide-mobile" data-i18n="dashboard.table.import">Import</th><th data-i18n="dashboard.table.message">Message</th></tr>
               </thead>
               <tbody id="logs-tbody">
-                <tr><td colspan="5"><div class="skeleton skeleton-line"></div></td></tr>
-                <tr><td colspan="5"><div class="skeleton skeleton-line w-80"></div></td></tr>
+                <tr><td colspan="7"><div class="skeleton skeleton-line"></div></td></tr>
+                <tr><td colspan="7"><div class="skeleton skeleton-line w-80"></div></td></tr>
               </tbody>
             </table>
           </div>
@@ -989,7 +989,7 @@
           var dt = log.timestamp ? new Date(log.timestamp) : null;
           var timeStr = dt ? dt.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '—';
           var dateStr = dt ? dt.toLocaleDateString('fr-FR') : '—';
-          var source = log.source || log.source_server || '—';
+          var source = log.source || '—';
           var service = log.service || '—';
           var user = log.target_user || '—';
           var message = log.message || '';
@@ -1001,6 +1001,7 @@
             + '<td title="'+escAttr(source)+'">'+esc(source.length>12?source.substring(0,12)+'…':source)+'</td>'
             + '<td class="col-hide-mobile">'+esc(service)+'</td>'
             + '<td class="col-hide-mobile">'+esc(user)+'</td>'
+            + '<td class="col-hide-mobile">'+esc(log.imported_at ? timeAgo(log.imported_at) : '—')+'</td>'
             + '<td title="'+escAttr(message)+'">'+esc(truncated)+'</td>'
             + '</tr>';
         }).join('');

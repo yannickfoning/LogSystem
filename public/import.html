@@ -82,12 +82,11 @@
                         <line x1="12" y1="3" x2="12" y2="15" />
                     </svg>
                     <h2 data-i18n="import.drop_simple">Déposez vos fichiers ici</h2>
-                    <p class="text-hint">
-                        Glissez-déposez vos fichiers ou cliquez pour sélectionner
+                    <p data-i18n="import.drop">
+                        Glissez un ou plusieurs fichiers ici, ou cliquez pour sélectionner
                     </p>
                     <p class="text-hint" data-i18n="import.formats">
-                        Formats supportés : .log, .txt, .json, .jsonl, .csv, .xml, 
-                        <strong>.zip, .rar, .7z, .gz, .tar</strong> (max 500 Mo)
+                        Formats supportés : .log, .txt, .json, .jsonl, .csv, .xml, .zip, .gz, .tar, .rar, <strong>.7z</strong> — aucune taille maximale, la plateforme traite aussi les fichiers volumineux (200 Mo et plus). Les archives ZIP et RAR sont automatiquement extraites et tous les fichiers logs qu'elles contiennent sont traités.
                     </p>
                     <p class="text-info" data-i18n="import.multi_files">
                         💡 Les archives (ZIP, RAR, 7z) sont extraites automatiquement
@@ -167,9 +166,11 @@
         <script>
             (function () {
                 if (!window.api) return;
-                var selectedFile = null;
+                var selectedFiles = [];
                 var currentJobId = null;
                 var pollTimer = null;
+                var uploadQueueTotal = 0;
+                var uploadQueueDone = 0;
 
                 document
                     .getElementById("logout-btn")
@@ -197,17 +198,17 @@
                     e.preventDefault();
                     dropZone.classList.remove("dragover");
                     if (e.dataTransfer.files.length) {
-                        selectFile(e.dataTransfer.files[0]);
+                        selectFiles(e.dataTransfer.files);
                     }
                 });
                 fileInput.addEventListener("change", function () {
-                    if (fileInput.files.length) selectFile(fileInput.files[0]);
+                    if (fileInput.files.length) selectFiles(fileInput.files);
                 });
 
                 clearBtn.addEventListener("click", function () {
-                    selectedFile = null;
+                    selectedFiles = [];
                     fileInput.value = "";
-                    dropZone.querySelector("p").textContent = "Glissez-déposez vos fichiers ou cliquez pour sélectionner";
+                    renderSelectedFilesLabel();
                     importBtn.disabled = true;
                     clearBtn.style.display = "none";
                 });
@@ -236,29 +237,86 @@
                                 ? window.i18n.t("import.unsupported")
                                 : "Format non supporté",
                         );
+                        return false;
+                    }
+                    return true;
+                }
+
+                // Plusieurs fichiers peuvent être sélectionnés ou déposés en une fois :
+                // ils sont importés les uns après les autres (file d'attente), et chaque
+                // archive ZIP/RAR est elle-même extraite et traitée automatiquement côté serveur.
+                function selectFiles(fileList) {
+                    var valid = Array.from(fileList).filter(selectFile);
+                    if (!valid.length) return;
+                    selectedFiles = selectedFiles.concat(valid);
+                    renderSelectedFilesLabel();
+                    uploadBtn.disabled = false;
+                }
+
+                function renderSelectedFilesLabel() {
+                    if (!selectedFiles.length) {
+                        dropZone.querySelector("p").textContent = window.i18n
+                            ? window.i18n.t("import.drop")
+                            : "Glissez un ou plusieurs fichiers ici, ou cliquez pour sélectionner";
                         return;
                     }
-                    selectedFile = file;
+                    var totalMo = selectedFiles
+                        .reduce(function (sum, f) { return sum + f.size; }, 0) / 1024 / 1024;
                     dropZone.querySelector("p").textContent =
-                        file.name +
-                        " (" +
-                        (file.size / 1024 / 1024).toFixed(2) +
-                        " Mo)";
-                    importBtn.disabled = false;
-                    clearBtn.style.display = "inline-block";
+                        selectedFiles.length +
+                        " fichier(s) sélectionné(s) (" +
+                        totalMo.toFixed(2) +
+                        " Mo) : " +
+                        selectedFiles.map(function (f) { return f.name; }).join(", ");
                 }
 
                 importBtn.addEventListener("click", async function () {
-                    if (!selectedFile) return;
-                    importBtn.disabled = true;
-                    importBtn.innerHTML =
+                    if (!selectedFiles.length) return;
+                    uploadBtn.disabled = true;
+                    uploadQueueTotal = selectedFiles.length;
+                    uploadQueueDone = 0;
+                    document
+                        .getElementById("progress-section")
+                        .classList.remove("is-hidden");
+                    uploadNextFile();
+                });
+
+                function uploadNextFile() {
+                    if (!selectedFiles.length) {
+                        uploadBtn.disabled = false;
+                        uploadBtn.textContent = "Importer";
+                        window.toast.success("Tous les imports sont terminés");
+                        return;
+                    }
+                    var file = selectedFiles.shift();
+                    renderSelectedFilesLabel();
+                    uploadOneFile(file);
+                }
+
+                async function uploadOneFile(file) {
+                    uploadBtn.innerHTML =
                         '<span class="spinner"></span> ' +
                         (window.i18n
                             ? window.i18n.t("import.uploading")
-                            : "Import...");
+                            : "Import...") +
+                        " (" +
+                        (uploadQueueDone + 1) +
+                        "/" +
+                        uploadQueueTotal +
+                        ")";
 
                     var formData = new FormData();
-                    formData.append("files", selectedFile);
+                    formData.append("file", file);
+                    var source = document.getElementById("import-source").value;
+                    var service =
+                        document.getElementById("import-service").value;
+                    var locale = document.getElementById("import-locale")
+                        ? document.getElementById("import-locale").value
+                        : null;
+
+                    if (source) formData.append("source", source);
+                    if (service) formData.append("service", service);
+                    if (locale) formData.append("locale", locale);
 
                     try {
                         var result = await api.upload(
@@ -266,24 +324,19 @@
                             formData,
                         );
                         currentJobId = result.job_id;
-                        document
-                            .getElementById("import-progress")
-                            .style.display = "block";
-                        document
-                            .getElementById("import-success")
-                            .style.display = "none";
                         window.toast.success(
-                            "Import démarré : " + selectedFile.name,
+                            "Import démarré : " + file.name,
                         );
                         startPolling();
                     } catch (err) {
                         window.toast.error(
-                            err.error || "Erreur lors de l'upload",
+                            (err.error || "Erreur lors de l'upload") +
+                                " (" + file.name + ")",
                         );
-                        importBtn.disabled = false;
-                        importBtn.innerHTML = '<span class="btn-icon">🚀</span><span>Importer</span>';
+                        uploadQueueDone++;
+                        uploadNextFile();
                     }
-                });
+                }
 
                 function startPolling() {
                     if (pollTimer) clearInterval(pollTimer);
@@ -323,6 +376,108 @@
 
                                     // Display quality summary
                                     if (job.import_summary) {
+                                        var s = job.import_summary;
+                                        var total = job.total_lines || 0;
+                                        var inserted = job.processed_lines || 0;
+                                        var skipped = job.skipped_lines || 0;
+                                        var missingUser = s.missing_user || 0;
+                                        var missingTs =
+                                            s.missing_timestamp || 0;
+                                        var inferred =
+                                            s.timestamp_inferred_count || 0;
+
+                                        var pctUser =
+                                            total > 0
+                                                ? Math.round(
+                                                      (1 -
+                                                          missingUser / total) *
+                                                          100,
+                                                  )
+                                                : 0;
+                                        var pctTs =
+                                            total > 0
+                                                ? Math.round(
+                                                      (1 - missingTs / total) *
+                                                          100,
+                                                  )
+                                                : 0;
+
+                                        var t = window.i18n ? window.i18n.t : function(k) { return k; };
+                                        var summaryHtml =
+                                            '<div class="card mt-16" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px">';
+                                        summaryHtml +=
+                                            '<h4 style="margin:0 0 12px;font-size:14px;color:#1e293b">📊 ' + t('import.quality.title') + '</h4>';
+                                        summaryHtml +=
+                                            '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">';
+                                        summaryHtml +=
+                                            '<div style="text-align:center"><div style="font-size:22px;font-weight:700;color:#2563eb">' +
+                                            inserted +
+                                            '</div><div style="font-size:11px;color:#64748b">' + t('import.quality.imported') + '</div></div>';
+                                        summaryHtml +=
+                                            '<div style="text-align:center"><div style="font-size:22px;font-weight:700;color:' +
+                                            (pctTs >= 90
+                                                ? "#16a34a"
+                                                : pctTs >= 60
+                                                  ? "#d97706"
+                                                  : "#dc2626") +
+                                            '">' +
+                                            pctTs +
+                                            '%</div><div style="font-size:11px;color:#64748b">' + t('import.quality.dates') + '<br>' +
+                                            (missingTs > 0
+                                                ? t('import.quality.inferred', {count: missingTs})
+                                                : "✓ " + t('import.quality.all_extracted')) +
+                                            "</div></div>";
+                                        summaryHtml +=
+                                            '<div style="text-align:center"><div style="font-size:22px;font-weight:700;color:' +
+                                            (pctUser >= 70
+                                                ? "#16a34a"
+                                                : pctUser >= 40
+                                                  ? "#d97706"
+                                                  : "#94a3b8") +
+                                            '">' +
+                                            pctUser +
+                                            '%</div><div style="font-size:11px;color:#64748b">' + t('import.quality.with_user') + '<br>' +
+                                            (missingUser > 0
+                                                ? t('import.quality.not_found', {count: missingUser})
+                                                : "✓ " + t('import.quality.all_identified')) +
+                                            "</div></div>";
+                                        summaryHtml += "</div>";
+                                        if (skipped > 0)
+                                            summaryHtml +=
+                                                '<p style="font-size:12px;color:#dc2626;margin:8px 0 0">' +
+                                                t('import.quality.skipped_text', {count: skipped}) +
+                                                "</p>";
+                                        summaryHtml += "</div>";
+                                        document
+                                            .getElementById("import-progress")
+                                            .insertAdjacentHTML('afterend', summaryHtml);
+                                    }
+
+                                    selectedFiles = [];
+                                    currentJobId = null;
+                                    uploadQueueDone++;
+                                    loadJobs();
+                                    uploadNextFile();
+                                } else if (job.status === "failed") {
+                                    clearInterval(pollTimer);
+                                    document.getElementById("import-progress").style.display = "none";
+                                    document.getElementById("import-success").style.display = "none";
+                                    var errorMsg = job.error_message || "Erreur inconnue";
+                                    window.toast.error(
+                                        "Import échoué : " + errorMsg,
+                                    );
+                                    currentJobId = null;
+                                    uploadQueueDone++;
+                                    loadJobs();
+                                    uploadNextFile();
+                                }
+                            })
+                            .catch(function (err) {
+                                window.toast.error(
+                                    "Erreur de polling import",
+                                );
+                            });
+                    }
                                         var s = job.import_summary;
                                         var total = job.total_lines || 0;
                                         var inserted = job.processed_lines || 0;

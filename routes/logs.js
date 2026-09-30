@@ -15,7 +15,7 @@ const LOG_COLUMNS = 'id, timestamp, created_time, imported_at, log_level, source
 
 // ── Helper : filtres SQL partagés ─────────────────────────────────────────────
 function buildFilters(query, userScopeFilter, useImportedAtForDateRange = false) {
-  const { log_level, source, source_server, service, event_type, error_type, fingerprint, date_from, date_to, imported_from, imported_to, search, from_timestamp, to_timestamp, realtime } = query;
+  const { log_level, source, source_server, service, event_type, error_type, fingerprint, target_user, date_from, date_to, imported_from, imported_to, search, from_timestamp, to_timestamp, realtime } = query;
   let sql = userScopeFilter.sql;
   const params = [...userScopeFilter.params];
 
@@ -23,6 +23,7 @@ function buildFilters(query, userScopeFilter, useImportedAtForDateRange = false)
   if (source)    { sql += ' AND source = ?';      params.push(source); }
   if (source_server) { sql += ' AND source_server = ?'; params.push(source_server); }
   if (service)   { sql += ' AND service = ?';     params.push(service); }
+  if (target_user) { sql += ' AND target_user = ?'; params.push(target_user); }
   if (event_type) { sql += ' AND event_type = ?'; params.push(event_type); }
   if (error_type) { sql += ' AND error_type = ?'; params.push(error_type); }
   if (fingerprint) { sql += ' AND fingerprint = ?'; params.push(fingerprint); }

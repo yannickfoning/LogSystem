@@ -296,7 +296,11 @@ async function start() {
   }
 
   try {
-    await runMigrations();
+    if (process.env.RUN_MIGRATIONS_ON_START !== 'false') {
+      await runMigrations();
+    } else {
+      logger.info('[MIGRATION] Skipping migrations (RUN_MIGRATIONS_ON_START=false)');
+    }
   } catch (error) {
     logger.fatal({
       event: 'migration_failed',

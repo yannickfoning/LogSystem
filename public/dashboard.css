@@ -625,7 +625,9 @@ body.is-admin .admin-only { display: block; }
 .legend-fatal { background: #fc5c65; }
 .legend-debug { background: #6b7280; }
 .col-stack { display: flex; flex-direction: column; gap: 16px; }
-.scroll-y-sm { max-height: 280px; }
+/* Panneau "Alertes en temps réel" agrandi pour afficher plus d'alertes sans avoir
+   à scroller sans arrêt (demande : rallonger la taille des alertes en temps réel). */
+.scroll-y-sm { max-height: 560px; }
 .alert-badge-count {
   background: var(--accent-red); color: #fff; font-size: 10px;
   padding: 1px 5px; border-radius: 4px;

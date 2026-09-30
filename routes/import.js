@@ -45,7 +45,12 @@ const upload = multer({
   }),
   limits: {
     files: parseInt(process.env.UPLOAD_MAX_FILES || "10", 10),
-    fileSize: parseInt(process.env.UPLOAD_MAX_SIZE || "50") * 1024 * 1024, // Default 50MB, configurable
+    // Pas de plafond de taille de fichier : la plateforme doit pouvoir traiter
+    // des fichiers d'au moins 200 Mo, et aucune limite maximale n'est imposée.
+    // (`fileSize: Infinity` équivaut au comportement par défaut de multer,
+    // mais on le déclare explicitement pour que ce choix soit assumé et ne
+    // dépende pas d'un défaut implicite qui pourrait changer.)
+    fileSize: Infinity,
   },
   fileFilter: (req, file, cb) => {
     const filename = file.originalname;
@@ -242,13 +247,15 @@ async function processImport(
         );
         fileParsedLogs = [];
       }
-      allParsedLogs = allParsedLogs.concat(
-        fileParsedLogs.map((log) => ({
-          ...log,
-          file_created_at: file.file_created_at || null,
-          file_modified_at: file.file_modified_at || null,
-        })),
-      );
+      // Pas de copie/concat (fichiers de plusieurs centaines de Mo = centaines de
+      // milliers d'entrées) : on annote sur place puis on ajoute par lots.
+      for (let k = 0; k < fileParsedLogs.length; k++) {
+        const log = fileParsedLogs[k];
+        log.file_created_at = file.file_created_at || null;
+        log.file_modified_at = file.file_modified_at || null;
+        allParsedLogs.push(log);
+      }
+      fileParsedLogs = null;
     }
   }
 
@@ -323,20 +330,12 @@ async function processImport(
           if (!logEntry.timestamp) {
             importSummary.missing_timestamp++;
             importSummary.skipped++;
-            logger.warn(
-              { event: "missing_timestamp", logIndex: i, jobId },
-              "[IMPORT]",
-            );
             continue;
           }
 
           // Validate and warn about missing user/module
           if (!logEntry.target_user) {
             importSummary.missing_user++;
-            logger.warn(
-              { event: "missing_user", logIndex: i, jobId },
-              "[IMPORT]",
-            );
             // Don't skip — allow null target_user
           }
 
@@ -346,10 +345,6 @@ async function processImport(
 
           if (!logEntry.module) {
             importSummary.missing_module++;
-            logger.warn(
-              { event: "missing_module", logIndex: i, jobId },
-              "[IMPORT]",
-            );
             // Don't skip — allow null module
           }
 
@@ -359,10 +354,6 @@ async function processImport(
           }
           if (!logEntry.message) {
             importSummary.skipped++;
-            logger.warn(
-              { event: "missing_message", logIndex: i, jobId },
-              "[IMPORT]",
-            );
             continue;
           }
 
@@ -861,7 +852,6 @@ router.post(
       // Envoyer tous les fichiers au worker asynchrone
       for (const file of files) {
         // Read file content from disk for disk storage
-        const fs = require('fs');
         let fileContent;
         try {
           fileContent = fs.readFileSync(file.path);

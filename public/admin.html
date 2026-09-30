@@ -99,19 +99,17 @@
         <button class="btn btn-primary btn-sm" id="btn-create-recommendation">Créer une recommandation</button>
       </div>
       
-      <!-- Inline Recommendation Form -->
-      <div class="card" id="recommendation-form-card" style="display: none; margin-bottom: 16px;">
-        <div class="card-header">
-          <h3 id="recommendation-form-title">Créer une recommandation</h3>
-          <button class="btn btn-xs btn-secondary" id="btn-cancel-recommendation">Annuler</button>
-        </div>
+      <!-- Formulaire de recommandation intégré à la page (plus de fenêtre/popup) -->
+      <div class="card" id="recommendation-panel" style="display:none">
+        <div class="card-header" id="recommendation-panel-title">Créer une recommandation</div>
         <form id="recommendation-form">
           <input type="hidden" id="rec-id">
           <div class="form-group">
             <label data-i18n="admin.rec.error_type">Type d'erreur</label>
             <select id="rec-error-type" required>
-              <option value="">Sélectionner un type d'erreur...</option>
+              <option value="" disabled selected>Sélectionnez un type d'erreur...</option>
             </select>
+            <small class="text-muted">Liste des types d'erreurs réellement présents dans les logs.</small>
           </div>
           <div class="form-group">
             <label data-i18n="admin.rec.recommendation">Recommandation</label>
@@ -127,12 +125,15 @@
               </select>
             </div>
             <div class="form-group">
-              <label>
-                <input type="checkbox" id="rec-active" checked> Active
-              </label>
+              <label data-i18n="admin.rec.active_label">Statut</label>
+              <select id="rec-active">
+                <option value="1">Active</option>
+                <option value="0">Inactive</option>
+              </select>
             </div>
           </div>
-          <div class="form-actions">
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" id="recommendation-panel-cancel">Annuler</button>
             <button type="submit" class="btn btn-primary">Enregistrer</button>
           </div>
         </form>
@@ -309,20 +310,18 @@
             </select>
           </div>
         </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label data-i18n="admin.threshold">Seuil</label>
-            <input type="number" id="rf-threshold" min="1">
-          </div>
-          <div class="form-group">
-            <label data-i18n="admin.severity">Sévérité</label>
-            <select id="rf-severity">
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="critical">Critical</option>
-            </select>
-          </div>
+        <div class="form-group">
+          <label data-i18n="admin.threshold">Seuil</label>
+          <input type="number" id="rf-threshold" min="1">
+        </div>
+        <div class="form-group">
+          <label data-i18n="admin.severity">Sévérité</label>
+          <select id="rf-severity">
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+            <option value="critical">Critical</option>
+          </select>
         </div>
         <div class="form-group">
           <label>
@@ -640,37 +639,45 @@
         });
       }
 
-      // Load error types for recommendation dropdown
-      function loadErrorTypes() {
-        api.get('/api/search/metadata').then(function(data) {
-          var errorTypeSelect = document.getElementById('rec-error-type');
-          if (data && data.error_types && Array.isArray(data.error_types)) {
-            // Sort alphabetically
-            var sortedErrorTypes = data.error_types.sort();
-            sortedErrorTypes.forEach(function(errorType) {
-              var option = document.createElement('option');
-              option.value = errorType;
-              option.textContent = errorType;
-              errorTypeSelect.appendChild(option);
-            });
+      // Le menu déroulant "Type d'erreur" est rempli avec les valeurs réellement
+      // présentes dans les logs stockés (une seule fois, réutilisé ensuite).
+      var errorTypesLoaded = false;
+      function loadErrorTypesDropdown(selected) {
+        var select = document.getElementById('rec-error-type');
+        function fill(types) {
+          var current = selected || select.value;
+          select.innerHTML = '<option value="" disabled>Sélectionnez un type d\'erreur...</option>'
+            + types.map(function(t) { return '<option value="'+esc(t)+'">'+esc(t)+'</option>'; }).join('');
+          if (current && types.indexOf(current) === -1) {
+            select.insertAdjacentHTML('beforeend', '<option value="'+esc(current)+'">'+esc(current)+'</option>');
           }
-        }).catch(function() {
-          // Silently fail if metadata API doesn't support error_types
-        });
+          select.value = current || '';
+        }
+        if (errorTypesLoaded) { fill(window.__errorTypesCache || []); return; }
+        api.get('/api/search/metadata').then(function(meta) {
+          window.__errorTypesCache = meta.error_types || [];
+          errorTypesLoaded = true;
+          fill(window.__errorTypesCache);
+        }).catch(function() { fill([]); });
+      }
+
+      function openRecommendationPanel(title) {
+        document.getElementById('recommendation-panel-title').textContent = title;
+        document.getElementById('recommendation-panel').style.display = '';
+        document.getElementById('recommendation-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      function closeRecommendationPanel() {
+        document.getElementById('recommendation-panel').style.display = 'none';
+        document.getElementById('recommendation-form').reset();
       }
 
       document.getElementById('btn-create-recommendation').addEventListener('click', function() {
         document.getElementById('rec-id').value = '';
-        document.getElementById('rec-error-type').value = '';
         document.getElementById('rec-recommendation').value = '';
         document.getElementById('rec-priority').value = '5';
-        document.getElementById('rec-active').checked = true;
-        document.getElementById('recommendation-form-title').textContent = 'Créer une recommandation';
-        document.getElementById('recommendation-form-card').style.display = 'block';
-      });
-
-      document.getElementById('btn-cancel-recommendation').addEventListener('click', function() {
-        document.getElementById('recommendation-form-card').style.display = 'none';
+        document.getElementById('rec-active').value = '1';
+        loadErrorTypesDropdown('');
+        openRecommendationPanel('Créer une recommandation');
       });
 
       document.getElementById('recommendations-body').addEventListener('click', function(e) {
@@ -679,12 +686,11 @@
         if (btn.classList.contains('act-edit-rec')) {
           var r = JSON.parse(decodeURIComponent(btn.dataset.rec));
           document.getElementById('rec-id').value = r.id;
-          document.getElementById('rec-error-type').value = r.error_type;
           document.getElementById('rec-recommendation').value = r.recommendation;
           document.getElementById('rec-priority').value = r.priority;
-          document.getElementById('rec-active').checked = !!r.is_active;
-          document.getElementById('recommendation-form-title').textContent = 'Modifier la recommandation';
-          document.getElementById('recommendation-form-card').style.display = 'block';
+          document.getElementById('rec-active').value = r.is_active ? '1' : '0';
+          loadErrorTypesDropdown(r.error_type);
+          openRecommendationPanel('Modifier la recommandation');
         }
         if (btn.classList.contains('act-delete-rec')) {
           if (!confirm('Confirmer la suppression ?')) return;
@@ -702,15 +708,17 @@
           error_type: document.getElementById('rec-error-type').value,
           recommendation: document.getElementById('rec-recommendation').value,
           priority: parseInt(document.getElementById('rec-priority').value, 10),
-          is_active: document.getElementById('rec-active').checked
+          is_active: document.getElementById('rec-active').value === '1'
         };
         var promise = id ? api.put('/api/recommendations/' + id, payload) : api.post('/api/recommendations', payload);
         promise.then(function() {
           window.toast.success(id ? 'Recommandation modifiée' : 'Recommandation créée');
-          document.getElementById('recommendation-form-card').style.display = 'none';
+          closeRecommendationPanel();
           loadRecommendations();
-        });
+        }).catch(function(err) { window.toast.error(err.error || 'Erreur'); });
       });
+
+      document.getElementById('recommendation-panel-cancel').addEventListener('click', closeRecommendationPanel);
 
       document.querySelectorAll('.modal-overlay').forEach(function(m) {
         m.addEventListener('click', function(e) { if (e.target === m) m.classList.remove('active'); });
@@ -815,8 +823,10 @@
           condition_value: document.getElementById('rf-condition-value').value,
           threshold_value: parseInt(document.getElementById('rf-threshold').value) || null,
           severity: document.getElementById('rf-severity').value,
-          time_window_minutes: 60, // Default value
-          cooldown_minutes: 30, // Default value
+          // Fenêtre et cooldown ne sont plus configurables depuis l'interface :
+          // on garde des valeurs par défaut raisonnables (1h de fenêtre, 30 min de cooldown).
+          time_window_minutes: 60,
+          cooldown_minutes: 30,
           is_active: document.getElementById('rf-active').checked
         };
         var promise = id ? api.put('/api/admin/alert-rules/' + id, data) : api.post('/api/admin/alert-rules', data);
