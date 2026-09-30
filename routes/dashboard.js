@@ -114,67 +114,81 @@ router.get('/summary', async (req, res) => {
     /**
      * todayCount: logs whose event occurred today (event_timestamp).
      * importedTodayCount: logs imported today (ingestion activity).
+     *
+     * PERF: ces requêtes sont indépendantes les unes des autres — elles étaient
+     * exécutées en série (await l'une après l'autre), ce qui multipliait le temps
+     * de chargement du dashboard par le nombre de requêtes. On les lance maintenant
+     * en parallèle avec Promise.all.
      */
     const { start: todayStartSql } = utcTodayBounds();
-    
-    // Optimisation: requête combinée pour les statistiques du jour
-    var [todayStats] = await pool.execute(
-      `SELECT 
-        COUNT(*) as imported_today_count,
-        SUM(CASE WHEN log_level IN ('ERROR', 'CRITICAL', 'FATAL') THEN 1 ELSE 0 END) as error_count
-       FROM logs WHERE ${OPERATIONAL_TS} >= ?` + scope.sql,
-      [todayStartSql, ...scope.params]
-    );
-    
     const alertFilter = alertScope(req);
-    var [unreadAlerts] = await pool.execute(
-      "SELECT COUNT(*) as cnt FROM alerts WHERE status = 'new'" + alertFilter.sql,
-      alertFilter.params
-    );
-    
-    // Optimisation: requête combinée pour les niveaux de log
-    var [levelStats] = await pool.execute(
-      `SELECT 
-        log_level,
-        COUNT(*) as cnt,
-        SUM(CASE WHEN log_level = 'FATAL' THEN 1 ELSE 0 END) as fatal_count,
-        SUM(CASE WHEN log_level = 'CRITICAL' THEN 1 ELSE 0 END) as critical_count
-       FROM logs WHERE log_level IS NOT NULL` + scope.sql + ' GROUP BY log_level',
-      scope.params
-    );
-    
-    var [sourceCount] = await pool.execute(
-      'SELECT COUNT(DISTINCT COALESCE(source, source_server, log_source)) as cnt FROM logs WHERE COALESCE(source, source_server, log_source) IS NOT NULL AND COALESCE(source, source_server, log_source) != \'\'' + scope.sql,
-      scope.params
-    );
-    
-    // Compter les utilisateurs
-    var [userCount] = await pool.execute('SELECT COUNT(*) as cnt FROM users WHERE is_active = 1');
+
+    const [
+      [importedToday],
+      [errorCount],
+      [unreadAlerts],
+      [fatalCount],
+      [criticalCount],
+      [sourceCount],
+      [levelRows],
+      [userCount],
+    ] = await Promise.all([
+      pool.execute(
+        `SELECT COUNT(*) as cnt FROM logs WHERE ${OPERATIONAL_TS} >= ?` + scope.sql,
+        [todayStartSql, ...scope.params]
+      ),
+      pool.execute(
+        `SELECT COUNT(*) as cnt FROM logs WHERE ${OPERATIONAL_TS} >= ? AND log_level IN ('ERROR', 'CRITICAL', 'FATAL')` + scope.sql,
+        [todayStartSql, ...scope.params]
+      ),
+      pool.execute(
+        "SELECT COUNT(*) as cnt FROM alerts WHERE status = 'new'" + alertFilter.sql,
+        alertFilter.params
+      ),
+      pool.execute(
+        "SELECT COUNT(*) as cnt FROM logs WHERE log_level = 'FATAL'" + scope.sql,
+        scope.params
+      ),
+      pool.execute(
+        "SELECT COUNT(*) as cnt FROM logs WHERE log_level = 'CRITICAL'" + scope.sql,
+        scope.params
+      ),
+      pool.execute(
+        'SELECT COUNT(DISTINCT source) as cnt FROM logs WHERE source IS NOT NULL AND source != \'\'' + scope.sql,
+        scope.params
+      ),
+      pool.execute(
+        'SELECT log_level, COUNT(*) as cnt FROM logs WHERE log_level IS NOT NULL' + scope.sql + ' GROUP BY log_level',
+        scope.params
+      ),
+      pool.execute('SELECT COUNT(*) as cnt FROM users WHERE is_active = 1'),
+    ]);
     
     // Niveaux par clé
     const levels = {};
-    let fatalCount = 0;
-    let criticalCount = 0;
     
-    for (const row of levelStats) {
+    for (const row of levelRows) {
       const levelKey = String(row.log_level || '').toUpperCase();
       levels[levelKey] = Number(row.cnt);
-      fatalCount += Number(row.fatal_count || 0);
-      criticalCount += Number(row.critical_count || 0);
     }
 
-    const importedTodayCount = Number(todayStats[0]?.imported_today_count || 0);
-    const errorCount = Number(todayStats[0]?.error_count || 0);
+    const importedTodayCount = Number(importedToday[0]?.cnt || 0);
+    const errorCountVal = Number(errorCount[0]?.cnt || 0);
+    fatalCount = Number(fatalCount[0]?.cnt || 0);
+    criticalCount = Number(criticalCount[0]?.cnt || 0);
 
     const data = {
       // Standardized camelCase format
       totalLogs: Number(total[0]?.cnt || 0),
       todayLogs: importedTodayCount,
       importedTodayCount: importedTodayCount,
-      errorCount: errorCount,
+      errorCount: errorCountVal,
       unreadAlerts: Number(unreadAlerts[0]?.cnt || 0),
-      fatalCount: fatalCount,
-      criticalCount: criticalCount,
+      fatal_count: Number(fatalCount[0]?.cnt || 0),
+      critical_count: Number(criticalCount[0]?.cnt || 0),
+      // BUGFIX: le frontend lit `source_count` (snake_case) ; ce champ manquait ici,
+      // donc le KPI "Sources actives" du dashboard restait figé à 0.
+      source_count: Number(sourceCount[0]?.cnt || 0),
       infoCount: Number(levels['INFO'] || 0),
       warningCount: Number(levels['WARNING'] || 0),
       userCount: Number(userCount[0]?.cnt || 0),
@@ -191,7 +205,7 @@ router.get('/summary', async (req, res) => {
       total_logs: Number(total[0]?.cnt || 0),
       today_logs: importedTodayCount,
       imported_today_count: importedTodayCount,
-      error_count: errorCount,
+      error_count: errorCountVal,
       unread_alerts: Number(unreadAlerts[0]?.cnt || 0),
       fatal_count: fatalCount,
       critical_count: criticalCount,

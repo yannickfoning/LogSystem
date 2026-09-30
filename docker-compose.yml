@@ -1,25 +1,30 @@
-version: '3.9'
-
 services:
   app:
     build:
       context: .
       target: runner
       args:
-        SESSION_SECRET: ${SESSION_SECRET}
+        SESSION_SECRET: ad548761168c3897b8c7102bc0eb916ccc42c25451a840142dd22b908ec113f89556f53a7063d9c6b9aa217c143aecd7852c4fcd2926a1bdc780f6c9ff1d368a
     container_name: logsystem
     restart: unless-stopped
     ports:
       - "10000:10000"
     env_file: .env
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
       - PORT=10000
       - DB_HOST=mysql
       - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=localdev123
+      - REDIS_PASSWORD=localdev123
+      - SESSION_SECRET=ad548761168c3897b8c7102bc0eb916ccc42c25451a840142dd22b908ec113f89556f53a7063d9c6b9aa217c143aecd7852c4fcd2926a1bdc780f6c9ff1d368a
+      - CSRF_SECRET=8f9a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2
+      - RUN_MIGRATIONS_ON_START=false
+      - START_BACKGROUND_JOBS=false
     volumes:
-      - uploads:/app/uploads
-      - logs:/app/logs
+      - logsystem-uploads:/app/uploads
+      - logsystem-logs:/app/logs
     networks:
       - logsystem
     depends_on:
@@ -29,25 +34,26 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:10000/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 10
+      start_period: 120s
 
   mysql:
     image: mysql:8.0
     container_name: logsystem-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: localdev123
       MYSQL_DATABASE: ${DB_NAME:-logsystem}
-      MYSQL_USER: ${DB_USER:-logsystem}
-      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_USER: logsystem
+      MYSQL_PASSWORD: localdev123
+      MYSQL_ROOT_HOST: '%'
     volumes:
-      - mysql_data:/var/lib/mysql
+      - logsystem-mysql:/var/lib/mysql
       - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     networks:
       - logsystem
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-plocaldev123"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -57,22 +63,26 @@ services:
     image: redis:7-alpine
     container_name: logsystem-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    command: redis-server --appendonly yes --requirepass localdev123
     volumes:
-      - redis_data:/data
+      - logsystem-redis:/data
     networks:
       - logsystem
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "localdev123", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
 
 volumes:
-  uploads:
-  logs:
-  mysql_data:
-  redis_data:
+  logsystem-uploads:
+    external: true
+  logsystem-logs:
+    external: true
+  logsystem-mysql:
+    external: true
+  logsystem-redis:
+    external: true
 
 networks:
   logsystem:

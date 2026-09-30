@@ -1,11 +1,14 @@
-# Test fonctionnel simple des améliorations
+# Test fonctionnel complet des améliorations du cahier des charges
+# Utilise curl pour tester directement les API endpoints
+
 $ErrorActionPreference = "Stop"
 $BaseUrl = "http://localhost:10000"
 $SessionCookie = ""
 
-Write-Host "Starting comprehensive functional tests..." -ForegroundColor Green
+Write-Host "🚀 Démarrage des tests fonctionnels complets..." -ForegroundColor Green
 Write-Host ""
 
+# Fonction pour faire des requêtes HTTP
 function Invoke-ApiRequest {
     param(
         [string]$Method,
@@ -19,46 +22,34 @@ function Invoke-ApiRequest {
     
     if ($Cookie) {
         $headers["Cookie"] = $Cookie
-        Write-Host "DEBUG: Sending Cookie: $Cookie" -ForegroundColor DarkGray
     }
     
     try {
         if ($Data) {
             $body = $Data | ConvertTo-Json
-            Write-Host "DEBUG: Request: $Method $url" -ForegroundColor DarkGray
             $response = Invoke-WebRequest -Uri $url -Method $Method -Body $body -ContentType "application/json" -Headers $headers -UseBasicParsing
         } else {
-            Write-Host "DEBUG: Request: $Method $url" -ForegroundColor DarkGray
             $response = Invoke-WebRequest -Uri $url -Method $Method -Headers $headers -UseBasicParsing
         }
         
-        Write-Host "DEBUG: Response Status: $($response.StatusCode)" -ForegroundColor DarkGray
         return @{
             StatusCode = $response.StatusCode
             Body = $response.Content | ConvertFrom-Json
             Headers = $response.Headers
         }
     } catch {
-        Write-Host "DEBUG: Request failed: $($_.Exception.Message)" -ForegroundColor DarkGray
-        try {
-            $errorResponse = $_.ErrorDetails.Message | ConvertFrom-Json
-            return @{
-                StatusCode = $_.Exception.Response.StatusCode.value__
-                Body = $errorResponse
-                Headers = @{}
-            }
-        } catch {
-            return @{
-                StatusCode = 500
-                Body = @{ error = $_.Exception.Message }
-                Headers = @{}
-            }
+        $errorResponse = $_.ErrorDetails.Message | ConvertFrom-Json
+        return @{
+            StatusCode = $_.Exception.Response.StatusCode.value__
+            Body = $errorResponse
+            Headers = @{}
         }
     }
 }
 
+# Test d'authentification
 function Test-Authentication {
-    Write-Host "Testing authentication..." -ForegroundColor Yellow
+    Write-Host "🔐 Test d'authentification..." -ForegroundColor Yellow
     
     $loginData = @{
         email = "admin@logsystem.local"
@@ -67,13 +58,9 @@ function Test-Authentication {
     
     $response = Invoke-ApiRequest -Method "POST" -Path "/api/auth/login" -Data $loginData
     
-    Write-Host "Response status: $($response.StatusCode)" -ForegroundColor Cyan
-    Write-Host "Response body: $($response.Body | ConvertTo-Json -Compress)" -ForegroundColor Cyan
-    
     if ($response.StatusCode -eq 200) {
+        # Extraire le cookie de session
         $setCookie = $response.Headers["Set-Cookie"]
-        Write-Host "Set-Cookie header: $setCookie" -ForegroundColor Cyan
-        
         if ($setCookie) {
             # Handle array of Set-Cookie headers
             if ($setCookie -is [array]) {
@@ -85,37 +72,35 @@ function Test-Authentication {
             
             if ($sessionMatch) {
                 $global:SessionCookie = "connect.sid=" + $sessionMatch.Matches[0].Groups[1].Value
-                Write-Host "Session cookie set (length: $($global:SessionCookie.Length))" -ForegroundColor Cyan
-                Write-Host "Cookie content: $($global:SessionCookie)" -ForegroundColor Cyan
-                Write-Host "OK: Authentication successful" -ForegroundColor Green
+                Write-Host "✅ Authentification réussie" -ForegroundColor Green
                 return $true
             } else {
-                Write-Host "Could not extract connect.sid from Set-Cookie" -ForegroundColor Yellow
-                Write-Host "DEBUG: Set-Cookie content: $setCookie" -ForegroundColor Yellow
+                Write-Host "❌ Impossible d'extraire connect.sid du Set-Cookie" -ForegroundColor Red
                 return $false
             }
         } else {
-            Write-Host "No Set-Cookie header found" -ForegroundColor Yellow
+            Write-Host "❌ Pas de header Set-Cookie trouvé" -ForegroundColor Red
             return $false
         }
     }
     
-    Write-Host "FAIL: Authentication failed: $($response.StatusCode)" -ForegroundColor Red
+    Write-Host "❌ Authentification échouée: $($response.StatusCode)" -ForegroundColor Red
     return $false
 }
 
+# Test 1: Filtres du dashboard
 function Test-DashboardFilters {
     Write-Host ""
-    Write-Host "Testing dashboard filters..." -ForegroundColor Yellow
+    Write-Host "🎨 Test des filtres du dashboard..." -ForegroundColor Yellow
     
     $tests = @(
-        @{ Name = "Level filter"; Params = "?level=ERROR" },
-        @{ Name = "Platform filter"; Params = "?platform=Production" },
-        @{ Name = "Source type filter"; Params = "?sourceType=import" },
-        @{ Name = "Directory filter"; Params = "?directory=/var/log" },
-        @{ Name = "Service filter"; Params = "?service=auth" },
-        @{ Name = "Time range filter"; Params = "?timeRange=24h" },
-        @{ Name = "Combined filter"; Params = "?level=ERROR&platform=Production&timeRange=24h" }
+        @{ Name = "Filtre par niveau"; Params = "?level=ERROR" },
+        @{ Name = "Filtre par plateforme"; Params = "?platform=Production" },
+        @{ Name = "Filtre par type de source"; Params = "?sourceType=import" },
+        @{ Name = "Filtre par répertoire"; Params = "?directory=/var/log" },
+        @{ Name = "Filtre par service"; Params = "?service=auth" },
+        @{ Name = "Filtre par période"; Params = "?timeRange=24h" },
+        @{ Name = "Filtre combiné"; Params = "?level=ERROR&platform=Production&timeRange=24h" }
     )
     
     $passed = 0
@@ -123,21 +108,23 @@ function Test-DashboardFilters {
         $response = Invoke-ApiRequest -Method "GET" -Path "/api/dashboard/recent-logs$($test.Params)" -Cookie $global:SessionCookie
         
         if ($response.StatusCode -eq 200) {
-            Write-Host "OK: $($test.Name): $($response.StatusCode)" -ForegroundColor Green
+            Write-Host "✅ $($test.Name): $($response.StatusCode)" -ForegroundColor Green
             $passed++
         } else {
-            Write-Host "FAIL: $($test.Name): $($response.StatusCode)" -ForegroundColor Red
+            Write-Host "❌ $($test.Name): $($response.StatusCode)" -ForegroundColor Red
         }
     }
     
-    Write-Host "Result: $passed/$($tests.Count) tests passed" -ForegroundColor Cyan
+    Write-Host "📊 Résultat filtres: $passed/$($tests.Count) tests passés" -ForegroundColor Cyan
     return $passed -eq $tests.Count
 }
 
+# Test 2: API de partage
 function Test-SharingAPI {
     Write-Host ""
-    Write-Host "Testing sharing API..." -ForegroundColor Yellow
+    Write-Host "📤 Test de l'API de partage..." -ForegroundColor Yellow
     
+    # Récupérer quelques log IDs
     $logsResponse = Invoke-ApiRequest -Method "GET" -Path "/api/dashboard/recent-logs?limit=5" -Cookie $global:SessionCookie
     $logIds = @()
     if ($logsResponse.Body.recentLogs) {
@@ -147,33 +134,33 @@ function Test-SharingAPI {
     
     $tests = @(
         @{ 
-            Name = "Share config"
+            Name = "Configuration de partage"
             Method = "GET"
             Path = "/api/share/config"
             Data = $null
         },
         @{ 
-            Name = "Email share"
+            Name = "Partage par email"
             Method = "POST"
             Path = "/api/share/email"
             Data = @{
                 emailTo = "test@example.com"
                 logIds = $logIds
-                subject = "Test Export"
+                subject = "Test LogSystem Export"
             }
         },
         @{ 
-            Name = "WhatsApp share"
+            Name = "Partage par WhatsApp"
             Method = "POST"
             Path = "/api/share/whatsapp"
             Data = @{
                 phoneNumber = "+33612345678"
                 logIds = $logIds
-                message = "Test Export"
+                message = "Test LogSystem Export"
             }
         },
         @{ 
-            Name = "Shareable link"
+            Name = "Génération de lien partageable"
             Method = "POST"
             Path = "/api/share/link"
             Data = @{
@@ -188,26 +175,27 @@ function Test-SharingAPI {
         $response = Invoke-ApiRequest -Method $test.Method -Path $test.Path -Data $test.Data -Cookie $global:SessionCookie
         
         if ($response.StatusCode -eq 200) {
-            Write-Host "OK: $($test.Name): $($response.StatusCode)" -ForegroundColor Green
+            Write-Host "✅ $($test.Name): $($response.StatusCode)" -ForegroundColor Green
             $passed++
         } else {
-            Write-Host "FAIL: $($test.Name): $($response.StatusCode)" -ForegroundColor Red
+            Write-Host "❌ $($test.Name): $($response.StatusCode)" -ForegroundColor Red
         }
     }
     
-    Write-Host "Result: $passed/$($tests.Count) tests passed" -ForegroundColor Cyan
+    Write-Host "📊 Résultat partage: $passed/$($tests.Count) tests passés" -ForegroundColor Cyan
     return $passed -eq $tests.Count
 }
 
+# Test 3: Alert automation avec retry
 function Test-AlertAutomation {
     Write-Host ""
-    Write-Host "Testing alert automation..." -ForegroundColor Yellow
+    Write-Host "🚨 Test de l'alert automation avec retry..." -ForegroundColor Yellow
     
     $tests = @(
-        @{ Name = "Get alerts"; Path = "/api/dashboard/alerts" },
-        @{ Name = "Critical alerts"; Path = "/api/dashboard/alerts/critical-only" },
-        @{ Name = "Grouped alerts"; Path = "/api/dashboard/alerts/grouped" },
-        @{ Name = "System alerts"; Path = "/api/dashboard/alerts/system-only" }
+        @{ Name = "Récupérer les alertes"; Path = "/api/dashboard/alerts" },
+        @{ Name = "Alertes critiques uniquement"; Path = "/api/dashboard/alerts/critical-only" },
+        @{ Name = "Alertes groupées"; Path = "/api/dashboard/alerts/grouped" },
+        @{ Name = "Alertes système uniquement"; Path = "/api/dashboard/alerts/system-only" }
     )
     
     $passed = 0
@@ -215,26 +203,27 @@ function Test-AlertAutomation {
         $response = Invoke-ApiRequest -Method "GET" -Path $test.Path -Cookie $global:SessionCookie
         
         if ($response.StatusCode -eq 200) {
-            Write-Host "OK: $($test.Name): $($response.StatusCode)" -ForegroundColor Green
+            Write-Host "✅ $($test.Name): $($response.StatusCode)" -ForegroundColor Green
             $passed++
         } else {
-            Write-Host "FAIL: $($test.Name): $($response.StatusCode)" -ForegroundColor Red
+            Write-Host "❌ $($test.Name): $($response.StatusCode)" -ForegroundColor Red
         }
     }
     
-    Write-Host "Result: $passed/$($tests.Count) tests passed" -ForegroundColor Cyan
+    Write-Host "📊 Résultat alert automation: $passed/$($tests.Count) tests passés" -ForegroundColor Cyan
     return $passed -eq $tests.Count
 }
 
+# Test 4: Corrections de bugs (API codes, search)
 function Test-BugFixes {
     Write-Host ""
-    Write-Host "Testing bug fixes..." -ForegroundColor Yellow
+    Write-Host "🐛 Test des corrections de bugs..." -ForegroundColor Yellow
     
     $tests = @(
-        @{ Name = "Search standard"; Path = "/api/search?query=error&limit=10" },
-        @{ Name = "Search with level"; Path = "/api/search?query=error&level=ERROR&limit=10" },
-        @{ Name = "Search metadata"; Path = "/api/search/metadata" },
-        @{ Name = "Search trends"; Path = "/api/search/trends?window_hours=24" }
+        @{ Name = "Recherche standard"; Path = "/api/search?query=error&limit=10" },
+        @{ Name = "Recherche avec filtre niveau"; Path = "/api/search?query=error&level=ERROR&limit=10" },
+        @{ Name = "Métadonnées de recherche"; Path = "/api/search/metadata" },
+        @{ Name = "Tendances de recherche"; Path = "/api/search/trends?window_hours=24" }
     )
     
     $passed = 0
@@ -242,20 +231,21 @@ function Test-BugFixes {
         $response = Invoke-ApiRequest -Method "GET" -Path $test.Path -Cookie $global:SessionCookie
         
         if ($response.StatusCode -eq 200) {
-            Write-Host "OK: $($test.Name): $($response.StatusCode)" -ForegroundColor Green
+            Write-Host "✅ $($test.Name): $($response.StatusCode)" -ForegroundColor Green
             $passed++
         } else {
-            Write-Host "FAIL: $($test.Name): $($response.StatusCode)" -ForegroundColor Red
+            Write-Host "❌ $($test.Name): $($response.StatusCode)" -ForegroundColor Red
         }
     }
     
-    Write-Host "Result: $passed/$($tests.Count) tests passed" -ForegroundColor Cyan
+    Write-Host "📊 Résultat corrections bugs: $passed/$($tests.Count) tests passés" -ForegroundColor Cyan
     return $passed -eq $tests.Count
 }
 
+# Test 5: Intégrité de la base de données
 function Test-DatabaseIntegrity {
     Write-Host ""
-    Write-Host "Testing database integrity..." -ForegroundColor Yellow
+    Write-Host "💾 Test de l'intégrité de la base de données..." -ForegroundColor Yellow
     
     $tests = @(
         @{ Name = "Summary API"; Path = "/api/dashboard/summary" },
@@ -270,21 +260,22 @@ function Test-DatabaseIntegrity {
         $response = Invoke-ApiRequest -Method "GET" -Path $test.Path -Cookie $global:SessionCookie
         
         if ($response.StatusCode -eq 200) {
-            Write-Host "OK: $($test.Name): $($response.StatusCode)" -ForegroundColor Green
+            Write-Host "✅ $($test.Name): $($response.StatusCode)" -ForegroundColor Green
             $passed++
         } else {
-            Write-Host "FAIL: $($test.Name): $($response.StatusCode)" -ForegroundColor Red
+            Write-Host "❌ $($test.Name): $($response.StatusCode)" -ForegroundColor Red
         }
     }
     
-    Write-Host "Result: $passed/$($tests.Count) tests passed" -ForegroundColor Cyan
+    Write-Host "📊 Résultat intégrité DB: $passed/$($tests.Count) tests passés" -ForegroundColor Cyan
     return $passed -eq $tests.Count
 }
 
+# Test principal
 function Run-AllTests {
     $authSuccess = Test-Authentication
     if (-not $authSuccess) {
-        Write-Host "Cannot continue without authentication" -ForegroundColor Red
+        Write-Host "❌ Impossible de continuer sans authentification" -ForegroundColor Red
         return
     }
     
@@ -297,11 +288,11 @@ function Run-AllTests {
     }
     
     Write-Host ""
-    Write-Host "FINAL TEST SUMMARY:" -ForegroundColor Magenta
+    Write-Host "📋 RÉSUMÉ FINAL DES TESTS:" -ForegroundColor Magenta
     Write-Host "==================================================" -ForegroundColor Magenta
     
     foreach ($test in $results.Keys) {
-        $status = if ($results[$test]) { "PASS" } else { "FAIL" }
+        $status = if ($results[$test]) { "✅ PASSÉ" } else { "❌ ÉCHOUÉ" }
         $color = if ($results[$test]) { "Green" } else { "Red" }
         Write-Host "$($test.PadRight(25)): $status" -ForegroundColor $color
     }
@@ -310,13 +301,14 @@ function Run-AllTests {
     $totalTests = $results.Count
     
     Write-Host "==================================================" -ForegroundColor Magenta
-    Write-Host "Final score: $totalPassed/$totalTests test categories passed" -ForegroundColor Cyan
+    Write-Host "🎯 Score final: $totalPassed/$totalTests catégories de tests réussies" -ForegroundColor Cyan
     
     if ($totalPassed -eq $totalTests) {
-        Write-Host "All functional tests passed successfully!" -ForegroundColor Green
+        Write-Host "🎉 Tous les tests fonctionnels sont passés avec succès !" -ForegroundColor Green
     } else {
-        Write-Host "Some tests failed. Check logs above." -ForegroundColor Yellow
+        Write-Host "⚠️ Certains tests ont échoué. Vérifiez les logs ci-dessus." -ForegroundColor Yellow
     }
 }
 
+# Exécuter les tests
 Run-AllTests
