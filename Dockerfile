@@ -1,6 +1,6 @@
 FROM node:20-alpine AS runner
 
-RUN apk add --no-cache openssl curl unzip p7zip
+RUN apk add --no-cache openssl curl unzip p7zip unrar
 WORKDIR /app
 
 ENV NODE_ENV=production
