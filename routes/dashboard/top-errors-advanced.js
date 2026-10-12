@@ -77,7 +77,9 @@ router.get('/top-errors-grouped', requireAuth, async (req, res) => {
         END) AS recent_count,
         MAX(l.timestamp) AS most_recent,
         GROUP_CONCAT(DISTINCT NULLIF(l.module, '') ORDER BY l.module SEPARATOR ',') AS affected_modules,
-        MAX(l.id) AS sample_log_id
+        MAX(l.id) AS sample_log_id,
+        MAX(eg.solution_applied) AS solution_applied,
+        MAX(eg.solution_applied_at) AS solution_applied_at
        FROM logs l
        LEFT JOIN error_groups eg ON eg.fingerprint = l.fingerprint AND eg.user_id = l.user_id
        WHERE l.user_id = ?
@@ -92,36 +94,67 @@ router.get('/top-errors-grouped', requireAuth, async (req, res) => {
       queryParams
     );
 
-    // Transformer pour le frontend avec indicateurs visuels
-    const formatted = errorGroups.map((group, index) => ({
-      rank: index + 1,
-      id: group.id,
-      fingerprint: group.fingerprint,
-      title: group.title || 'Erreur inconnue',
-      errorType: group.error_type,
-      eventType: group.event_type,
-      severity: group.severity_max || 'ERROR',
-      // 🔴 COMPTEUR EN ROUGE - nombre d'occurrences
-      occurrenceCount: {
-        value: Number(group.occurrence_count),
-        display: `🔴 ${group.occurrence_count}`, // Rouge avec badge
-        color: group.occurrence_count > 100 ? '#d32f2f' : group.occurrence_count > 50 ? '#f57c00' : '#fbc02d'
-      },
-      recentCount: Number(group.recent_count || 0),
-      firstSeen: group.first_seen,
-      lastSeen: group.last_seen,
-      mostRecent: group.most_recent,
-      status: group.status || 'open',
-      returnCount: Number(group.return_count || 0),
-      returnedAt: group.returned_at,
-      sourceServer: group.source_server,
-      service: group.service,
-      sample_log_id: group.sample_log_id,
-      affectedModules: group.affected_modules ? group.affected_modules.split(',') : [],
-      // Indicateurs de performance
-      trend: group.recent_count > group.occurrence_count * 0.1 ? 'increasing' : 'stable',
-      urgency: group.occurrence_count > 100 ? 'critical' : group.occurrence_count > 50 ? 'high' : 'medium'
-    }));
+    // Récupérer les recommandations pour chaque groupe d'erreurs
+    const fingerprints = errorGroups.map(g => g.fingerprint);
+    const errorTypes = errorGroups.map(g => g.error_type).filter(Boolean);
+    
+    let recommendations = {};
+    if (errorTypes.length > 0) {
+      const [recRows] = await pool.execute(
+        `SELECT error_type, recommendation, has_solution, solution_details
+         FROM error_recommendations
+         WHERE is_active = 1 AND error_type IN (${errorTypes.map(() => '?').join(',')})
+         ORDER BY priority DESC`,
+        errorTypes
+      );
+      
+      recommendations = recRows.reduce((acc, rec) => {
+        acc[rec.error_type] = rec;
+        return acc;
+      }, {});
+    }
+
+    // Transformer pour le frontend avec indicateurs visuels et suggestions
+    const formatted = errorGroups.map((group, index) => {
+      const recommendation = recommendations[group.error_type];
+      const hasRecommendation = !!recommendation;
+      const hasKnownSolution = recommendation && recommendation.has_solution;
+      
+      return {
+        rank: index + 1,
+        id: group.id,
+        fingerprint: group.fingerprint,
+        title: group.title || 'Erreur inconnue',
+        errorType: group.error_type,
+        eventType: group.event_type,
+        severity: group.severity_max || 'ERROR',
+        // 🔴 COMPTEUR EN ROUGE - nombre d'occurrences
+        occurrenceCount: {
+          value: Number(group.occurrence_count),
+          display: `🔴 ${group.occurrence_count}`, // Rouge avec badge
+          color: group.occurrence_count > 100 ? '#d32f2f' : group.occurrence_count > 50 ? '#f57c00' : '#fbc02d'
+        },
+        recentCount: Number(group.recent_count || 0),
+        firstSeen: group.first_seen,
+        lastSeen: group.last_seen,
+        mostRecent: group.most_recent,
+        status: group.status || 'open',
+        returnCount: Number(group.return_count || 0),
+        returnedAt: group.returned_at,
+        sourceServer: group.source_server,
+        service: group.service,
+        sample_log_id: group.sample_log_id,
+        affectedModules: group.affected_modules ? group.affected_modules.split(',') : [],
+        // Indicateurs de performance
+        trend: group.recent_count > group.occurrence_count * 0.1 ? 'increasing' : 'stable',
+        urgency: group.occurrence_count > 100 ? 'critical' : group.occurrence_count > 50 ? 'high' : 'medium',
+        // Suggestions et solutions
+        suggestion: hasRecommendation ? (hasKnownSolution ? recommendation.solution_details : recommendation.recommendation) : null,
+        hasKnownSolution: hasKnownSolution,
+        solutionApplied: group.solution_applied,
+        solutionAppliedAt: group.solution_applied_at
+      };
+    });
 
     res.json({
       success: true,

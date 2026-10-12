@@ -1101,6 +1101,19 @@
           var fp = String(g.fingerprint || '');
           var occCount = g.occurrenceCount || { value: g.occurrence_count || 1, color: '#fbc02d' };
           var colorStyle = 'color: ' + occCount.color + '; background-color: ' + occCount.color + '20; border: 1px solid ' + occCount.color + '40;';
+          
+          // Afficher la suggestion si disponible
+          var suggestionHtml = '';
+          if (g.suggestion) {
+            var suggestionIcon = g.hasKnownSolution ? '✅' : '💡';
+            var suggestionClass = g.hasKnownSolution ? 'solution-known' : 'suggestion-tip';
+            var truncatedSuggestion = g.suggestion.length > 120 ? g.suggestion.substring(0, 120) + '…' : g.suggestion;
+            suggestionHtml = '<div class="err-suggestion ' + suggestionClass + '" title="' + esc(g.suggestion) + '">'
+              + '<span class="suggestion-icon">' + suggestionIcon + '</span>'
+              + '<span class="suggestion-text">' + esc(truncatedSuggestion) + '</span>'
+              + '</div>';
+          }
+          
           return '<div class="err-group" data-sample-log-id="'+esc(sampleId)+'" data-fingerprint="'+esc(fp)+'" title="Details du groupe">'
             + '<div class="err-count" title="'+esc(occCount.value+' occurrences de cette erreur')+'" aria-label="'+esc(occCount.value+' occurrences de cette erreur')+'" style="'+colorStyle+'">🔴 '+occCount.value+'</div>'
             + '<div class="flex-1 overflow-hidden">'
@@ -1109,6 +1122,7 @@
             + '<div class="err-meta text-kpi-trend">' +
               '1re: '+esc(fmtDateTime(g.firstSeen||g.first_seen)||'–')+' · Dernière: '+esc(fmtDateTime(g.lastSeen||g.last_seen)||'–')+
             '</div>'
+            + suggestionHtml
             + '</div></div>';
         }).join('');
       }).catch(function(e){

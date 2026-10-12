@@ -390,6 +390,38 @@ body { font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe 
 .err-title { font-size: 12px; color: var(--text); font-weight: 500; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
 .err-meta  { font-size: 11px; color: var(--text2); }
 
+/* ── Error suggestions ────────────────────────────────────────────────── */
+.err-suggestion {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.err-suggestion.suggestion-tip {
+  background: rgba(79,142,247,0.08);
+  border-left: 3px solid var(--accent-blue);
+}
+
+.err-suggestion.solution-known {
+  background: rgba(16,185,129,0.08);
+  border-left: 3px solid var(--accent-green);
+}
+
+.suggestion-icon {
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.suggestion-text {
+  color: var(--text);
+  word-break: break-word;
+}
+
 /* ── System status ──────────────────────────────────────────────────── */
 .status-row {
   display: flex;
