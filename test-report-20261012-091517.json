@@ -1,0 +1,109 @@
+﻿{
+    "PassedTests":  5,
+    "Timestamp":  "2026-10-12 09:15:17",
+    "TotalTests":  20,
+    "FailedTests":  15,
+    "Results":  [
+                    {
+                        "Test":  "Login with valid credentials",
+                        "Status":  "PASSED",
+                        "Details":  "{\"id\":1,\"email\":\"admin@logsystem.local\",\"display_name\":\"Admin\",\"role\":\"admin\"}"
+                    },
+                    {
+                        "Test":  "Login response contains user data",
+                        "Status":  "PASSED",
+                        "Details":  ""
+                    },
+                    {
+                        "Test":  "Login rejects wrong password",
+                        "Status":  "PASSED",
+                        "Details":  ""
+                    },
+                    {
+                        "Test":  "Session check with /api/me",
+                        "Status":  "FAILED",
+                        "Details":  ""
+                    },
+                    {
+                        "Test":  "Dashboard KPI API",
+                        "Status":  "FAILED",
+                        "Details":  "The remote server returned an error: (401) Unauthorized."
+                    },
+                    {
+                        "Test":  "Dashboard Trends API",
+                        "Status":  "FAILED",
+                        "Details":  ""
+                    },
+                    {
+                        "Test":  "Recent logs API",
+                        "Status":  "FAILED",
+                        "Details":  ""
+                    },
+                    {
+                        "Test":  "Level distribution API",
+                        "Status":  "FAILED",
+                        "Details":  ""
+                    },
+                    {
+                        "Test":  "Top errors API",
+                        "Status":  "FAILED",
+                        "Details":  ""
+                    },
+                    {
+                        "Test":  "Simple search (ERROR)",
+                        "Status":  "FAILED",
+                        "Details":  ""
+                    },
+                    {
+                        "Test":  "Search with level filter",
+                        "Status":  "FAILED",
+                        "Details":  ""
+                    },
+                    {
+                        "Test":  "List alerts API",
+                        "Status":  "FAILED",
+                        "Details":  ""
+                    },
+                    {
+                        "Test":  "Mark alerts as read API",
+                        "Status":  "FAILED",
+                        "Details":  ""
+                    },
+                    {
+                        "Test":  "List users API",
+                        "Status":  "FAILED",
+                        "Details":  ""
+                    },
+                    {
+                        "Test":  "List alert rules API",
+                        "Status":  "FAILED",
+                        "Details":  ""
+                    },
+                    {
+                        "Test":  "System stats API",
+                        "Status":  "FAILED",
+                        "Details":  ""
+                    },
+                    {
+                        "Test":  "Recommendations API",
+                        "Status":  "FAILED",
+                        "Details":  ""
+                    },
+                    {
+                        "Test":  "Watcher status API",
+                        "Status":  "FAILED",
+                        "Details":  ""
+                    },
+                    {
+                        "Test":  "Logout API",
+                        "Status":  "PASSED",
+                        "Details":  ""
+                    },
+                    {
+                        "Test":  "Session invalidated after logout",
+                        "Status":  "PASSED",
+                        "Details":  ""
+                    }
+                ],
+    "SuccessRate":  25
+}

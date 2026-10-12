@@ -3,8 +3,6 @@ services:
     build:
       context: .
       target: runner
-      args:
-        SESSION_SECRET: ${SESSION_SECRET}
     container_name: logsystem
     restart: unless-stopped
     ports:
@@ -73,13 +71,13 @@ services:
     image: redis:7-alpine
     container_name: logsystem-redis
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-LogSystemRedis2024!}"]
     volumes:
       - logsystem-redis:/data
     networks:
       - logsystem
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-LogSystemRedis2024!}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5

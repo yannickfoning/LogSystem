@@ -1,0 +1,24 @@
+﻿{
+    "PassedTests":  2,
+    "Timestamp":  "2026-10-12 09:14:32",
+    "TotalTests":  3,
+    "FailedTests":  1,
+    "Results":  [
+                    {
+                        "Test":  "API Recommandations",
+                        "Status":  "FAILED",
+                        "Details":  "The remote server returned an error: (401) Unauthorized."
+                    },
+                    {
+                        "Test":  "API Logout",
+                        "Status":  "PASSED",
+                        "Details":  "{\"success\":true}"
+                    },
+                    {
+                        "Test":  "Session invalidÃ©e aprÃ¨s logout",
+                        "Status":  "PASSED",
+                        "Details":  ""
+                    }
+                ],
+    "SuccessRate":  66.67
+}

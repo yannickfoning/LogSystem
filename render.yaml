@@ -4,10 +4,10 @@ services:
     env: node
     region: frankfurt
     plan: starter
-    buildCommand: npm install --legacy-peer-deps
-    startCommand: PORT=10000 npm start
+    buildCommand: npm ci
+    startCommand: npm start
     healthCheckPath: /health
-    autoDeploy: true
+    autoDeploy: false
     envVars:
       - key: NODE_ENV
         value: production
@@ -29,7 +29,7 @@ services:
       - key: DB_SSL_CA_PATH
         sync: false
       - key: DB_SSL_REJECT_UNAUTHORIZED
-        value: "false"
+        value: "true"
       - key: DB_KEEPALIVE
         value: "true"
       - key: DB_CONNECTION_LIMIT
@@ -45,7 +45,7 @@ services:
       - key: PORT
         value: "10000"
       - key: IMPORT_BATCH_SIZE
-        value: "500"
+        value: "1000"
       - key: ALERT_EVAL_INTERVAL
         value: "60000"
       - key: RETENTION_CRON_HOUR
