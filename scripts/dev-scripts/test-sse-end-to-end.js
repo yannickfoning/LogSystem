@@ -37,6 +37,9 @@ async function testSSEEndToEnd() {
   console.log('Step 2: Opening SSE connection...');
   const sseEvents = [];
   let sseConnected = false;
+  let alertReceived = false;
+  let alertTimestamp = null;
+  let alertChecksPerformed = false;
   const connectionTime = Date.now();
 
   const ssePromise = new Promise((resolve, reject) => {
@@ -125,8 +128,7 @@ async function testSSEEndToEnd() {
     console.log('');
 
     const startTime = Date.now();
-    let alertReceived = false;
-    let alertTimestamp = null;
+    alertChecksPerformed = true;
 
     const checkInterval = setInterval(() => {
       const elapsed = Date.now() - startTime;
@@ -235,7 +237,7 @@ async function testSSEEndToEnd() {
   console.log('=== FINAL CONCLUSION ===');
   console.log('RAW DATA:');
   console.log(`Log insertion time: ${insertionTime}`);
-  console.log(`Alert received via SSE: ${typeof alertReceived !== 'undefined' ? (alertReceived ? 'YES' : 'NO') : 'N/A (SSE requires auth)'}`);
+  console.log(`Alert received via SSE: ${alertChecksPerformed ? (alertReceived ? 'YES' : 'NO') : 'N/A (SSE requires auth)'}`);
   console.log(`Alert created in DB (with user_id): ${alerts.length > 0 ? 'YES' : 'NO'}`);
   console.log(`Alert created in DB (without user_id): ${alerts2.length > 0 ? 'YES' : 'NO'}`);
   console.log('');
@@ -243,7 +245,7 @@ async function testSSEEndToEnd() {
   console.log(`Alerts require user_id: ${alerts2.length === 0 ? 'CONFIRMED' : 'NOT CONFIRMED'}`);
   console.log('');
   console.log('TIMING:');
-  if (typeof alertReceived !== 'undefined' && alertReceived) {
+  if (alertChecksPerformed && alertReceived) {
     console.log(`Insertion → SSE delivery: ${alertTimestamp - insertionTime}ms`);
   } else {
     console.log('SSE delivery timing: N/A (SSE requires authentication, cannot test without it)');

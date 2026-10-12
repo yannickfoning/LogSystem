@@ -477,7 +477,7 @@ router.get('/directory', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const scope = userScope(req);
-    const cols = 'id, timestamp, created_time, imported_at, timezone, log_level, source, source_server, service, message, normalized_message, event_type, fingerprint, user_id, client_ip, module, error_type, stack_trace, target_user, raw_log, parser_format, timestamp_inferred, classification_confidence, created_at, file_created_at';
+    const cols = 'id, timestamp, created_time, imported_at, timezone, log_level, source, source_server, source_system, log_source, service, message, normalized_message, event_type, fingerprint, user_id, client_ip, module, error_type, stack_trace, target_user, raw_log, parser_format, timestamp_inferred, classification_confidence, created_at, file_created_at, (SELECT COALESCE(NULLIF(display_name, \'\'), email) FROM users AS import_user WHERE import_user.id = logs.imported_by_user_id) AS importer_name, (SELECT filename FROM import_jobs AS source_job WHERE source_job.id = logs.import_job_id) AS import_filename';
     const [rows] = await pool.execute(`SELECT ${cols} FROM logs WHERE id = ?` + scope.sql, [req.params.id, ...scope.params]);
     if (!rows.length) return res.status(404).json({ error: 'Log non trouvé' });
     res.json(rows[0]);

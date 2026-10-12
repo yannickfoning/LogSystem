@@ -1,12 +1,11 @@
 import logger from '../config/logger.js';
-import pool, { levelSeverity, normalizeLevel } from '../config/database.js';
+import pool from '../config/database.js';
+import { levelSeverity, normalizeLevel } from '../services/logLevelUtils.js';
 import EventEmitter from 'events';
 import { detectVolumeAnomalies } from './anomaliesService.js';
 import {
   OPERATIONAL_TS,
-  OPERATIONAL_TS_EXPR,
   isCloudDeployment,
-  toMysqlUtcDatetime,
   mysqlUtcMinutesAgo,
 } from '../lib/operationalTime.js';
 
@@ -52,15 +51,6 @@ export function setAlertWorker(worker) {
 }
 
 async function ensureDefaultAlertRules() {
-  try {
-    const [globalRows] = await pool.execute('SELECT COUNT(*) as cnt FROM alert_rules WHERE is_active = 1 AND is_global = 1');
-    if (globalRows[0].cnt > 0) return;
-  } catch (e) {
-    if (!/Unknown column.*is_global/i.test(e.message)) throw e;
-    const [rows] = await pool.execute('SELECT COUNT(*) as cnt FROM alert_rules WHERE is_active = 1');
-    if (rows[0].cnt > 0) return;
-  }
-
   logger.info({ event: 'seeding_default_alert_rules' }, '[ALERT]');
   const [adminUsers] = await pool.execute("SELECT id FROM users WHERE role = 'admin' AND is_active = 1 LIMIT 1");
   const creatorId = adminUsers[0]?.id || null;
@@ -68,6 +58,18 @@ async function ensureDefaultAlertRules() {
 
   const allRules = [
     ['Erreurs fréquentes (ERROR)', 'Détecte 10+ erreurs ERROR sur 5 minutes', 'level', 'ERROR', 10, 5, 'high', 10],
+    [
+      'Même erreur répétée',
+      'Alerte lorsqu’une même empreinte ERROR, CRITICAL ou FATAL revient au moins 5 fois en 15 minutes.',
+      'fingerprint', JSON.stringify({ mode: 'repeated', exclude_event_type: 'database_query' }),
+      5, 15, 'high', 30,
+    ],
+    [
+      'Erreurs Java de requête répétées',
+      'Alerte sur une empreinte récurrente des logs Java de requête/base de données importés.',
+      'fingerprint', JSON.stringify({ mode: 'repeated', format: 'java', event: 'database_query' }),
+      3, 15, 'critical', 30,
+    ],
     ['FATAL détecté', 'Alerte immédiate sur toute occurrence FATAL', 'level', 'FATAL', 1, 60, 'critical', 5],
     ['CRITICAL détecté', 'Alerte immédiate sur toute occurrence CRITICAL', 'level', 'CRITICAL', 1, 60, 'critical', 10],
     ['Événements sécurité', 'Détecte 3+ événements de sécurité', 'level', 'SECURITY', 3, 30, 'critical', 15],
@@ -76,11 +78,26 @@ async function ensureDefaultAlertRules() {
     ['Pic de WARNINGs', 'Détecte 100+ warnings sur 15 minutes', 'level', 'WARNING', 100, 15, 'medium', 20],
   ];
 
+  const logFormats = [
+    ['Apache', 'apache'], ['Nginx', 'nginx'], ['Docker', 'docker'],
+    ['Kubernetes', 'kubernetes'], ['Syslog', 'syslog'], ['Java', 'java'],
+    ['Python', 'python'], ['PHP', 'php'], ['Odoo', 'odoo'],
+    ['JSON', 'json'], ['JSONL', 'jsonl'], ['CSV', 'csv'], ['XML', 'xml'],
+  ];
+  for (const [label, format] of logFormats) {
+    allRules.push([
+      `Erreurs ${label}`,
+      `Détecte au moins 5 logs ERROR, CRITICAL ou FATAL de type ${label} sur 15 minutes`,
+      'log_type', JSON.stringify({ format, levels: ['ERROR', 'CRITICAL', 'FATAL'] }),
+      5, 15, 'high', 15,
+    ]);
+  }
+
   for (const [name, description, conditionType, conditionValue, thresholdValue, timeWindow, severity, cooldown] of allRules) {
     await pool.execute(
       `INSERT INTO alert_rules (name, description, condition_type, condition_value, threshold_value, time_window_minutes, severity, cooldown_minutes, is_active, is_global, applicable_to_users, created_by)
        SELECT ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, NULL, ?
-       WHERE NOT EXISTS (SELECT 1 FROM alert_rules WHERE name = ? AND is_global = 1)`,
+       WHERE NOT EXISTS (SELECT 1 FROM alert_rules WHERE name = ? AND is_global = 1 AND is_active = 1)`,
       [name, description, conditionType, conditionValue, thresholdValue, timeWindow, severity, cooldown, creatorId, name]
     );
   }
@@ -88,10 +105,16 @@ async function ensureDefaultAlertRules() {
 
 // Helper function to parse condition_value in both JSON and STRING formats
 function parseConditionValue(conditionValue, rule) {
+  if (rule.condition_type === 'log_type') {
+    return { value: conditionValue, threshold: rule.threshold_value };
+  }
   // Try JSON format first (legacy format)
   if (conditionValue && typeof conditionValue === 'string' && conditionValue.startsWith('{')) {
     try {
       const parsed = JSON.parse(conditionValue);
+      if (parsed.mode === 'repeated') {
+        return { value: conditionValue, threshold: rule.threshold_value };
+      }
       // Map legacy JSON keys to modern format
       if (parsed.level) return { value: parsed.level, threshold: parsed.count || 1 };
       if (parsed.count) return { value: null, threshold: parsed.count };
@@ -169,6 +192,75 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
       return createAlert(rule, `Aucune activité depuis ${rule.time_window_minutes} minutes`, targetUserId);
     }
   } else if (conditionType === 'fingerprint') {
+    let fingerprintCriteria = null;
+    if (typeof effectiveValue === 'string' && effectiveValue.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(effectiveValue);
+        if (parsed && parsed.mode === 'repeated') fingerprintCriteria = parsed;
+      } catch { /* Existing exact fingerprint rules remain supported. */ }
+    }
+    if (fingerprintCriteria) {
+      const allowedLevels = new Set(['ERROR', 'CRITICAL', 'FATAL']);
+      const levels = Array.isArray(fingerprintCriteria.levels)
+        ? fingerprintCriteria.levels.map(normalizeLevel).filter(level => allowedLevels.has(level))
+        : ['ERROR', 'CRITICAL', 'FATAL'];
+      const allowedFormats = new Set([
+        'apache', 'nginx', 'docker', 'kubernetes', 'syslog', 'java', 'python',
+        'php', 'odoo', 'json', 'jsonl', 'csv', 'xml', 'text',
+      ]);
+      const parserFormat = String(fingerprintCriteria.format || fingerprintCriteria.parser_format || '').toLowerCase();
+      const eventType = String(fingerprintCriteria.event || fingerprintCriteria.event_type || '');
+      const excludedEventType = String(fingerprintCriteria.exclude_event_type || '');
+      if (!levels.length || (parserFormat && !allowedFormats.has(parserFormat))
+        || !/^[a-z0-9_.-]{0,80}$/i.test(eventType)
+        || !/^[a-z0-9_.-]{0,80}$/i.test(excludedEventType)) return null;
+
+      const placeholders = levels.map(() => '?').join(',');
+      let criteriaSql = '';
+      const criteriaParams = [];
+      if (parserFormat) {
+        criteriaSql += ' AND LOWER(parser_format) = ?';
+        criteriaParams.push(parserFormat);
+      }
+      if (eventType) {
+        criteriaSql += ' AND event_type = ?';
+        criteriaParams.push(eventType);
+      }
+      if (excludedEventType) {
+        criteriaSql += ' AND (event_type IS NULL OR event_type <> ?)';
+        criteriaParams.push(excludedEventType);
+      }
+      const [repeated] = await pool.execute(
+        `SELECT fingerprint, COUNT(*) AS occurrences, MAX(error_type) AS error_type,
+                MAX(event_type) AS event_type, MAX(parser_format) AS parser_format,
+                MAX(service) AS service, MAX(source_server) AS source_server
+         FROM logs
+         WHERE ${tsCol} >= ? AND fingerprint IS NOT NULL
+           AND log_level IN (${placeholders})${criteriaSql} ${userFilter}
+         GROUP BY fingerprint
+         HAVING COUNT(*) >= ?
+         ORDER BY occurrences DESC
+         LIMIT 10`,
+        [windowStartFormatted, ...levels, ...criteriaParams, ...scopedParams, effectiveThreshold ?? 3],
+      );
+      const created = [];
+      for (const match of repeated) {
+        const fingerprint = String(match.fingerprint || '');
+        const message = `Même motif d’erreur répété (${fingerprint.slice(0, 12)}) au moins ${effectiveThreshold ?? 3} fois en ${rule.time_window_minutes} min`;
+        const alert = await createAlert(rule, message, targetUserId, {
+          fingerprint,
+          occurrence_count: Number(match.occurrences),
+          error_type: match.error_type,
+          event_type: match.event_type,
+          parser_format: match.parser_format,
+          service: match.service,
+          source_server: match.source_server,
+        });
+        if (alert) created.push(alert);
+      }
+      return created;
+    }
+
     const [rows] = await pool.execute(
       `SELECT COUNT(*) as cnt FROM logs WHERE ${tsCol} >= ? AND fingerprint = ? ` + userFilter,
       [windowStartFormatted, effectiveValue, ...scopedParams]
@@ -222,6 +314,38 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
     if (rows[0].cnt >= (effectiveThreshold ?? 1)) {
       return createAlert(rule, `${rows[0].cnt} log(s) ${effectiveValue} détecté(s)`, targetUserId);
     }
+  } else if (conditionType === 'log_type') {
+    let criteria;
+    try {
+      criteria = JSON.parse(conditionValue);
+    } catch {
+      logger.warn({ event: 'invalid_log_type_alert_rule', ruleId: rule.id }, '[ALERT]');
+      return null;
+    }
+    const allowedFormats = new Set([
+      'apache', 'nginx', 'docker', 'kubernetes', 'syslog', 'java', 'python',
+      'php', 'odoo', 'json', 'jsonl', 'csv', 'xml',
+    ]);
+    const format = typeof criteria.format === 'string' ? criteria.format.toLowerCase() : '';
+    if (!allowedFormats.has(format)) return null;
+
+    const allowedLevels = new Set(['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL', 'FATAL']);
+    const levels = Array.isArray(criteria.levels)
+      ? criteria.levels.map(normalizeLevel).filter(level => allowedLevels.has(level))
+      : [];
+    if (!levels.length) return null;
+
+    const placeholders = levels.map(() => '?').join(',');
+    const [rows] = await pool.execute(
+      `SELECT COUNT(*) AS cnt FROM logs
+       WHERE ${tsCol} >= ? AND LOWER(parser_format) = ? AND log_level IN (${placeholders}) ${userFilter}`,
+      [windowStartFormatted, format, ...levels, ...scopedParams]
+    );
+    const count = Number(rows[0]?.cnt || 0);
+    const threshold = Math.max(1, Number(effectiveThreshold) || 1);
+    if (count >= threshold) {
+      return createAlert(rule, `${count} log(s) ${format} de niveau ${levels.join('/')} sur ${rule.time_window_minutes} min (seuil : ${threshold})`, targetUserId);
+    }
   } else if (conditionType === 'import_status') {
     const scopeUser = targetUserId ? 'AND user_id = ?' : '';
     const [rows] = await pool.execute(
@@ -249,7 +373,7 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
   return null;
 }
 
-async function createAlert(rule, message, targetUserId = null) {
+async function createAlert(rule, message, targetUserId = null, alertMetadata = {}) {
   // ✅ BUG #3 CORRIGÉ : cooldown via NOW() MySQL, pas toISOString()
   // AMÉLIORATION 2: Enhanced deduplication - check for identical alerts (same rule_id, user_id, unresolved)
   const userId = targetUserId ?? rule.created_by ?? null;
@@ -280,6 +404,7 @@ async function createAlert(rule, message, targetUserId = null) {
     affected_modules: [],
     affected_users: []
   };
+  Object.assign(context, alertMetadata);
 
   // Fetch sample logs and statistics for context
   try {
@@ -289,14 +414,18 @@ async function createAlert(rule, message, targetUserId = null) {
     
     // Get count and sample logs
     const tsCol = OPERATIONAL_TS;
+    const fingerprintFilter = alertMetadata.fingerprint ? ' AND fingerprint = ?' : '';
+    const sampleParams = alertMetadata.fingerprint
+      ? [windowStartFormatted, ...(userId ? [userId] : []), alertMetadata.fingerprint]
+      : params;
     const [samples] = await pool.execute(
       `SELECT id, timestamp, imported_at, message, module, target_user FROM logs 
-       WHERE ${tsCol} >= ? ${userFilter} 
+       WHERE ${tsCol} >= ? ${userFilter}${fingerprintFilter}
        ORDER BY ${tsCol} DESC LIMIT 3`,
-      params
+      sampleParams
     );
     
-    context.count_matched = samples.length;
+    context.count_matched = Number(alertMetadata.occurrence_count || samples.length);
     context.sample_logs = samples.map(log => ({
       timestamp: log.timestamp,
       message: log.message ? log.message.substring(0, 100) : '',
@@ -307,9 +436,9 @@ async function createAlert(rule, message, targetUserId = null) {
     // Get affected modules and users
     const [stats] = await pool.execute(
       `SELECT DISTINCT module, target_user FROM logs 
-       WHERE ${tsCol} >= ? ${userFilter}
+       WHERE ${tsCol} >= ? ${userFilter}${fingerprintFilter}
        AND module IS NOT NULL`,
-      params
+      sampleParams
     );
     
     const moduleSet = new Set();
@@ -484,9 +613,10 @@ export async function evalAllForUser(userId = null) {
   
   for (const rule of rules) {
     try {
-      const alert = await evalRule(rule, userId);
-      if (alert) {
-        alertCount++;
+      const result = await evalRule(rule, userId);
+      const created = Array.isArray(result) ? result : (result ? [result] : []);
+      alertCount += created.length;
+      for (const alert of created) {
         logger.info({ event: 'alert_rule_triggered', ruleId: rule.id, ruleName: rule.name, message: alert.message }, '[ALERT]');
       }
     } catch (e) {

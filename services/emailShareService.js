@@ -1,6 +1,7 @@
 import pool from '../config/database.js';
 import logger from '../config/logger.js';
 import crypto from 'node:crypto';
+import { sendEmail, sendWhatsApp } from './shareTransports.js';
 
 /**
  * Service pour partager des logs par email et WhatsApp
@@ -24,11 +25,9 @@ function convertLogsToCSV(logs) {
     const values = headers.map(header => {
       const value = log[header];
       // Escape quotes and wrap in quotes if contains comma
-      const stringValue = String(value ?? '');
-      if (stringValue.includes(',') || stringValue.includes('"')) {
-        return `"${stringValue.replace(/"/g, '""')}"`;
-      }
-      return stringValue;
+      let stringValue = String(value ?? '');
+      if (/^[\s]*[=+@-]/.test(stringValue)) stringValue = `'${stringValue}`;
+      return `"${stringValue.replace(/"/g, '""')}"`;
     });
     csvRows.push(values.join(','));
   }
@@ -72,7 +71,7 @@ function prepareEmailContent(logs, subject, includeSummary = true) {
         <p><strong>Level Distribution:</strong></p>
         <ul style="margin: 5px 0;">
           ${Object.entries(summary.byLevel).map(([level, count]) => 
-            `<li>${level}: ${count}</li>`
+            `<li>${escapeHtml(level)}: ${count}</li>`
           ).join('')}
         </ul>
         ${summary.dateRange ? `
@@ -95,6 +94,12 @@ function prepareEmailContent(logs, subject, includeSummary = true) {
       content: csv
     }]
   };
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, character => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[character]);
 }
 
 /**
@@ -130,75 +135,34 @@ async function storeSharedLink(dbPool, userId, logIds, expiresHours) {
  */
 export async function shareLogsByEmail(userId, emailTo, logIds, subject, options = {}) {
   try {
-    // Validate email
-    if (!emailTo || !emailTo.includes('@')) {
+    if (!emailTo || !/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(emailTo)) {
       throw new Error('Invalid email address');
     }
-    
-    // Validate log IDs
-    if (!logIds || !Array.isArray(logIds) || logIds.length === 0) {
-      throw new Error('No log IDs provided');
-    }
-    
-    // Fetch logs
-    const placeholders = logIds.map(() => '?').join(',');
+
+    const ids = validateLogIds(logIds);
+    const scope = options.accessScope || { sql: 'AND user_id = ?', params: [userId] };
+    const placeholders = ids.map(() => '?').join(',');
     const [logs] = await pool.query(
-      `SELECT id, timestamp, log_level, message, source, service, source_server, user_id, imported_at
-       FROM logs WHERE id IN (${placeholders}) AND user_id = ?`,
-      [...logIds, userId]
+      `SELECT id, timestamp, log_level, message, source, source_server, source_system,
+              service, event_type, error_type, target_user, parser_format, user_id, imported_at
+       FROM logs WHERE id IN (${placeholders}) ${scope.sql || ''}`,
+      [...ids, ...(scope.params || [])]
     );
-    
-    if (logs.length === 0) {
+    if (logs.length !== ids.length) {
       throw new Error('No logs found or access denied');
     }
-    
-    // Prepare email content
+
     const emailContent = prepareEmailContent(logs, subject, options.includeSummary !== false);
-    
-    // Check if email service is configured
-    const emailConfigured = process.env.EMAIL_SERVICE === 'true' || 
-                           process.env.SMTP_HOST || 
-                           process.env.SENDGRID_API_KEY;
-    
-    if (emailConfigured) {
-      // Try to send actual email (requires nodemailer or similar)
-      try {
-        // This would require installing and configuring nodemailer
-        // For now, we simulate the sending
-        logger.info({ 
-          event: 'email_share_sent', 
-          userId, 
-          emailTo, 
-          logCount: logs.length,
-          note: 'Email service configuration detected, but requires nodemailer implementation'
-        });
-        
-        return {
-          success: true,
-          message: 'Email sent successfully',
-          emailTo,
-          logCount: logs.length
-        };
-      } catch (sendError) {
-        logger.warn({ event: 'email_send_failed', error: sendError.message });
-        // Fall back to preparing content
-      }
-    }
-    
-    // Return prepared content for manual sending or testing
-    logger.info({ 
-      event: 'email_share_prepared', 
-      userId, 
-      emailTo, 
-      logCount: logs.length,
-      note: 'Email service not configured, returning prepared content'
+    await sendEmail({
+      to: emailTo,
+      subject: emailContent.subject,
+      html: emailContent.html,
+      attachments: emailContent.attachments,
     });
-    
+    logger.info({ event: 'email_share_sent', userId, logCount: logs.length });
     return {
       success: true,
-      message: 'Email prepared (requires email service configuration like nodemailer)',
-      preparedContent: emailContent,
-      emailTo,
+      message: 'E-mail remis au serveur SMTP.',
       logCount: logs.length
     };
     
@@ -213,20 +177,20 @@ export async function shareLogsByEmail(userId, emailTo, logIds, subject, options
  */
 export async function shareLogsByWhatsApp(userId, phoneNumber, logIds, message, options = {}) {
   try {
-    // Validate phone number
     if (!phoneNumber || !phoneNumber.match(/^\+?[1-9]\d{1,14}$/)) {
       throw new Error('Invalid phone number');
     }
-    
-    // Fetch logs
-    const placeholders = logIds.map(() => '?').join(',');
+    const ids = validateLogIds(logIds, 20);
+    const scope = options.accessScope || { sql: 'AND user_id = ?', params: [userId] };
+    const placeholders = ids.map(() => '?').join(',');
     const [logs] = await pool.query(
-      `SELECT id, timestamp, log_level, message, source, service 
-       FROM logs WHERE id IN (${placeholders}) AND user_id = ?`,
-      [...logIds, userId]
+      `SELECT id, timestamp, log_level, message, source, source_server, source_system,
+              service, event_type, error_type, target_user, parser_format
+       FROM logs WHERE id IN (${placeholders}) ${scope.sql || ''}`,
+      [...ids, ...(scope.params || [])]
     );
     
-    if (logs.length === 0) {
+    if (logs.length !== ids.length) {
       throw new Error('No logs found or access denied');
     }
     
@@ -240,56 +204,23 @@ export async function shareLogsByWhatsApp(userId, phoneNumber, logIds, message, 
       }, {})
     };
     
-    let whatsappMessage = message || `📊 LogSystem Export\n`;
-    whatsappMessage += `📅 ${new Date().toLocaleString()}\n`;
-    whatsappMessage += `📈 ${summary.total} logs shared\n\n`;
-    whatsappMessage += `📊 Level Distribution:\n`;
-    Object.entries(summary.byLevel).forEach(([level, count]) => {
-      whatsappMessage += `  ${level}: ${count}\n`;
-    });
-    
-    // Check if WhatsApp service is configured
-    const whatsappConfigured = process.env.WHATSAPP_SERVICE === 'true' || 
-                              process.env.TWILIO_ACCOUNT_SID || 
-                              process.env.WHATSAPP_API_KEY;
-    
-    if (whatsappConfigured) {
-      // Try to send actual WhatsApp message (requires Twilio or similar)
-      try {
-        logger.info({ 
-          event: 'whatsapp_share_sent', 
-          userId, 
-          phoneNumber, 
-          logCount: logs.length,
-          note: 'WhatsApp service configuration detected, but requires Twilio implementation'
-        });
-        
-        return {
-          success: true,
-          message: 'WhatsApp message sent successfully',
-          phoneNumber,
-          logCount: logs.length
-        };
-      } catch (sendError) {
-        logger.warn({ event: 'whatsapp_send_failed', error: sendError.message });
-        // Fall back to preparing message
-      }
-    }
-    
-    // Return prepared message for manual sending or testing
-    logger.info({ 
-      event: 'whatsapp_share_prepared', 
-      userId, 
-      phoneNumber, 
-      logCount: logs.length,
-      note: 'WhatsApp service not configured, returning prepared message'
-    });
-    
+    const lines = [
+      'LogSystem — log partagé',
+      message?.trim() ? `Note : ${message.trim()}` : '',
+      ...logs.slice(0, 5).map(log => {
+        const source = log.source || log.source_server || log.source_system || 'source inconnue';
+        const excerpt = String(log.message || '').replace(/\s+/g, ' ').slice(0, 300);
+        return `#${log.id} | ${log.timestamp} | ${log.log_level} | ${source} | ${log.service || 'service inconnu'} | ${log.error_type || log.event_type || log.parser_format || ''}\n${excerpt}`;
+      }),
+      logs.length > 5 ? `(${logs.length - 5} autre(s) log(s) non inclus)` : '',
+    ].filter(Boolean);
+    const whatsappMessage = lines.join('\n\n').slice(0, 1400);
+    const delivery = await sendWhatsApp({ to: phoneNumber, body: whatsappMessage });
+    logger.info({ event: 'whatsapp_share_sent', userId, logCount: logs.length, status: delivery.status });
     return {
       success: true,
-      message: 'WhatsApp message prepared (requires WhatsApp API configuration like Twilio)',
-      preparedMessage: whatsappMessage,
-      phoneNumber,
+      message: 'Message accepté par le fournisseur WhatsApp.',
+      providerStatus: delivery.status,
       logCount: logs.length
     };
     
@@ -297,6 +228,17 @@ export async function shareLogsByWhatsApp(userId, phoneNumber, logIds, message, 
     logger.error({ event: 'whatsapp_share_error', error: error.message });
     throw error;
   }
+}
+
+function validateLogIds(logIds, maximum = 500) {
+  if (!Array.isArray(logIds) || logIds.length === 0 || logIds.length > maximum) {
+    throw new Error(`Provide between 1 and ${maximum} log IDs`);
+  }
+  const ids = logIds.map(Number);
+  if (ids.some(id => !Number.isSafeInteger(id) || id <= 0)) {
+    throw new Error('Invalid log ID');
+  }
+  return [...new Set(ids)];
 }
 
 /**

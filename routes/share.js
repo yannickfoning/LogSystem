@@ -1,11 +1,12 @@
 import { Router } from 'express';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, userScope } from '../middleware/auth.js';
 import logger from '../config/logger.js';
 import { 
   shareLogsByEmail, 
   shareLogsByWhatsApp, 
   generateShareableLink 
 } from '../services/emailShareService.js';
+import { isEmailDeliveryConfigured, isWhatsAppDeliveryConfigured } from '../services/shareTransports.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -27,12 +28,15 @@ router.post('/email', async (req, res) => {
       return res.status(400).json({ error: 'Log IDs array required' });
     }
     
-    const result = await shareLogsByEmail(userId, emailTo, logIds, subject, options);
+    const result = await shareLogsByEmail(userId, emailTo, logIds, subject, {
+      ...(options || {}),
+      accessScope: userScope(req),
+    });
     res.json(result);
     
   } catch (error) {
     logger.error({ event: 'share_email_error', error: error.message });
-    res.status(500).json({ error: error.message || 'Failed to share via email' });
+    res.status(error.statusCode || 500).json({ error: error.message || 'Failed to share via email' });
   }
 });
 
@@ -53,12 +57,15 @@ router.post('/whatsapp', async (req, res) => {
       return res.status(400).json({ error: 'Log IDs array required' });
     }
     
-    const result = await shareLogsByWhatsApp(userId, phoneNumber, logIds, message, options);
+    const result = await shareLogsByWhatsApp(userId, phoneNumber, logIds, message, {
+      ...(options || {}),
+      accessScope: userScope(req),
+    });
     res.json(result);
     
   } catch (error) {
     logger.error({ event: 'share_whatsapp_error', error: error.message });
-    res.status(500).json({ error: error.message || 'Failed to share via WhatsApp' });
+    res.status(error.statusCode || 500).json({ error: error.message || 'Failed to share via WhatsApp' });
   }
 });
 
@@ -93,16 +100,14 @@ router.get('/config', async (req, res) => {
   try {
     const config = {
       email: {
-        available: process.env.EMAIL_SERVICE === 'true' || 
-                   process.env.SMTP_HOST || 
-                   process.env.SENDGRID_API_KEY,
-        service: process.env.EMAIL_SERVICE || 'none'
+        available: isEmailDeliveryConfigured(),
+        service: isEmailDeliveryConfigured() ? 'smtp' : 'none',
+        composeFallback: true,
       },
       whatsapp: {
-        available: process.env.WHATSAPP_SERVICE === 'true' || 
-                   process.env.TWILIO_ACCOUNT_SID || 
-                   process.env.WHATSAPP_API_KEY,
-        service: process.env.WHATSAPP_SERVICE || 'none'
+        available: isWhatsAppDeliveryConfigured(),
+        service: isWhatsAppDeliveryConfigured() ? 'twilio' : 'none',
+        composeFallback: true,
       }
     };
     

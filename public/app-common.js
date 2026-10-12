@@ -37,13 +37,28 @@
     return d.innerHTML;
   };
 
+  window.logMetadataLabel = function (value, fallback) {
+    if (Array.isArray(value)) {
+      for (var i = 0; i < value.length; i++) {
+        var candidate = window.logMetadataLabel(value[i], '');
+        if (candidate) return candidate;
+      }
+      return fallback === undefined ? 'Non renseigné' : fallback;
+    }
+    var text = String(value == null ? '' : value).trim();
+    if (!text || /^(unknown|inconnu|n\/a|na|null|-)$/i.test(text)) {
+      return fallback === undefined ? 'Non renseigné' : fallback;
+    }
+    return text;
+  };
+
   /** Format log event timestamp (prefers event_timestamp over timestamp). */
   window.logEventTime = function (log) {
     return log && (log.event_timestamp || log.timestamp) || null;
   };
 
   /** Render standardized log metadata block for detail modals. */
-  window.renderLogDetailHtml = function (log, esc, fmtDT, badge) {
+  window.renderLogDetailHtml = function (log, esc, fmtDT, badge, recommendation, history) {
     if (!log) return '';
     var eventTs = window.logEventTime(log);
     var html = '<div style="font-size:13px;line-height:1.8">';
@@ -55,13 +70,29 @@
     html += '</p>';
     if (log.imported_at) html += '<p><strong>Date d\'import:</strong> ' + fmtDT(log.imported_at) + '</p>';
     html += '<p><strong>Niveau:</strong> ' + badge(log.log_level) + '</p>';
-    html += '<p><strong>Source:</strong> ' + esc(log.source || log.log_source || '—') + '</p>';
-    html += '<p><strong>Utilisateur responsable du log:</strong> ' + esc(log.target_user || '—') + '</p>';
+    html += '<p><strong>Source:</strong> ' + esc(window.logMetadataLabel([log.source, log.source_server, log.module, log.log_source, log.source_system], log.import_filename ? 'Fichier : ' + log.import_filename : 'Non renseignée')) + '</p>';
+    html += '<p><strong>Service:</strong> ' + esc(window.logMetadataLabel(log.service)) + '</p>';
+    html += '<p><strong>Utilisateur responsable du log:</strong> ' + esc(window.logMetadataLabel(log.target_user, 'Non renseigné dans le log')) + '</p>';
+    if (log.importer_name) html += '<p><strong>Importé par:</strong> ' + esc(log.importer_name) + '</p>';
     if (log.log_origin) html += '<p><strong>Origine:</strong> ' + esc(log.log_origin) + '</p>';
     html += '<hr style="border-color:var(--border);margin:12px 0">';
     html += '<p><strong>Message:</strong></p><pre style="background:var(--surface2);padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-all;font-size:12px;max-height:200px;overflow:auto">' + esc(log.message) + '</pre>';
     if (log.stack_trace) {
       html += '<p style="margin-top:8px"><strong>Stack trace:</strong></p><pre style="background:#1a0000;color:#ff6b6b;padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-all;font-size:11px;max-height:200px;overflow:auto">' + esc(log.stack_trace) + '</pre>';
+    }
+    if (recommendation) {
+      html += '<div style="background:rgba(16,185,129,0.1);border-left:4px solid #10b981;padding:12px 16px;border-radius:6px;font-size:13px;margin:12px 0"><strong style="color:#10b981">💡 Recommandation :</strong><br><br>' + esc(recommendation) + '</div>';
+    }
+    if (history) {
+      var sameCount = Number(history.sameFingerprintOccurrences || 0);
+      var patternCount = Number(history.matchingTypeOccurrences || 0);
+      html += '<div style="background:rgba(59,130,246,0.08);border-left:4px solid #3b82f6;padding:10px 14px;border-radius:6px;font-size:12px;margin:12px 0">';
+      html += '<strong>📊 Constat sur les logs déjà importés :</strong><br>';
+      if (sameCount > 0) html += 'Même empreinte : ' + sameCount + ' occurrence(s), dont ' + Number(history.sameFingerprintLast7Days || 0) + ' sur les 7 derniers jours.<br>';
+      if (patternCount > 0) html += 'Même type d’erreur et même format : ' + patternCount + ' occurrence(s).<br>';
+      if (history.lastSeen) html += 'Dernière occurrence importée : ' + esc(fmtDT(history.lastSeen)) + '.';
+      if (!sameCount && !patternCount) html += 'Aucune occurrence comparable trouvée pour le moment.';
+      html += '</div>';
     }
     if (log.import_job_id) html += '<p><strong>Job import:</strong> #' + esc(log.import_job_id) + '</p>';
     html += '</div>';

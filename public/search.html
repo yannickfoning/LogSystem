@@ -71,6 +71,12 @@
           </select>
         </div>
         <div class="form-group">
+          <label class="filter-label" for="f-service" data-i18n="search.table.service">Service</label>
+          <select id="f-service">
+            <option value="" data-i18n="search.all_services">Tous les services</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label class="filter-label" for="f-user" data-i18n="search.user">Utilisateur</label>
           <select id="f-user">
             <option value="" data-i18n="search.all_users">Tous les utilisateurs</option>
@@ -113,6 +119,7 @@
               <th data-i18n="search.table.date">Date log</th>
               <th data-i18n="common.level">Niveau</th>
               <th data-i18n="common.source">Source</th>
+              <th data-i18n="modal.service">Service</th>
               <th data-i18n="search.table.user">Utilisateur responsable</th>
               <th data-i18n="common.message">Message</th>
             </tr>
@@ -135,6 +142,23 @@
         <button class="modal-close" id="detail-close">&times;</button>
       </div>
       <div id="detail-content"></div>
+      <section class="log-share-panel" aria-label="Partager le log">
+        <h4>Partager ce log</h4>
+        <div class="share-channel-grid">
+          <div>
+            <label for="share-email">Adresse e-mail</label>
+            <input id="share-email" type="email" maxlength="255" placeholder="personne@example.com">
+            <button class="btn btn-sm btn-secondary" id="share-email-btn" type="button">Envoyer par e-mail</button>
+          </div>
+          <div>
+            <label for="share-whatsapp">WhatsApp (format international)</label>
+            <input id="share-whatsapp" type="tel" maxlength="16" placeholder="+2250102030405">
+            <button class="btn btn-sm btn-secondary" id="share-whatsapp-btn" type="button">Envoyer par WhatsApp</button>
+          </div>
+        </div>
+        <p class="text-muted">Si aucun serveur e-mail ou fournisseur WhatsApp n’est configuré, un brouillon prérempli s’ouvre dans l’application correspondante pour confirmer l’envoi.</p>
+        <p id="share-status" class="text-muted" aria-live="polite"></p>
+      </section>
       <div class="modal-actions">
         <button class="btn btn-secondary" id="detail-close-btn" data-i18n="common.close">Fermer</button>
       </div>
@@ -152,6 +176,9 @@
       if (!window.api) return;
       var currentPage = 1;
       var totalPages = 1;
+      var currentLogId = null;
+      var currentLogDetails = null;
+      var shareDeliveryConfig = null;
 
       document.getElementById('logout-btn').addEventListener('click', function(e) {
         e.preventDefault();
@@ -191,7 +218,7 @@
           renderFacets(resp.facets);
           var tb = document.getElementById('logs-body');
           if (!rows.length) {
-            tb.innerHTML = '<tr><td colspan="5" class="no-data" data-i18n="search.no_results">Aucun résultat</td></tr>';
+            tb.innerHTML = '<tr><td colspan="6" class="no-data" data-i18n="search.no_results">Aucun résultat</td></tr>';
             document.getElementById('logs-pagination').innerHTML = '';
             return;
           }
@@ -200,13 +227,18 @@
             var tsCell = r.timestamp_inferred
               ? '<td><span class="ts-inferred" title="Date inférée">' + fmtDT(eventTs) + ' <small>~</small></span></td>'
               : '<td>' + fmtDT(eventTs) + '</td>';
-            var userCell = r.target_user
-              ? '<td><span class="user-badge">' + esc(r.target_user) + '</span></td>'
-              : '<td><span class="user-empty">—</span></td>';
+            var userCell;
+            var actor = window.logMetadataLabel(r.target_user, '');
+            if (actor) {
+              userCell = '<td><span class="user-badge" title="Utilisateur responsable extrait du log">' + esc(actor) + '</span></td>';
+            } else {
+              userCell = '<td><span class="user-empty" title="Le log source ne contient pas d’utilisateur responsable">Non renseigné</span></td>';
+            }
             return '<tr data-id="'+r.id+'">'
               + tsCell
               + '<td>'+badge(r.log_level)+'</td>'
-              + '<td>'+esc(r.source || r.log_source || '—')+'</td>'
+              + '<td>'+esc(window.logMetadataLabel([r.source, r.source_server, r.module, r.log_source, r.source_system], r.import_filename ? 'Fichier : ' + r.import_filename : 'Non renseignée'))+'</td>'
+              + '<td>'+esc(window.logMetadataLabel(r.service))+'</td>'
               + userCell
               + '<td class="text-truncate">'+esc(r.message)+'</td>'
               + '</tr>';
@@ -219,9 +251,6 @@
 
       document.getElementById('search-btn').addEventListener('click', function() { currentPage = 1; doSearch(); });
       document.getElementById('f-search').addEventListener('keyup', function(e) { if (e.key === 'Enter') { currentPage = 1; doSearch(); } });
-      // Auto-search on page load to show recent logs immediately
-      doSearch();
-
       function getSearchApiParams() {
         var p = getParams();
         var apiParams = {
@@ -231,6 +260,7 @@
         if (p.search) apiParams.query = p.search;
         if (p.log_level) apiParams.level = p.log_level;
         if (p.source) apiParams.source = p.source;
+        if (p.service) apiParams.service = p.service;
         if (p.user) apiParams.target_user = p.user;
         if (p.date_from) apiParams.from_timestamp = p.date_from + 'T00:00:00';
         if (p.date_to) apiParams.to_timestamp = p.date_to + 'T23:59:59';
@@ -241,6 +271,7 @@
         document.getElementById('f-search').value = '';
         document.getElementById('f-level').value = '';
         document.getElementById('f-source').value = '';
+        document.getElementById('f-service').value = '';
         document.getElementById('f-user').value = '';
         document.getElementById('f-date-from').value = '';
         document.getElementById('f-date-to').value = '';
@@ -248,39 +279,19 @@
         doSearch();
       });
 
-      // Charge dynamiquement toutes les sources et tous les utilisateurs
-      // réellement présents dans les logs stockés pour remplir les menus déroulants.
-      function loadMetadata() {
-        api.get('/api/search/metadata').then(function(meta) {
-          var sourceSelect = document.getElementById('f-source');
-          (meta.sources || []).forEach(function(s) {
-            var opt = document.createElement('option');
-            opt.value = s;
-            opt.textContent = s;
-            sourceSelect.appendChild(opt);
-          });
-          var userSelect = document.getElementById('f-user');
-          (meta.target_users || []).forEach(function(u) {
-            var opt = document.createElement('option');
-            opt.value = u;
-            opt.textContent = u;
-            userSelect.appendChild(opt);
-          });
-        }).catch(function() { /* menus restent sur "Toutes/Tous" si la requête échoue */ });
-      }
-      loadMetadata();
-
       function getParams() {
         var p = { page: currentPage, limit: 50 };
         var search = document.getElementById('f-search').value.trim();
         var level = document.getElementById('f-level').value;
         var source = document.getElementById('f-source').value;
+        var service = document.getElementById('f-service').value;
         var user = document.getElementById('f-user').value;
         var dateFrom = document.getElementById('f-date-from').value;
         var dateTo = document.getElementById('f-date-to').value;
         if (search) p.search = search;
         if (level) p.log_level = level;
         if (source) p.source = source;
+        if (service) p.service = service;
         if (user) p.user = user;
         if (dateFrom) p.date_from = dateFrom;
         if (dateTo) p.date_to = dateTo;
@@ -294,6 +305,9 @@
         }
         if (params.has('source')) {
           document.getElementById('f-source').value = params.get('source');
+        }
+        if (params.has('service')) {
+          document.getElementById('f-service').value = params.get('service');
         }
         if (params.has('user')) {
           document.getElementById('f-user').value = params.get('user');
@@ -314,7 +328,7 @@
         var sourcePriority = ['Splunk', 'Info', 'WAF', 'Apache', 'Nginx', 'Application'];
         
         // Load metadata from the correct API endpoint
-        api.get('/api/search/metadata').then(function(data) {
+        return api.get('/api/search/metadata').then(function(data) {
           // Load sources
           var sourceSelect = document.getElementById('f-source');
           if (data && data.sources && Array.isArray(data.sources)) {
@@ -348,6 +362,16 @@
               userSelect.appendChild(option);
             });
           }
+
+          var serviceSelect = document.getElementById('f-service');
+          if (data && Array.isArray(data.services)) {
+            data.services.slice().sort().forEach(function(service) {
+              var option = document.createElement('option');
+              option.value = service;
+              option.textContent = service;
+              serviceSelect.appendChild(option);
+            });
+          }
         }).catch(function() {
           // Silently fail if API doesn't support metadata
         });
@@ -360,6 +384,7 @@
           document.getElementById('f-level').value = '';
           document.getElementById('f-search').value = '';
           document.getElementById('f-source').value = '';
+          document.getElementById('f-service').value = '';
           document.getElementById('f-user').value = '';
           document.getElementById('f-date-from').value = '';
           document.getElementById('f-date-to').value = '';
@@ -425,17 +450,19 @@
           var errorType = log.error_type || null;
           
           // Load recommendation based on error type if available
-          var recommendationPromise = errorType ? 
-            api.get('/api/recommendations/match/' + encodeURIComponent(errorType) + 
-              (log.event_type ? '?event_type=' + encodeURIComponent(log.event_type) : '') +
-              (log.log_level ? (log.event_type ? '&' : '?') + 'log_level=' + encodeURIComponent(log.log_level) : '')) :
-            Promise.resolve({ recommendation: null });
+          var recommendationPromise = api.get('/api/recommendations/match?' + buildQuery({
+            log_id: log.id,
+            error_type: errorType || '',
+            log_format: log.parser_format || log.log_format || '',
+            event_type: log.event_type || '',
+            log_level: log.log_level || ''
+          }));
           
           recommendationPromise.then(function(recData) {
             var recommendation = recData && recData.recommendation ? recData.recommendation : null;
             
             if (window.renderLogDetailHtml) {
-              document.getElementById('detail-content').innerHTML = window.renderLogDetailHtml(log, esc, fmtDT, badge);
+                document.getElementById('detail-content').innerHTML = window.renderLogDetailHtml(log, esc, fmtDT, badge, recommendation, recData.history);
             } else {
               var html = '<div style="font-size:13px;line-height:1.8">';
               html += '<p><strong data-i18n="modal.id">Identifiant:</strong> ' + log.id + '</p>';
@@ -449,9 +476,9 @@
               html += '</p>';
               if (log.imported_at) html += '<p><strong>Date d\'import:</strong> ' + fmtDT(log.imported_at) + '</p>';
               html += '<p><strong data-i18n="modal.level">Importance:</strong> ' + badge(log.log_level) + '</p>';
-              html += '<p><strong data-i18n="modal.source">Source:</strong> ' + esc(log.source || log.log_source || '—') + '</p>';
-              html += '<p><strong data-i18n="modal.service">Service:</strong> ' + esc(log.service || '—') + '</p>';
-              html += '<p><strong>Utilisateur responsable du log:</strong> ' + esc(log.target_user || '—') + '</p>';
+              html += '<p><strong data-i18n="modal.source">Source:</strong> ' + esc(window.logMetadataLabel([log.source, log.source_server, log.module, log.log_source, log.source_system], log.import_filename ? 'Fichier : ' + log.import_filename : 'Non renseignée')) + '</p>';
+              html += '<p><strong data-i18n="modal.service">Service:</strong> ' + esc(window.logMetadataLabel(log.service)) + '</p>';
+              html += '<p><strong>Utilisateur responsable du log:</strong> ' + esc(window.logMetadataLabel(log.target_user, 'Non renseigné dans le log')) + '</p>';
               if (log.log_origin) html += '<p><strong>Origine:</strong> ' + esc(log.log_origin) + '</p>';
               html += '<hr style="border-color:var(--border);margin:12px 0">';
               html += '<p><strong data-i18n="modal.message">Message:</strong></p><pre style="background:var(--surface2);padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-all;font-size:12px;max-height:200px;overflow:auto">' + esc(log.message) + '</pre>';
@@ -468,6 +495,9 @@
               document.getElementById('detail-content').innerHTML = html;
             }
             document.getElementById('detail-modal').classList.add('active');
+            currentLogId = id;
+            currentLogDetails = log;
+            loadShareOptions();
           }).catch(function() {
             // If recommendation fails, still show the log details without recommendation
             if (window.renderLogDetailHtml) {
@@ -485,9 +515,9 @@
               html += '</p>';
               if (log.imported_at) html += '<p><strong>Date d\'import:</strong> ' + fmtDT(log.imported_at) + '</p>';
               html += '<p><strong data-i18n="modal.level">Importance:</strong> ' + badge(log.log_level) + '</p>';
-              html += '<p><strong data-i18n="modal.source">Source:</strong> ' + esc(log.source || log.log_source || '—') + '</p>';
-              html += '<p><strong data-i18n="modal.service">Service:</strong> ' + esc(log.service || '—') + '</p>';
-              html += '<p><strong>Utilisateur responsable du log:</strong> ' + esc(log.target_user || '—') + '</p>';
+              html += '<p><strong data-i18n="modal.source">Source:</strong> ' + esc(window.logMetadataLabel([log.source, log.source_server, log.module, log.log_source, log.source_system], log.import_filename ? 'Fichier : ' + log.import_filename : 'Non renseignée')) + '</p>';
+              html += '<p><strong data-i18n="modal.service">Service:</strong> ' + esc(window.logMetadataLabel(log.service)) + '</p>';
+              html += '<p><strong>Utilisateur responsable du log:</strong> ' + esc(window.logMetadataLabel(log.target_user, 'Non renseigné dans le log')) + '</p>';
               if (log.log_origin) html += '<p><strong>Origine:</strong> ' + esc(log.log_origin) + '</p>';
               html += '<hr style="border-color:var(--border);margin:12px 0">';
               html += '<p><strong data-i18n="modal.message">Message:</strong></p><pre style="background:var(--surface2);padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-all;font-size:12px;max-height:200px;overflow:auto">' + esc(log.message) + '</pre>';
@@ -498,6 +528,9 @@
               document.getElementById('detail-content').innerHTML = html;
             }
             document.getElementById('detail-modal').classList.add('active');
+            currentLogId = id;
+            currentLogDetails = log;
+            loadShareOptions();
           });
         });
       });
@@ -512,9 +545,93 @@
         if (e.target === this) this.classList.remove('active');
       });
 
-      applyUrlFilters();
-      loadDropdownOptions();
-      doSearch();
+      function loadShareOptions() {
+        api.get('/api/share/config').then(function(config) {
+          shareDeliveryConfig = config;
+          document.getElementById('share-email-btn').textContent = config.email.available ? 'Envoyer par e-mail' : 'Ouvrir un brouillon e-mail';
+          document.getElementById('share-whatsapp-btn').textContent = config.whatsapp.available ? 'Envoyer par WhatsApp' : 'Ouvrir WhatsApp';
+        }).catch(function() {
+          shareDeliveryConfig = { email: { available: false }, whatsapp: { available: false } };
+          document.getElementById('share-email-btn').textContent = 'Ouvrir un brouillon e-mail';
+          document.getElementById('share-whatsapp-btn').textContent = 'Ouvrir WhatsApp';
+        });
+      }
+
+      function reportShareResult(error, successMessage) {
+        var status = document.getElementById('share-status');
+        status.textContent = error ? (error.error || error.message || 'Échec de l’envoi.') : successMessage;
+        status.style.color = error ? 'var(--danger, #dc2626)' : 'var(--success, #059669)';
+      }
+
+      function getShareText(log) {
+        if (!log) return '';
+        var fields = [
+          'LogSystem — log partagé',
+          'Identifiant : ' + (log.id || ''),
+          'Date : ' + (log.event_timestamp || log.timestamp || ''),
+          'Niveau : ' + (log.log_level || ''),
+          'Type : ' + (log.error_type || log.event_type || 'non renseigné'),
+          'Service : ' + window.logMetadataLabel(log.service),
+          'Source : ' + window.logMetadataLabel([log.source, log.source_server, log.source_system, log.log_source]),
+          'Utilisateur responsable : ' + window.logMetadataLabel(log.target_user, 'Non renseigné dans le log'),
+          'Message : ' + String(log.message || '').replace(/\s+/g, ' ').slice(0, 1200)
+        ];
+        if (log.stack_trace) fields.push('Trace : ' + String(log.stack_trace).replace(/\s+/g, ' ').slice(0, 600));
+        return fields.join('\n');
+      }
+
+      function openShareComposer(url) {
+        var opened = window.open(url, '_blank');
+        if (!opened) {
+          reportShareResult({ error: 'Le navigateur a bloqué l’ouverture. Autorisez les fenêtres surgissantes pour cette page puis réessayez.' });
+          return false;
+        }
+        reportShareResult(null, 'Le brouillon est prêt dans votre application de partage. Confirmez l’envoi dans celle-ci.');
+        return true;
+      }
+
+      document.getElementById('share-email-btn').addEventListener('click', function() {
+        var emailTo = document.getElementById('share-email').value.trim();
+        if (!currentLogId || !emailTo) return reportShareResult({ error: 'Saisissez une adresse e-mail.' });
+        if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(emailTo)) return reportShareResult({ error: 'Adresse e-mail invalide.' });
+        if (!shareDeliveryConfig || !shareDeliveryConfig.email.available) {
+          var logText = getShareText(currentLogDetails);
+          var subject = 'LogSystem — log #' + currentLogId + ' — ' + (currentLogDetails.log_level || 'log');
+          openShareComposer('mailto:' + encodeURIComponent(emailTo).replace(/%40/gi, '@')
+            + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(logText));
+          return;
+        }
+        api.post('/api/share/email', { emailTo: emailTo, logIds: [Number(currentLogId)] })
+          .then(function(result) { reportShareResult(null, result.message || 'E-mail remis au serveur SMTP.'); })
+          .catch(function(error) {
+            var logText = getShareText(currentLogDetails);
+            var subject = 'LogSystem — log #' + currentLogId + ' — ' + (currentLogDetails.log_level || 'log');
+            var opened = openShareComposer('mailto:' + encodeURIComponent(emailTo).replace(/%40/gi, '@')
+              + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(logText));
+            if (opened && error && error.error) reportShareResult(null, 'Le serveur SMTP est indisponible. Le brouillon a été ouvert pour terminer l’envoi.');
+          });
+      });
+
+      document.getElementById('share-whatsapp-btn').addEventListener('click', function() {
+        var phoneNumber = document.getElementById('share-whatsapp').value.trim();
+        if (!currentLogId || !phoneNumber) return reportShareResult({ error: 'Saisissez un numéro au format international.' });
+        if (!/^\+?[1-9]\d{1,14}$/.test(phoneNumber)) return reportShareResult({ error: 'Numéro invalide. Utilisez le format international, par exemple +2250102030405.' });
+        if (!shareDeliveryConfig || !shareDeliveryConfig.whatsapp.available) {
+          openShareComposer('https://wa.me/' + phoneNumber.replace(/\D/g, '') + '?text=' + encodeURIComponent(getShareText(currentLogDetails)));
+          return;
+        }
+        api.post('/api/share/whatsapp', { phoneNumber: phoneNumber, logIds: [Number(currentLogId)] })
+          .then(function(result) { reportShareResult(null, result.message || 'Message accepté par le fournisseur WhatsApp.'); })
+          .catch(function() {
+            var opened = openShareComposer('https://wa.me/' + phoneNumber.replace(/\D/g, '') + '?text=' + encodeURIComponent(getShareText(currentLogDetails)));
+            if (opened) reportShareResult(null, 'Le fournisseur WhatsApp est indisponible. Le message prérempli a été ouvert dans WhatsApp.');
+          });
+      });
+
+      loadDropdownOptions().then(function() {
+        applyUrlFilters();
+        doSearch();
+      });
     })();
   </script>
 </body>

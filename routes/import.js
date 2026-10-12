@@ -20,6 +20,7 @@ import { invalidateDashboard } from "../services/cacheService.js";
 import { extractArchive, isArchive, filterLogFiles, mapArchiveError, ArchiveError } from "../lib/processing/archiveHandler.js";
 import { importLimiter } from "../lib/rateLimiter.js";
 import { importWorker } from "../workers/import-worker.js";
+import { upsertErrorGroupsFromLogs } from "../services/errorGroupService.js";
 import fs from 'fs';
 import path from 'path';
 
@@ -45,12 +46,9 @@ const upload = multer({
   }),
   limits: {
     files: parseInt(process.env.UPLOAD_MAX_FILES || "10", 10),
-    // Pas de plafond de taille de fichier : la plateforme doit pouvoir traiter
-    // des fichiers d'au moins 200 Mo, et aucune limite maximale n'est imposée.
-    // (`fileSize: Infinity` équivaut au comportement par défaut de multer,
-    // mais on le déclare explicitement pour que ce choix soit assumé et ne
-    // dépende pas d'un défaut implicite qui pourrait changer.)
-    fileSize: Infinity,
+    // La plateforme doit pouvoir traiter des fichiers jusqu'à 5000 MB (5 GB)
+    // Utilise la limite UPLOAD_MAX_SIZE avec Infinity comme fallback
+    fileSize: parseInt(process.env.UPLOAD_MAX_SIZE || "5242880000", 10),
   },
   fileFilter: (req, file, cb) => {
     const filename = file.originalname;
@@ -69,13 +67,21 @@ const upload = multer({
     const allowedMimeTypes = [
       "text/plain",
       "text/log",
+      "text/csv",
+      "application/csv",
+      "text/xml",
+      "application/xml",
       "application/json",
       "application/jsonl",
+      "application/x-ndjson",
       "text/x-log",
       "application/octet-stream",
       "application/zip",
+      "application/x-zip-compressed",
       "application/gzip",
       "application/x-gzip",
+      "application/x-bzip2",
+      "application/x-xz",
       "application/x-tar",
       "application/x-7z-compressed",
       "application/vnd.rar",
@@ -108,6 +114,12 @@ const upload = multer({
       "txt.gz",
       "txt.bz2",
       "txt.xz",
+      "json.gz",
+      "json.bz2",
+      "json.xz",
+      "csv.gz",
+      "csv.bz2",
+      "csv.xz",
     ];
 
     if (!allowedExtensions.includes(ext)) {
@@ -148,8 +160,8 @@ async function processImport(
   const importService = service ?? null;
   const dateLocale = locale || process.env.LOG_DATE_LOCALE || "fr"; // FIX 2a
   const batchSize = Math.min(
-    parseInt(process.env.IMPORT_BATCH_SIZE || "500", 10),
-    500,
+    parseInt(process.env.IMPORT_BATCH_SIZE || "1000", 10),
+    2000,
   );
   const importTimestamp = new Date().toISOString().slice(0, 19).replace("T", " ");
   const LARGE_FILE_THRESHOLD = 10 * 1024 * 1024; // 10MB
@@ -667,7 +679,15 @@ async function processLogBatch(batch, jobId, userId, importSource, importService
 async function insertBatch(conn, batch, userId) {
   await conn.beginTransaction();
   try {
-    const logValues = batch.map((entry) => [
+    const orderedBatch = [...batch].sort((a, b) => {
+      const aFingerprint = String(a.fingerprint || '');
+      const bFingerprint = String(b.fingerprint || '');
+      if (aFingerprint !== bFingerprint) return aFingerprint < bFingerprint ? -1 : 1;
+      const aTimestamp = String(a.timestamp || '');
+      const bTimestamp = String(b.timestamp || '');
+      return aTimestamp === bTimestamp ? 0 : (aTimestamp < bTimestamp ? -1 : 1);
+    });
+    const logValues = orderedBatch.map((entry) => [
       entry.raw_log,
       entry.timestamp,
       entry.created_time,
@@ -710,103 +730,7 @@ async function insertBatch(conn, batch, userId) {
       [logValues],
     );
 
-    // FIX: error_groups — severity_max est VARCHAR donc on compare avec FIELD()
-    // pour éviter GREATEST() sur des types incompatibles
-    const errorEntries = batch.filter(entry => ['ERROR', 'CRITICAL', 'FATAL'].includes(entry.log_level));
-    
-    if (errorEntries.length > 0) {
-      // Grouper par fingerprint pour n'insérer qu'une fois par fingerprint avec le bon compte
-      const fingerprintGroups = new Map();
-      for (const entry of errorEntries) {
-        if (!fingerprintGroups.has(entry.fingerprint)) {
-          fingerprintGroups.set(entry.fingerprint, {
-            fingerprint: entry.fingerprint,
-            title: (entry.message || "").slice(0, 500),
-            event_type: entry.event_type,
-            log_level: entry.log_level,
-            count: 0,
-            timestamp: entry.timestamp,
-            source_server: entry.source_server,
-            service: entry.service,
-            error_type: entry.error_type,
-            user_id: userId || null,
-          });
-        }
-        fingerprintGroups.get(entry.fingerprint).count++;
-      }
-
-      const errorGroupValues = Array.from(fingerprintGroups.values()).map(group => [
-        group.fingerprint,
-        group.title,
-        group.event_type,
-        group.log_level,
-        group.count,
-        group.timestamp,
-        group.timestamp,
-        group.source_server,
-        group.service,
-        group.error_type,
-        group.user_id,
-      ]);
-
-      const placeholders = errorGroupValues
-        .map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .join(",");
-      const flatParams = errorGroupValues.flat();
-
-      // FIX: utiliser FIELD() pour comparer les niveaux texte correctement
-      await conn.query(
-        `INSERT INTO error_groups (fingerprint, title, event_type, severity_max, occurrence_count, first_seen, last_seen, source_server, service, error_type, user_id)
-         VALUES ${placeholders}
-         ON DUPLICATE KEY UPDATE
-           occurrence_count = occurrence_count + VALUES(occurrence_count),
-           previous_seen = IF(VALUES(last_seen) > last_seen, last_seen, previous_seen),
-           return_reason = IF(
-             (status = 'resolved' OR TIMESTAMPDIFF(DAY, last_seen, VALUES(last_seen)) >= ?)
-             AND VALUES(last_seen) > last_seen,
-             CONCAT('Erreur deja observee le ', DATE_FORMAT(first_seen, '%Y-%m-%d %H:%i:%s'),
-                    ', absente depuis ', TIMESTAMPDIFF(DAY, last_seen, VALUES(last_seen)),
-                    ' jour(s), puis reapparue le ', DATE_FORMAT(VALUES(last_seen), '%Y-%m-%d %H:%i:%s')),
-             return_reason
-           ),
-           returned_at = IF(
-             (status = 'resolved' OR TIMESTAMPDIFF(DAY, last_seen, VALUES(last_seen)) >= ?)
-             AND VALUES(last_seen) > last_seen,
-             VALUES(last_seen),
-             returned_at
-           ),
-           return_count = IF(
-             (status = 'resolved' OR TIMESTAMPDIFF(DAY, last_seen, VALUES(last_seen)) >= ?)
-             AND VALUES(last_seen) > last_seen,
-             return_count + 1,
-             return_count
-           ),
-           status = IF(
-             (status = 'resolved' OR TIMESTAMPDIFF(DAY, last_seen, VALUES(last_seen)) >= ?)
-             AND VALUES(last_seen) > last_seen,
-             'returned',
-             'open'
-           ),
-           last_seen = GREATEST(last_seen, VALUES(last_seen)),
-           first_seen = LEAST(first_seen, VALUES(first_seen)),
-           source_server = COALESCE(VALUES(source_server), source_server),
-           service = COALESCE(VALUES(service), service),
-           error_type = COALESCE(VALUES(error_type), error_type),
-           severity_max = IF(
-             FIELD(VALUES(severity_max), 'DEBUG','INFO','WARNING','ERROR','CRITICAL','FATAL') >
-             FIELD(severity_max,         'DEBUG','INFO','WARNING','ERROR','CRITICAL','FATAL'),
-             VALUES(severity_max),
-             severity_max
-           )`,
-        [
-          ...flatParams,
-          RETURN_GAP_DAYS,
-          RETURN_GAP_DAYS,
-          RETURN_GAP_DAYS,
-          RETURN_GAP_DAYS,
-        ],
-      );
-    }
+    await upsertErrorGroupsFromLogs(conn, userId, orderedBatch, RETURN_GAP_DAYS);
 
     await conn.commit();
   } catch (e) {
@@ -949,6 +873,8 @@ router.get("/jobs/:id", async (req, res) => {
       progress,
       logsProcessed: job.processed_lines,
       logsTotal: job.total_lines,
+      insertedLines: job.successful_lines || 0,
+      skippedLines: job.skipped_lines || 0,
       createdAt: job.created_at,
       completedAt: job.completed_at,
       errorMessage: job.error_message,
@@ -989,6 +915,8 @@ router.get("/jobs/:id/status", async (req, res) => {
       progress,
       logsProcessed: job.processed_lines,
       logsTotal: job.total_lines,
+      insertedLines: job.successful_lines || 0,
+      skippedLines: job.skipped_lines || 0,
       errorCount: job.error_count,
       createdAt: job.created_at,
       startedAt: job.started_at,
@@ -1008,7 +936,7 @@ router.get("/jobs/:id/summary", async (req, res) => {
   try {
     const scope = userScope(req);
     const [jobRows] = await pool.execute(
-      "SELECT id, total_lines, processed_lines, error_count, status FROM import_jobs WHERE id = ?" +
+      "SELECT id, filename, total_lines, processed_lines, successful_lines, skipped_lines, error_count, status, import_source, import_service, completed_at FROM import_jobs WHERE id = ?" +
         scope.sql,
       [req.params.id, ...scope.params],
     );
@@ -1019,12 +947,10 @@ router.get("/jobs/:id/summary", async (req, res) => {
 
     const job = jobRows[0];
     const total = job.total_lines || 0;
-    const inserted = job.processed_lines || 0;
+    const processed = job.processed_lines || 0;
+    const inserted = job.successful_lines || 0;
     const errors = job.error_count || 0;
-    const skipped =
-      job.skipped_lines != null
-        ? job.skipped_lines
-        : Math.max(0, total - inserted - errors);
+    const skipped = job.skipped_lines || 0;
 
     // Calculate from logs: count by target_user and module presence
     let missing_user = 0;
@@ -1033,12 +959,11 @@ router.get("/jobs/:id/summary", async (req, res) => {
     if (job.status === "completed" && total > 0) {
       const [stats] = await pool.execute(
         `SELECT
-          SUM(CASE WHEN target_user IS NULL THEN 1 ELSE 0 END) as cnt_missing_user,
-          SUM(CASE WHEN module IS NULL THEN 1 ELSE 0 END) as cnt_missing_module
+          COALESCE(SUM(CASE WHEN target_user IS NULL THEN 1 ELSE 0 END), 0) as cnt_missing_user,
+          COALESCE(SUM(CASE WHEN module IS NULL THEN 1 ELSE 0 END), 0) as cnt_missing_module
          FROM logs
-         WHERE created_at >= DATE_SUB(NOW(), INTERVAL 5 MINUTE) AND user_id = ?
-         LIMIT ${inserted}`,
-        [req.session.user.id],
+         WHERE import_job_id = ? AND user_id = ?`,
+        [job.id, req.session.user.id],
       );
 
       if (stats && stats[0]) {
@@ -1049,6 +974,7 @@ router.get("/jobs/:id/summary", async (req, res) => {
 
     const summary = {
       total,
+      processed,
       inserted,
       skipped,
       source: job.import_source || null,
@@ -1057,7 +983,7 @@ router.get("/jobs/:id/summary", async (req, res) => {
       completed_at: job.completed_at || null,
       missing_user,
       missing_module,
-      missing_timestamp: skipped > 0 ? skipped : 0,
+      missing_timestamp: 0,
       errors,
       status: job.status,
     };

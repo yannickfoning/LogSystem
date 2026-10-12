@@ -1,4 +1,5 @@
 import pool from "../config/database.js";
+import logger from "../config/logger.js";
 
 const SESSION_VERSION_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 

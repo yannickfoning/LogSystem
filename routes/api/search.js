@@ -9,16 +9,20 @@ router.use(requireAuth);
 router.use(searchLimiter);
 
 const LOG_SEARCH_SELECT = `
-  id, timestamp, imported_at, log_level, source, source_server, service,
+  id, timestamp, imported_at, log_level, source, source_server, source_system, log_source, service,
   message, normalized_message, event_type, fingerprint, module, error_type,
   stack_trace, target_user,
-  parser_format, timestamp_inferred, classification_confidence, created_time
+  parser_format, timestamp_inferred, classification_confidence, created_time,
+  (SELECT COALESCE(NULLIF(display_name, ''), email) FROM users AS import_user WHERE import_user.id = logs.imported_by_user_id) AS importer_name,
+  (SELECT filename FROM import_jobs AS source_job WHERE source_job.id = logs.import_job_id) AS import_filename
 `.replace(/\s+/g, ' ').trim();
 
 const LOG_SEARCH_SELECT_MIN = `
-  id, timestamp, imported_at, log_level, source, source_server, service,
+  id, timestamp, imported_at, log_level, source, source_server, source_system, log_source, service,
   message, normalized_message, event_type, fingerprint, module, error_type,
-  stack_trace, target_user
+  stack_trace, target_user,
+  (SELECT COALESCE(NULLIF(display_name, ''), email) FROM users AS import_user WHERE import_user.id = logs.imported_by_user_id) AS importer_name,
+  (SELECT filename FROM import_jobs AS source_job WHERE source_job.id = logs.import_job_id) AS import_filename
 `.replace(/\s+/g, ' ').trim();
 
 function appendTextSearch(whereConditions, params, query) {
@@ -106,6 +110,31 @@ async function runLogsSearch(whereClause, params, limitNum, offsetNum) {
   }
 }
 
+router.get('/repeated-patterns', async (req, res) => {
+  try {
+    const scope = userScope(req);
+    const minOccurrences = Math.min(100, Math.max(2, Number.parseInt(req.query.min_occurrences, 10) || 3));
+    const limit = Math.min(50, Math.max(1, Number.parseInt(req.query.limit, 10) || 30));
+    const [patterns] = await pool.execute(
+      `SELECT fingerprint, MAX(parser_format) AS parser_format, MAX(log_level) AS log_level,
+              MAX(error_type) AS error_type, MAX(event_type) AS event_type,
+              MAX(service) AS service, COUNT(*) AS occurrences,
+              MIN(imported_at) AS first_imported_at, MAX(imported_at) AS last_imported_at
+       FROM logs
+       WHERE fingerprint IS NOT NULL AND log_level IN ('ERROR','CRITICAL','FATAL')${scope.sql}
+       GROUP BY fingerprint
+       HAVING COUNT(*) >= ?
+       ORDER BY occurrences DESC, last_imported_at DESC
+       LIMIT ${limit}`,
+      [...scope.params, minOccurrences],
+    );
+    res.json({ patterns, minimum_occurrences: minOccurrences });
+  } catch (error) {
+    logger.error({ event: 'repeated_patterns_error', error: error.message }, '[API]');
+    res.status(500).json({ error: 'Impossible de charger les motifs récurrents' });
+  }
+});
+
 /**
  * GET /api/search
  * 
@@ -146,8 +175,14 @@ router.get('/', async (req, res) => {
       offset = 0
     } = req.query;
 
-    const limitNum = Math.min(parseInt(limit) || 50, 100);
-    const offsetNum = Math.max(parseInt(offset) || 0, 0);
+    const requestedLimit = Number.parseInt(limit, 10);
+    const requestedOffset = Number.parseInt(offset, 10);
+    const limitNum = Number.isSafeInteger(requestedLimit) && requestedLimit > 0
+      ? Math.min(requestedLimit, 100)
+      : 50;
+    const offsetNum = Number.isSafeInteger(requestedOffset) && requestedOffset >= 0
+      ? requestedOffset
+      : 0;
 
     if (query && query.length > 500) {
       return res.status(400).json({ error: 'Longueur mot-clé: 1-500 caractères' });
@@ -199,7 +234,7 @@ router.get('/', async (req, res) => {
     }
 
     if (source) {
-      whereConditions.push('source = ?');
+      whereConditions.push("COALESCE(NULLIF(source, ''), NULLIF(source_server, ''), NULLIF(source_system, ''), NULLIF(log_source, ''), (SELECT filename FROM import_jobs AS source_job WHERE source_job.id = logs.import_job_id)) = ?");
       params.push(source);
     }
 
@@ -241,13 +276,6 @@ router.get('/', async (req, res) => {
     const whereClause = whereConditions.join(' AND ');
 
     const totalCount = await runCountQuery(whereClause, params);
-
-    if (totalCount > 10000) {
-      return res.status(422).json({
-        error: 'Trop de résultats (10K max). Affinez votre recherche.',
-        count: totalCount,
-      });
-    }
 
     const logs = await runLogsSearch(whereClause, params, limitNum, offsetNum);
 
@@ -311,8 +339,14 @@ router.get('/error-directory', async (req, res) => {
       offset = 0
     } = req.query;
 
-    const limitNum = Math.min(parseInt(limit) || 50, 100);
-    const offsetNum = Math.max(parseInt(offset) || 0, 0);
+    const requestedLimit = Number.parseInt(limit, 10);
+    const requestedOffset = Number.parseInt(offset, 10);
+    const limitNum = Number.isSafeInteger(requestedLimit) && requestedLimit > 0
+      ? Math.min(requestedLimit, 100)
+      : 50;
+    const offsetNum = Number.isSafeInteger(requestedOffset) && requestedOffset >= 0
+      ? requestedOffset
+      : 0;
 
     let whereConditions = ['1=1'];
     let params = [];
@@ -345,8 +379,8 @@ router.get('/error-directory', async (req, res) => {
        FROM error_groups 
        WHERE ${whereClause}
        ORDER BY last_seen DESC
-       LIMIT ? OFFSET ?`,
-      [...params, limitNum, offsetNum]
+       LIMIT ${limitNum} OFFSET ${offsetNum}`,
+      params
     );
 
     // Enrichir avec logs récents et tendances
@@ -489,7 +523,11 @@ router.get('/metadata', async (req, res) => {
     const scope = userScope(req);
 
     const [services] = await pool.execute(
-      `SELECT DISTINCT service FROM logs WHERE service IS NOT NULL ${scope.sql || ''} LIMIT 100`,
+      `SELECT DISTINCT service FROM logs
+       WHERE service IS NOT NULL AND TRIM(service) <> ''
+         AND LOWER(TRIM(service)) NOT IN ('unknown', 'inconnu', 'n/a', 'na', 'null', '-')
+         ${scope.sql || ''}
+       ORDER BY service LIMIT 500`,
       scope.params || []
     );
 
@@ -498,10 +536,16 @@ router.get('/metadata', async (req, res) => {
       scope.params || []
     );
 
-    // "sources" reflects the real `source` column (origin of the log), not the
-    // host/server (`source_server`), which was a frequent source of confusion.
     const [sources] = await pool.execute(
-      `SELECT DISTINCT source FROM logs WHERE source IS NOT NULL AND source != '' ${scope.sql || ''} ORDER BY source LIMIT 200`,
+      `SELECT DISTINCT COALESCE(NULLIF(source, ''), NULLIF(source_server, ''), NULLIF(source_system, ''), NULLIF(log_source, ''),
+         (SELECT filename FROM import_jobs AS source_job WHERE source_job.id = logs.import_job_id)) AS source
+       FROM logs
+       WHERE COALESCE(NULLIF(source, ''), NULLIF(source_server, ''), NULLIF(source_system, ''), NULLIF(log_source, ''),
+         (SELECT filename FROM import_jobs AS source_job WHERE source_job.id = logs.import_job_id)) IS NOT NULL
+         AND LOWER(TRIM(COALESCE(NULLIF(source, ''), NULLIF(source_server, ''), NULLIF(source_system, ''), NULLIF(log_source, ''),
+           (SELECT filename FROM import_jobs AS source_job WHERE source_job.id = logs.import_job_id)))) NOT IN ('unknown', 'inconnu', 'n/a', 'na', 'null', '-')
+       ${scope.sql || ''}
+       ORDER BY source LIMIT 1000`,
       scope.params || []
     );
 
@@ -511,7 +555,11 @@ router.get('/metadata', async (req, res) => {
     );
 
     const [users] = await pool.execute(
-      `SELECT DISTINCT target_user FROM logs WHERE target_user IS NOT NULL ${scope.sql || ''} LIMIT 100`,
+      `SELECT DISTINCT target_user FROM logs
+       WHERE target_user IS NOT NULL AND TRIM(target_user) <> ''
+         AND LOWER(TRIM(target_user)) NOT IN ('unknown', 'inconnu', 'n/a', 'na', 'null', '-')
+         ${scope.sql || ''}
+       ORDER BY target_user LIMIT 500`,
       scope.params || []
     );
 

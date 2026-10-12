@@ -63,7 +63,7 @@ function isReady() {
   return redis !== null && !redisUnavailable && redis.isReady;
 }
 
-const CACHE_TTL_STATS = 300; // 5 minutes for stats
+const CACHE_TTL_STATS = 30; // Keep dashboard data in step with the 30-second refresh interval.
 const _CACHE_TTL_COUNTERS = 60; // 1 minute for counters (reserved for future use)
 
 export async function getCachedDashboard(userId) {

@@ -64,7 +64,7 @@ process.on('unhandledRejection', (reason) => {
 
 // ── Express app ────────────────────────────────────────────────────────────────
 const app = express();
-app.set('trust proxy', 1);
+// app.set('trust proxy', 1); // Désactivé pour Docker dev sans reverse proxy
 
 // ── Database health tracking ────────────────────────────────────────────────────
 let databaseReady = false;
@@ -72,7 +72,8 @@ let databaseReady = false;
 
 // ── HTTPS redirect ────────────────────────────────────────────────────────────
 // En local (dev), on évite le redirect HTTPS pour pouvoir tester sans erreur TLS.
-const shouldForceHttps = IS_PROD && process.env.FORCE_HTTPS !== 'false';
+// Désactivé pour Docker development
+const shouldForceHttps = false; // IS_PROD && process.env.FORCE_HTTPS !== 'false';
 if (shouldForceHttps) {
   app.use((req, res, next) => {
     if (req.headers['x-forwarded-proto'] !== 'https') {

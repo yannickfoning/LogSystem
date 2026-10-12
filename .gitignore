@@ -4,9 +4,11 @@ build/
 logs/*.log
 logs/**/*.log
 uploads/
-*.env
-!.env.example
+.env
 .env.local
+.env.docker
+!.env.example
+!.env.docker.example
 ca.pem
 cookies.txt
 tsconfig.tsbuildinfo

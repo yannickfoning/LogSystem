@@ -5,7 +5,7 @@ import { normalizeMessage } from '../lib/processing/normalize.js';
 import { classifyLog } from '../lib/processing/classify.js';
 import { generateFingerprint } from '../lib/processing/fingerprint.js';
 import logger from '../config/logger.js';
-import { normalizeLevel } from '../config/database.js';
+import { normalizeLevel } from '../services/logLevelUtils.js';
 import pool from '../config/database.js';
 import fs from 'fs';
 import path from 'path';
@@ -14,6 +14,8 @@ import { alertEngineBus } from './alertEngine.js'; // FIX #5: Import du bus even
 import { alertWorker } from '../workers/alertWorker.js';
 import { enrichLogMetadata } from '../lib/processing/logMetadata.js';
 import { OPERATIONAL_TS } from '../lib/operationalTime.js';
+import { invalidateDashboard } from './cacheService.js';
+import { upsertErrorGroupsFromLogs } from './errorGroupService.js';
 
 let watcher = null;
 const fileOffsets = new Map(); // FIX #4: Suivi des offsets par fichier
@@ -118,10 +120,18 @@ function findOwnerForPath(filePath) {
 async function loadPersistedOffsets() {
   try {
     const [rows] = await pool.execute('SELECT path, `offset` FROM watch_offsets');
+    let loaded = 0;
+    let stale = 0;
     for (const row of rows) {
-      fileOffsets.set(row.path, row.offset);
+      if (fs.existsSync(row.path)) {
+        fileOffsets.set(row.path, row.offset);
+        loaded++;
+      } else {
+        await removePersistedOffset(row.path);
+        stale++;
+      }
     }
-    logger.info({ event: 'loaded_persisted_offsets', count: rows.length }, '[WATCHER]');
+    logger.info({ event: 'loaded_persisted_offsets', count: loaded, staleRemoved: stale }, '[WATCHER]');
   } catch (e) {
     logger.warn({ event: 'could_not_load_persisted_offsets', error: e.message }, '[WATCHER]');
   }
@@ -139,6 +149,19 @@ async function persistOffset(filePath, offset) {
   }
 }
 
+async function removePersistedOffset(filePath) {
+  try {
+    await pool.execute('DELETE FROM watch_offsets WHERE path_hash = ?', [watchPathHash(filePath)]);
+  } catch (e) {
+    logger.warn({ event: 'could_not_remove_persisted_offset', filePath, error: e.message }, '[WATCHER]');
+  }
+}
+
+function isRetryableLockError(error) {
+  return ['ER_LOCK_DEADLOCK', 'ER_LOCK_WAIT_TIMEOUT'].includes(error?.code)
+    || [1213, 1205].includes(Number(error?.errno));
+}
+
 async function processLogFile(filePath, incremental = true) {
   try {
     const stats = fs.statSync(filePath);
@@ -149,7 +172,6 @@ async function processLogFile(filePath, incremental = true) {
     if (incremental && currentSize < lastOffset) {
       logger.info({ event: 'file_rotation_detected', filePath, currentSize, lastOffset }, '[WATCHER]');
       fileOffsets.set(filePath, 0);
-      await persistOffset(filePath, 0);
       // Re-process the entire rotated file
       return enqueueFileProcessing(filePath, () => processLogFile(filePath, false));
     }
@@ -162,25 +184,27 @@ async function processLogFile(filePath, incremental = true) {
       fs.readSync(fd, buffer, 0, buffer.length, lastOffset);
       fs.closeSync(fd);
       content = buffer.toString('utf8');
-      fileOffsets.set(filePath, currentSize);
-      // W-02: Persist the new offset
-      await persistOffset(filePath, currentSize);
     } else if (!incremental) {
       content = fs.readFileSync(filePath, 'utf8');
-      fileOffsets.set(filePath, currentSize);
-      // W-02: Persist the offset
-      await persistOffset(filePath, currentSize);
     } else {
       // Fichier non modifié
       return;
     }
     
-    if (!content.trim()) return;
+    if (!content.trim()) {
+      fileOffsets.set(filePath, currentSize);
+      await persistOffset(filePath, currentSize);
+      return;
+    }
     
     // V5: Use universal parser for multiple format support
     const detected = detectFormat(Buffer.from(content));
     const parsed = await parseLogContent(Buffer.from(content), detected);
-    if (!parsed.length) return;
+    if (!parsed.length) {
+      fileOffsets.set(filePath, currentSize);
+      await persistOffset(filePath, currentSize);
+      return;
+    }
 
     // FIX #9: Enrichissement hors DB pour optimiser les connexions
     const userId = findOwnerForPath(filePath) || null;
@@ -219,149 +243,105 @@ async function processLogFile(filePath, incremental = true) {
       return enriched;
     });
 
-    // FIX #9: UNE seule connexion pour tout le fichier
+    // Keep lock acquisition in a stable order and retry transient InnoDB deadlocks.
     const conn = await pool.getConnection();
+    let insertedEntries = [];
+    let committed = false;
     try {
-      await conn.beginTransaction();
-      
-      // P-04: V5 bulk insert with new metadata columns
-      const logValues = entries.map(entry => [
-        entry.raw_log,
-        entry.timestamp,
-        entry.event_timestamp || entry.timestamp,
-        entry.created_time,
-        entry.timezone,
-        entry.log_level,
-        entry.source,
-        entry.source_server,
-        entry.service,
-        entry.message,
-        entry.normalized_message,
-        entry.event_type,
-        entry.fingerprint,
-        entry.user_id,
-        entry.source_type,
-        entry.ip_address || entry.client_ip || null,
-        entry.module || null,
-        entry.error_type || null,
-        entry.stack_trace || null,
-        entry.target_user || null,
-        entry.log_format || entry.parser_format || null,
-        entry.timestamp_inferred,
-        entry.classification_confidence,
-        entry.imported_at || null,
-      ]);
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          insertedEntries = [];
+          await conn.beginTransaction();
 
-      await conn.query(
-        `INSERT IGNORE INTO logs (
-          raw_log, timestamp, event_timestamp, created_time, timezone, log_level, source, source_server, service, message, normalized_message,
-          event_type, fingerprint, user_id, source_type, client_ip, module, error_type, stack_trace,
-          target_user, parser_format, timestamp_inferred, classification_confidence,
-          imported_at
-        ) VALUES ?`,
-        [logValues]
-      );
+          const logInsertSql = `INSERT IGNORE INTO logs (
+            raw_log, timestamp, event_timestamp, created_time, timezone, log_level, source, source_server, service, message, normalized_message,
+            event_type, fingerprint, user_id, source_type, client_ip, module, error_type, stack_trace,
+            target_user, parser_format, timestamp_inferred, classification_confidence,
+            imported_at
+          ) VALUES (${new Array(24).fill('?').join(', ')})`;
+          const orderedEntries = entries.slice().sort((a, b) => {
+            const aFingerprint = String(a.fingerprint || '');
+            const bFingerprint = String(b.fingerprint || '');
+            if (aFingerprint !== bFingerprint) return aFingerprint < bFingerprint ? -1 : 1;
+            const aTimestamp = String(a.timestamp || '');
+            const bTimestamp = String(b.timestamp || '');
+            return aTimestamp === bTimestamp ? 0 : (aTimestamp < bTimestamp ? -1 : 1);
+          });
 
-      const errorEntries = entries.filter(entry => ['ERROR', 'CRITICAL', 'FATAL'].includes(entry.log_level));
-
-      if (errorEntries.length > 0) {
-        const fingerprintGroups = new Map();
-        for (const entry of errorEntries) {
-          if (!fingerprintGroups.has(entry.fingerprint)) {
-            fingerprintGroups.set(entry.fingerprint, {
-              fingerprint: entry.fingerprint,
-              title: (entry.message || '').slice(0, 500),
-              event_type: entry.event_type,
-              log_level: entry.log_level,
-              count: 0,
-              timestamp: entry.timestamp,
-              source_server: entry.source_server,
-              service: entry.service,
-              error_type: entry.error_type,
-              user_id: entry.user_id || null,
-            });
+          for (const entry of orderedEntries) {
+            const values = [
+              entry.raw_log,
+              entry.timestamp,
+              entry.event_timestamp || entry.timestamp,
+              entry.created_time,
+              entry.timezone,
+              entry.log_level,
+              entry.source,
+              entry.source_server,
+              entry.service,
+              entry.message,
+              entry.normalized_message,
+              entry.event_type,
+              entry.fingerprint,
+              entry.user_id,
+              entry.source_type,
+              entry.ip_address || entry.client_ip || null,
+              entry.module || null,
+              entry.error_type || null,
+              entry.stack_trace || null,
+              entry.target_user || null,
+              entry.log_format || entry.parser_format || null,
+              entry.timestamp_inferred,
+              entry.classification_confidence,
+              entry.imported_at || null,
+            ];
+            const [insertResult] = await conn.execute(logInsertSql, values);
+            if (Number(insertResult.affectedRows) > 0) insertedEntries.push(entry);
           }
-          fingerprintGroups.get(entry.fingerprint).count++;
+
+          await upsertErrorGroupsFromLogs(conn, userId, insertedEntries, RETURN_GAP_DAYS);
+          await conn.commit();
+          committed = true;
+          break;
+        } catch (error) {
+          try {
+            await conn.rollback();
+          } catch (rollbackError) {
+            logger.warn({ event: 'watcher_rollback_error', filePath, error: rollbackError.message }, '[WATCHER]');
+          }
+
+          if (isRetryableLockError(error) && attempt < 3) {
+            logger.warn({ event: 'batch_insert_retry', filePath, attempt, error: error.message }, '[WATCHER]');
+            await new Promise(resolve => setTimeout(resolve, 50 * attempt));
+            continue;
+          }
+
+          logger.error({ event: 'batch_insert_error', filePath, attempt, error: error.message, code: error.code }, '[WATCHER]');
+          throw error;
         }
-
-        const errorGroupValues = Array.from(fingerprintGroups.values()).map(group => [
-          group.fingerprint,
-          group.title,
-          group.event_type,
-          group.log_level,
-          group.count,
-          group.timestamp,
-          group.timestamp,
-          group.source_server,
-          group.service,
-          group.error_type,
-          group.user_id,
-        ]);
-
-        const placeholders = errorGroupValues.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(',');
-        const flatParams = errorGroupValues.flat();
-
-        await conn.query(
-          `INSERT INTO error_groups (fingerprint, title, event_type, severity_max, occurrence_count, first_seen, last_seen, source_server, service, error_type, user_id)
-           VALUES ${placeholders}
-           ON DUPLICATE KEY UPDATE
-             occurrence_count = occurrence_count + VALUES(occurrence_count),
-             previous_seen = IF(VALUES(last_seen) > last_seen, last_seen, previous_seen),
-             return_reason = IF(
-               (status = 'resolved' OR TIMESTAMPDIFF(DAY, last_seen, VALUES(last_seen)) >= ?)
-               AND VALUES(last_seen) > last_seen,
-               CONCAT('Erreur deja observee le ', DATE_FORMAT(first_seen, '%Y-%m-%d %H:%i:%s'),
-                      ', absente depuis ', TIMESTAMPDIFF(DAY, last_seen, VALUES(last_seen)),
-                      ' jour(s), puis reapparue le ', DATE_FORMAT(VALUES(last_seen), '%Y-%m-%d %H:%i:%s')),
-               return_reason
-             ),
-             returned_at = IF(
-               (status = 'resolved' OR TIMESTAMPDIFF(DAY, last_seen, VALUES(last_seen)) >= ?)
-               AND VALUES(last_seen) > last_seen,
-               VALUES(last_seen),
-               returned_at
-             ),
-             return_count = IF(
-               (status = 'resolved' OR TIMESTAMPDIFF(DAY, last_seen, VALUES(last_seen)) >= ?)
-               AND VALUES(last_seen) > last_seen,
-               return_count + 1,
-               return_count
-             ),
-             status = IF(
-               (status = 'resolved' OR TIMESTAMPDIFF(DAY, last_seen, VALUES(last_seen)) >= ?)
-               AND VALUES(last_seen) > last_seen,
-               'returned',
-               'open'
-             ),
-             last_seen = GREATEST(last_seen, VALUES(last_seen)),
-             first_seen = LEAST(first_seen, VALUES(first_seen)),
-             source_server = COALESCE(VALUES(source_server), source_server),
-             service = COALESCE(VALUES(service), service),
-             error_type = COALESCE(VALUES(error_type), error_type),
-             severity_max = IF(
-               FIELD(VALUES(severity_max), 'DEBUG','INFO','WARNING','ERROR','CRITICAL','FATAL') >
-               FIELD(severity_max,         'DEBUG','INFO','WARNING','ERROR','CRITICAL','FATAL'),
-               VALUES(severity_max),
-               severity_max
-             )`,
-          [...flatParams, RETURN_GAP_DAYS, RETURN_GAP_DAYS, RETURN_GAP_DAYS, RETURN_GAP_DAYS]
-        );
       }
-
-
-      await conn.commit();
-    } catch (e) {
-      await conn.rollback();
-      logger.error({ event: 'batch_insert_error', error: e.message }, '[WATCHER]');
     } finally {
       conn.release();
     }
-    logger.info({ event: 'lines_processed', count: parsed.length, filePath }, '[WATCHER]');
+
+    if (!committed) throw new Error(`Watcher transaction did not commit for ${filePath}`);
+    if (userId && insertedEntries.length > 0) {
+      try {
+        await invalidateDashboard(userId);
+      } catch (error) {
+        logger.warn({ event: 'dashboard_cache_invalidation_failed', userId, error: error.message }, '[WATCHER]');
+      }
+    }
+
+    // Persist progress only after successful parsing and database commit so failures replay safely.
+    fileOffsets.set(filePath, currentSize);
+    await persistOffset(filePath, currentSize);
+    logger.info({ event: 'lines_processed', count: insertedEntries.length, skipped: parsed.length - insertedEntries.length, filePath }, '[WATCHER]');
     
     // FIX #5: Déclencher évaluation alertes + flux temps réel (Watch Log)
-    if (parsed.length > 0) {
-      alertWorker.broadcastLogBatch(entries, { userId });
-      alertEngineBus.emit('logs.inserted', { userId, count: parsed.length });
+    if (insertedEntries.length > 0) {
+      alertWorker.broadcastLogBatch(insertedEntries, { userId });
+      alertEngineBus.emit('logs.inserted', { userId, count: insertedEntries.length });
     }
   } catch (e) {
     logger.error({ event: 'processing_error', filePath, error: e.message }, '[WATCHER]');
@@ -407,6 +387,11 @@ export async function startWatcher() {
       // W-01: Use enqueueFileProcessing to prevent race conditions
       enqueueFileProcessing(filePath, () => processLogFile(filePath, true));
     }
+  });
+
+  watcher.on('unlink', (filePath) => {
+    fileOffsets.delete(filePath);
+    removePersistedOffset(filePath);
   });
 
   watcher.on('error', (error) => {

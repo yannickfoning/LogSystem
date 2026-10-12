@@ -13,36 +13,82 @@ const router = Router();
 router.get('/top-errors-grouped', requireAuth, async (req, res) => {
   try {
     const userId = req.session?.user?.id;
-    const { limit = 20, sortBy = 'count' } = req.query;
+    const requestedLimit = Number.parseInt(req.query.limit, 10);
+    const limit = Number.isInteger(requestedLimit)
+      ? Math.min(Math.max(requestedLimit, 1), 100)
+      : 20;
+    const requestedRange = String(req.query.timeRange || 'all').trim().toLowerCase();
+    const rangeFilters = {
+      '24h': 'AND l.timestamp >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY)',
+      '7d': 'AND l.timestamp >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY)',
+      '30d': 'AND l.timestamp >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY)',
+    };
+    const timeRange = requestedRange === 'all' || rangeFilters[requestedRange]
+      ? requestedRange
+      : 'all';
+    const rangeFilter = rangeFilters[timeRange] || '';
+    const severity = ['critical', 'high', 'medium'].includes(String(req.query.severity || '').toLowerCase())
+      ? String(req.query.severity).toLowerCase()
+      : 'all';
+    const search = String(req.query.search || '').trim().slice(0, 120);
+    const havingFilters = ['COUNT(DISTINCT l.id) >= 2'];
+    const queryParams = [userId];
+
+    if (severity === 'critical') havingFilters.push('COUNT(DISTINCT l.id) > 100');
+    if (severity === 'high') havingFilters.push('COUNT(DISTINCT l.id) > 50 AND COUNT(DISTINCT l.id) <= 100');
+    if (severity === 'medium') havingFilters.push('COUNT(DISTINCT l.id) <= 50');
+    if (search) {
+      havingFilters.push(`(
+        COALESCE(NULLIF(MAX(eg.title), ''), NULLIF(MAX(l.error_type), ''),
+          NULLIF(MAX(l.event_type), ''), LEFT(MAX(l.message), 500)) LIKE ?
+        OR l.fingerprint LIKE ?
+      )`);
+      const searchPattern = `%${search}%`;
+      queryParams.push(searchPattern, searchPattern);
+    }
 
     const [errorGroups] = await pool.execute(
-      `SELECT 
-        eg.id,
-        eg.fingerprint,
-        eg.title,
-        eg.error_type,
-        eg.event_type,
-        eg.severity_max,
-        eg.occurrence_count,
-        eg.first_seen,
-        eg.last_seen,
-        eg.status,
-        eg.return_count,
-        eg.returned_at,
-        eg.source_server,
-        eg.service,
-        COUNT(DISTINCT l.id) as recent_count,
-        MAX(l.timestamp) as most_recent,
-        GROUP_CONCAT(DISTINCT l.module SEPARATOR ',') as affected_modules
-       FROM error_groups eg
-       LEFT JOIN logs l ON l.fingerprint = eg.fingerprint 
-         AND l.user_id = ? 
-         AND l.timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-       WHERE eg.user_id = ? AND eg.status IN ('open', 'returned')
-       GROUP BY eg.id
-       ORDER BY eg.occurrence_count DESC
-       LIMIT ?`,
-      [userId, userId, parseInt(limit)]
+      `SELECT
+        MAX(eg.id) AS id,
+        l.fingerprint,
+        COALESCE(NULLIF(MAX(eg.title), ''), NULLIF(MAX(l.error_type), ''),
+          NULLIF(MAX(l.event_type), ''), LEFT(MAX(l.message), 500)) AS title,
+        MAX(l.error_type) AS error_type,
+        MAX(l.event_type) AS event_type,
+        CASE MAX(CASE l.log_level
+          WHEN 'FATAL' THEN 3
+          WHEN 'CRITICAL' THEN 2
+          ELSE 1
+        END)
+          WHEN 3 THEN 'FATAL'
+          WHEN 2 THEN 'CRITICAL'
+          ELSE 'ERROR'
+        END AS severity_max,
+        COUNT(DISTINCT l.id) AS occurrence_count,
+        MIN(l.timestamp) AS first_seen,
+        MAX(l.timestamp) AS last_seen,
+        MAX(eg.status) AS status,
+        MAX(eg.return_count) AS return_count,
+        MAX(eg.returned_at) AS returned_at,
+        MAX(l.source_server) AS source_server,
+        MAX(l.service) AS service,
+        COUNT(DISTINCT CASE
+          WHEN l.timestamp >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY) THEN l.id
+        END) AS recent_count,
+        MAX(l.timestamp) AS most_recent,
+        GROUP_CONCAT(DISTINCT NULLIF(l.module, '') ORDER BY l.module SEPARATOR ',') AS affected_modules,
+        MAX(l.id) AS sample_log_id
+       FROM logs l
+       LEFT JOIN error_groups eg ON eg.fingerprint = l.fingerprint AND eg.user_id = l.user_id
+       WHERE l.user_id = ?
+         AND l.fingerprint IS NOT NULL AND TRIM(l.fingerprint) <> ''
+         AND l.log_level IN ('ERROR', 'CRITICAL', 'FATAL')
+         ${rangeFilter}
+       GROUP BY l.fingerprint
+       HAVING ${havingFilters.join(' AND ')}
+       ORDER BY occurrence_count DESC, most_recent DESC, l.fingerprint ASC
+       LIMIT ${limit}`,
+      queryParams
     );
 
     // Transformer pour le frontend avec indicateurs visuels
@@ -50,25 +96,26 @@ router.get('/top-errors-grouped', requireAuth, async (req, res) => {
       rank: index + 1,
       id: group.id,
       fingerprint: group.fingerprint,
-      title: group.title,
+      title: group.title || 'Erreur inconnue',
       errorType: group.error_type,
       eventType: group.event_type,
-      severity: group.severity_max,
+      severity: group.severity_max || 'ERROR',
       // 🔴 COMPTEUR EN ROUGE - nombre d'occurrences
       occurrenceCount: {
-        value: group.occurrence_count,
+        value: Number(group.occurrence_count),
         display: `🔴 ${group.occurrence_count}`, // Rouge avec badge
         color: group.occurrence_count > 100 ? '#d32f2f' : group.occurrence_count > 50 ? '#f57c00' : '#fbc02d'
       },
-      recentCount: group.recent_count,
+      recentCount: Number(group.recent_count || 0),
       firstSeen: group.first_seen,
       lastSeen: group.last_seen,
       mostRecent: group.most_recent,
-      status: group.status,
-      returnCount: group.return_count,
+      status: group.status || 'open',
+      returnCount: Number(group.return_count || 0),
       returnedAt: group.returned_at,
       sourceServer: group.source_server,
       service: group.service,
+      sample_log_id: group.sample_log_id,
       affectedModules: group.affected_modules ? group.affected_modules.split(',') : [],
       // Indicateurs de performance
       trend: group.recent_count > group.occurrence_count * 0.1 ? 'increasing' : 'stable',
@@ -84,7 +131,8 @@ router.get('/top-errors-grouped', requireAuth, async (req, res) => {
         criticalCount: formatted.filter(g => g.urgency === 'critical').length,
         highCount: formatted.filter(g => g.urgency === 'high').length,
         totalOccurrences: formatted.reduce((sum, g) => sum + g.occurrenceCount.value, 0)
-      }
+      },
+      filters: { timeRange, severity, search }
     });
   } catch (e) {
     logger.error({ event: 'top_errors_grouped_error', error: e.message });

@@ -2,33 +2,9 @@ import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
 import logger from './logger.js';
 import fs from 'fs';
+import { normalizeLevel, levelSeverity } from '../services/logLevelUtils.js';
 
 dotenv.config();
-
-export function normalizeLevel(level) {
-  const raw = String(level ?? 'INFO').trim();
-  const l = raw.toUpperCase();
-  const aliases = {
-    TRACE: 'TRACE',
-    DEBUG: 'DEBUG',
-    INFO: 'INFO',
-    NOTICE: 'INFO',
-    WARN: 'WARNING',
-    WARNING: 'WARNING',
-    ERR: 'ERROR',
-    ERROR: 'ERROR',
-    CRITICAL: 'CRITICAL',
-    FATAL: 'FATAL',
-    ALERT: 'ERROR',
-    SECURITY: 'SECURITY',
-  };
-  return aliases[l] || 'INFO';
-}
-
-export function levelSeverity(level) {
-  const map = { 'DEBUG': 1, 'INFO': 2, 'WARNING': 3, 'ERROR': 4, 'CRITICAL': 5, 'FATAL': 6, 'SECURITY': 7 };
-  return map[normalizeLevel(level)] || 0;
-}
 
 // Lecture sécurisée du CA Aiven — ne crashe pas si le fichier est absent
 function readCaFile() {

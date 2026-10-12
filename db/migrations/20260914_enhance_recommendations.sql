@@ -2,18 +2,50 @@
 -- Date: 2026-09-14
 -- Description: Add frequency tracking, categorization, and severity levels to recommendations
 
--- Enhance error_recommendations table with new columns (using simpler syntax)
-ALTER TABLE error_recommendations 
-ADD COLUMN IF NOT EXISTS `frequency_threshold` INT DEFAULT 5 COMMENT 'Nombre minimum d''occurrences pour déclencher la recommandation';
+-- Enhance error_recommendations table with new columns (MySQL 8.0 compatible syntax)
+SET @column_exists = (SELECT COUNT(*) FROM information_schema.columns
+                     WHERE table_schema = DATABASE() AND table_name = 'error_recommendations' AND column_name = 'frequency_threshold');
 
-ALTER TABLE error_recommendations 
-ADD COLUMN IF NOT EXISTS `recommendation_category` VARCHAR(50) DEFAULT 'general' COMMENT 'Catégorie: database, authentication, performance, memory, network';
+SET @sql = IF(@column_exists = 0,
+  'ALTER TABLE error_recommendations ADD COLUMN `frequency_threshold` INT DEFAULT 5 COMMENT ''Nombre minimum d''occurrences pour déclencher la recommandation''',
+  'SELECT "Column frequency_threshold already exists" AS message');
 
-ALTER TABLE error_recommendations 
-ADD COLUMN IF NOT EXISTS `severity_level` ENUM('info','warning','critical') DEFAULT 'info';
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
-ALTER TABLE error_recommendations 
-ADD COLUMN IF NOT EXISTS `tags` JSON COMMENT 'Tags pour filtrage rapide';
+SET @column_exists = (SELECT COUNT(*) FROM information_schema.columns
+                     WHERE table_schema = DATABASE() AND table_name = 'error_recommendations' AND column_name = 'recommendation_category');
+
+SET @sql = IF(@column_exists = 0,
+  'ALTER TABLE error_recommendations ADD COLUMN `recommendation_category` VARCHAR(50) DEFAULT ''general'' COMMENT ''Catégorie: database, authentication, performance, memory, network''',
+  'SELECT "Column recommendation_category already exists" AS message');
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @column_exists = (SELECT COUNT(*) FROM information_schema.columns
+                     WHERE table_schema = DATABASE() AND table_name = 'error_recommendations' AND column_name = 'severity_level');
+
+SET @sql = IF(@column_exists = 0,
+  'ALTER TABLE error_recommendations ADD COLUMN `severity_level` ENUM(''info'',''warning'',''critical'') DEFAULT ''info''',
+  'SELECT "Column severity_level already exists" AS message');
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @column_exists = (SELECT COUNT(*) FROM information_schema.columns
+                     WHERE table_schema = DATABASE() AND table_name = 'error_recommendations' AND column_name = 'tags');
+
+SET @sql = IF(@column_exists = 0,
+  'ALTER TABLE error_recommendations ADD COLUMN `tags` JSON COMMENT ''Tags pour filtrage rapide''',
+  'SELECT "Column tags already exists" AS message');
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- Add indexes for performance (if they don't exist)
 SET @index_exists = (SELECT COUNT(*) FROM information_schema.statistics 
@@ -55,7 +87,14 @@ CREATE TABLE IF NOT EXISTS `recommendation_frequency` (
   CONSTRAINT `fk_rec_freq_rec` FOREIGN KEY (`recommendation_id`) REFERENCES `error_recommendations`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Update existing recommendations with default categories
-UPDATE error_recommendations 
-SET recommendation_category = 'general', severity_level = 'info' 
-WHERE recommendation_category IS NULL;
+-- Update existing recommendations with default categories (only if columns exist)
+SET @column_exists = (SELECT COUNT(*) FROM information_schema.columns
+                     WHERE table_schema = DATABASE() AND table_name = 'error_recommendations' AND column_name = 'recommendation_category');
+
+SET @sql = IF(@column_exists > 0,
+  'UPDATE error_recommendations SET recommendation_category = ''general'', severity_level = ''info'' WHERE recommendation_category IS NULL',
+  'SELECT "Skipping update - columns do not exist" AS message');
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

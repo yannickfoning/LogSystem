@@ -152,13 +152,6 @@ router.get('/', async (req, res) => {
     );
     const totalCount = countResult[0]?.total || 0;
 
-    if (totalCount > 10000) {
-      return res.status(422).json({
-        error: 'Trop de résultats (10K max). Affinez votre recherche.',
-        count: totalCount,
-      });
-    }
-
     // Fetch logs avec pagination
     // pool.query() used instead of execute() — mysql2 prepared statements don't support LIMIT ? OFFSET ?
     const [logs] = await pool.query(

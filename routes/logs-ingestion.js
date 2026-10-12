@@ -8,6 +8,7 @@ import { normalizeMessage } from "../lib/processing/normalize.js";
 import { classifyLog } from "../lib/processing/classify.js";
 import { generateFingerprint } from "../lib/processing/fingerprint.js";
 import { enrichLogMetadata } from "../lib/processing/logMetadata.js";
+import { upsertErrorGroupsFromLogs } from "../services/errorGroupService.js";
 import { triggerPostIngestAlerts } from "../services/alertEngine.js";
 import { OPERATIONAL_TS } from "../lib/operationalTime.js";
 import crypto from 'crypto';
@@ -22,10 +23,9 @@ router.use(ingestLimiter);
  * Endpoint d'ingestion HTTP pour les logs en temps réel
  * Les applications peuvent envoyer leurs logs via HTTP POST au lieu de file watching
  */
-router.post('/ingest', async (req, res) => {
+async function handleIngestBatch(req, res) {
   const conn = await pool.getConnection();
   try {
-    const scope = userScope(req);
     const userId = req.session?.user?.id;
     const { logs = [], batch_id = null } = req.body;
 
@@ -45,6 +45,7 @@ router.post('/ingest', async (req, res) => {
       errors: [],
       batch_id: batch_id || crypto.randomUUID()
     };
+    const insertedLogs = [];
 
     for (const logEntry of logs) {
       try {
@@ -94,7 +95,7 @@ router.post('/ingest', async (req, res) => {
             target_user, user_id, parser_format, source_type,
             timestamp_inferred, classification_confidence, batch_id
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ` + scope.sql;
+        `;
 
         const insertParams = [
           enriched.timestamp,
@@ -117,13 +118,16 @@ router.post('/ingest', async (req, res) => {
           enriched.source_type,
           enriched.timestamp_inferred,
           enriched.classification_confidence,
-          enriched.batch_id,
-          ...scope.params
+          enriched.batch_id
         ];
 
-        await conn.execute(insertSql, insertParams);
-
-        ingestResults.success++;
+        const [insertResult] = await conn.execute(insertSql, insertParams);
+        if (Number(insertResult.affectedRows) > 0) {
+          insertedLogs.push(enriched);
+          ingestResults.success++;
+        } else {
+          ingestResults.failed++;
+        }
       } catch (err) {
         ingestResults.failed++;
         ingestResults.errors.push({
@@ -134,6 +138,7 @@ router.post('/ingest', async (req, res) => {
       }
     }
 
+    await upsertErrorGroupsFromLogs(conn, userId, insertedLogs);
     await conn.commit();
 
     if (userId && ingestResults.success > 0) {
@@ -153,7 +158,9 @@ router.post('/ingest', async (req, res) => {
   } finally {
     conn.release();
   }
-});
+}
+
+router.post('/ingest', handleIngestBatch);
 
 /**
  * POST /api/logs/ingest/single
@@ -161,13 +168,9 @@ router.post('/ingest', async (req, res) => {
  * Endpoint simplifié pour l'ingestion d'un log unique
  */
 router.post('/ingest/single', async (req, res) => {
-  try {
-    const result = await req.app.ingestLog(req.body, req.session?.user?.id);
-    res.json(result);
-  } catch (e) {
-    logger.error({ event: 'single_ingest_failed', error: e.message }, '[INGEST]');
-    res.status(500).json({ error: 'Single log ingestion failed', details: e.message });
-  }
+  const logEntry = req.body || {};
+  req.body = { logs: [logEntry], batch_id: logEntry.batch_id || null };
+  return handleIngestBatch(req, res);
 });
 
 /**
@@ -363,7 +366,6 @@ router.get('/imported-today', async (req, res) => {
  */
 router.get('/import-jobs/:jobId/live', async (req, res) => {
   try {
-    const scope = userScope(req);
     const jobId = req.params.jobId;
 
     // Vérifier que le job appartient à l'utilisateur

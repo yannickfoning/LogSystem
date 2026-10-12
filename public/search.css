@@ -82,3 +82,33 @@
   .filter-grid { grid-template-columns: 1fr; }
   .chips { flex-wrap: wrap; }
 }
+.log-share-panel {
+  margin-top: 18px;
+  padding: 14px;
+  border: 1px solid var(--border, #d1d5db);
+  border-radius: 8px;
+}
+
+.log-share-panel h4 { margin: 0 0 12px; }
+.share-channel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+.share-channel-grid > div { display: grid; align-content: start; gap: 8px; }
+.share-channel-grid label { font-size: 12px; font-weight: 600; }
+.share-channel-grid input {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border, #d1d5db);
+  border-radius: 6px;
+  background: var(--surface, #fff);
+  color: var(--text, #111827);
+}
+.share-channel-grid button:disabled { opacity: .55; cursor: not-allowed; }
+
+@media (max-width: 600px) {
+  .log-share-panel { padding: 10px; }
+  .share-channel-grid { grid-template-columns: 1fr; }
+}

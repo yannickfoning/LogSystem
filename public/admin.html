@@ -314,6 +314,16 @@
           <label data-i18n="admin.threshold">Seuil</label>
           <input type="number" id="rf-threshold" min="1">
         </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="rf-window">Fenêtre d’observation (minutes)</label>
+            <input type="number" id="rf-window" min="1" value="60" required>
+          </div>
+          <div class="form-group">
+            <label for="rf-cooldown">Délai entre alertes (minutes)</label>
+            <input type="number" id="rf-cooldown" min="0" value="30" required>
+          </div>
+        </div>
         <div class="form-group">
           <label data-i18n="admin.severity">Sévérité</label>
           <select id="rf-severity">
@@ -746,8 +756,10 @@
           document.getElementById('rf-name').value = r.name;
           document.getElementById('rf-description').value = r.description || '';
           document.getElementById('rf-condition-type').value = r.condition_type;
-          document.getElementById('rf-condition-value').value = r.condition_value;
+          updateConditionValueOptions(r.condition_value || '');
           document.getElementById('rf-threshold').value = r.threshold_value || '';
+          document.getElementById('rf-window').value = r.time_window_minutes || 60;
+          document.getElementById('rf-cooldown').value = r.cooldown_minutes ?? 30;
           document.getElementById('rf-severity').value = r.severity;
           document.getElementById('rf-active').checked = !!r.is_active;
           document.getElementById('rule-modal-title').textContent = 'Modifier la règle';
@@ -773,9 +785,10 @@
       });
 
       // Dynamic condition value options based on condition type
-      function updateConditionValueOptions() {
+      function updateConditionValueOptions(selectedValue) {
         var conditionType = document.getElementById('rf-condition-type').value;
         var valueSelect = document.getElementById('rf-condition-value');
+        var preferredValue = selectedValue === undefined ? '' : selectedValue;
         
         // Clear existing options
         valueSelect.innerHTML = '<option value="">Sélectionner une valeur...</option>';
@@ -790,7 +803,10 @@
             options = ['1', '5', '10', '50', '100', '500', '1000'];
             break;
           case 'fingerprint':
-            options = ['Pattern match', 'Exact match', 'Regex'];
+            options = [{
+              value: '{"mode":"repeated"}',
+              label: 'Toutes les erreurs récurrentes (ERROR, CRITICAL, FATAL)'
+            }];
             break;
           case 'threshold':
             options = ['High', 'Medium', 'Low', 'Custom'];
@@ -804,14 +820,58 @@
         
         options.forEach(function(opt) {
           var option = document.createElement('option');
-          option.value = opt;
-          option.textContent = opt;
+          option.value = typeof opt === 'string' ? opt : opt.value;
+          option.textContent = typeof opt === 'string' ? opt : opt.label;
           valueSelect.appendChild(option);
         });
+
+        if (conditionType === 'fingerprint') {
+          if (selectedValue === undefined) {
+            document.getElementById('rf-window').value = 15;
+            document.getElementById('rf-threshold').value = 5;
+            document.getElementById('rf-severity').value = 'high';
+            preferredValue = options[0].value;
+          }
+          api.get('/api/search/repeated-patterns?min_occurrences=3&limit=30').then(function(result) {
+            if (document.getElementById('rf-condition-type').value !== 'fingerprint') return;
+            (result.patterns || []).forEach(function(pattern) {
+              if (!pattern.fingerprint || Array.from(valueSelect.options).some(function(option) { return option.value === pattern.fingerprint; })) return;
+              var option = document.createElement('option');
+              option.value = pattern.fingerprint;
+              var label = pattern.error_type || pattern.event_type || pattern.parser_format || 'Erreur';
+              if (pattern.service) label += ' · ' + pattern.service;
+              option.textContent = label + ' · ' + pattern.occurrences + ' répétitions · ' + pattern.fingerprint.slice(0, 10);
+              valueSelect.appendChild(option);
+            });
+            if (preferredValue && !Array.from(valueSelect.options).some(function(option) { return option.value === preferredValue; })) {
+              var savedOption = document.createElement('option');
+              savedOption.value = preferredValue;
+              savedOption.textContent = preferredValue.charAt(0) === '{' ? 'Configuration de récurrence enregistrée' : 'Empreinte enregistrée';
+              valueSelect.appendChild(savedOption);
+            }
+            valueSelect.value = preferredValue;
+          }).catch(function() {
+            if (preferredValue && !Array.from(valueSelect.options).some(function(option) { return option.value === preferredValue; })) {
+              var savedOption = document.createElement('option');
+              savedOption.value = preferredValue;
+              savedOption.textContent = preferredValue.charAt(0) === '{' ? 'Configuration de récurrence enregistrée' : 'Empreinte enregistrée';
+              valueSelect.appendChild(savedOption);
+            }
+            valueSelect.value = preferredValue;
+          });
+        } else {
+          if (preferredValue && !options.some(function(opt) { return (typeof opt === 'string' ? opt : opt.value) === preferredValue; })) {
+            var savedOption = document.createElement('option');
+            savedOption.value = preferredValue;
+            savedOption.textContent = preferredValue;
+            valueSelect.appendChild(savedOption);
+          }
+          valueSelect.value = preferredValue;
+        }
       }
       
       // Listen for condition type changes
-      document.getElementById('rf-condition-type').addEventListener('change', updateConditionValueOptions);
+      document.getElementById('rf-condition-type').addEventListener('change', function() { updateConditionValueOptions(); });
       
       document.getElementById('rule-form').addEventListener('submit', function(e) {
         e.preventDefault();
@@ -823,10 +883,8 @@
           condition_value: document.getElementById('rf-condition-value').value,
           threshold_value: parseInt(document.getElementById('rf-threshold').value) || null,
           severity: document.getElementById('rf-severity').value,
-          // Fenêtre et cooldown ne sont plus configurables depuis l'interface :
-          // on garde des valeurs par défaut raisonnables (1h de fenêtre, 30 min de cooldown).
-          time_window_minutes: 60,
-          cooldown_minutes: 30,
+          time_window_minutes: parseInt(document.getElementById('rf-window').value, 10) || 60,
+          cooldown_minutes: parseInt(document.getElementById('rf-cooldown').value, 10) || 0,
           is_active: document.getElementById('rf-active').checked
         };
         var promise = id ? api.put('/api/admin/alert-rules/' + id, data) : api.post('/api/admin/alert-rules', data);

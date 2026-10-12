@@ -1,6 +1,7 @@
 FROM node:20-alpine AS runner
 
-RUN apk add --no-cache openssl curl unzip p7zip unrar
+RUN apk add --no-cache openssl curl unzip p7zip
+
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -12,8 +13,8 @@ RUN npm install --legacy-peer-deps --production
 
 COPY --chown=logsystem:nodejs . .
 
-RUN mkdir -p /app/uploads /app/logs && \
-    chown -R logsystem:nodejs /app/uploads /app/logs
+RUN mkdir -p /app/uploads /app/logs /app/temp && \
+    chown -R logsystem:nodejs /app/uploads /app/logs /app/temp
 
 USER logsystem
 

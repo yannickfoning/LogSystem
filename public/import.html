@@ -86,7 +86,7 @@
                         Glissez un ou plusieurs fichiers ici, ou cliquez pour sélectionner
                     </p>
                     <p class="text-hint" data-i18n="import.formats">
-                        Formats supportés : .log, .txt, .json, .jsonl, .csv, .xml, .zip, .gz, .tar, .rar, <strong>.7z</strong> — aucune taille maximale, la plateforme traite aussi les fichiers volumineux (200 Mo et plus). Les archives ZIP et RAR sont automatiquement extraites et tous les fichiers logs qu'elles contiennent sont traités.
+                        Formats supportés : .log, .txt, .json, .jsonl, .csv, .xml, .zip, .gz, .tar, .rar, <strong>.7z</strong>. Jusqu’à 10 fichiers par import ; la taille maximale dépend de la configuration du serveur. Les archives sont extraites automatiquement.
                     </p>
                     <p class="text-info" data-i18n="import.multi_files">
                         💡 Les archives (ZIP, RAR, 7z) sont extraites automatiquement
@@ -164,490 +164,269 @@
         <script src="/app-common.js"></script>
         <script src="/js/mobile-nav.js" defer></script>
         <script>
-            (function () {
-                if (!window.api) return;
-                var selectedFiles = [];
-                var currentJobId = null;
-                var pollTimer = null;
-                var uploadQueueTotal = 0;
-                var uploadQueueDone = 0;
+(function () {
+    "use strict";
 
-                document
-                    .getElementById("logout-btn")
-                    .addEventListener("click", function (e) {
-                        e.preventDefault();
-                        window.logout();
-                    });
+    if (!window.api) return;
 
-                var dropZone = document.getElementById("drop-zone");
-                var fileInput = document.getElementById("file-input");
-                var importBtn = document.getElementById("import-btn");
-                var clearBtn = document.getElementById("clear-btn");
+    var api = window.api;
+    var selectedFiles = [];
+    var currentJobId = null;
+    var pollTimer = null;
+    var pollInFlight = false;
+    var maxFiles = 10;
+    var dropZone = document.getElementById("drop-zone");
+    var fileInput = document.getElementById("file-input");
+    var importBtn = document.getElementById("import-btn");
+    var clearBtn = document.getElementById("clear-btn");
+    var selectedContainer = document.getElementById("selected-files-container");
+    var selectedList = document.getElementById("selected-files-list");
+    var progress = document.getElementById("import-progress");
+    var success = document.getElementById("import-success");
 
-                dropZone.addEventListener("click", function () {
-                    fileInput.click();
-                });
-                dropZone.addEventListener("dragover", function (e) {
-                    e.preventDefault();
-                    dropZone.classList.add("dragover");
-                });
-                dropZone.addEventListener("dragleave", function () {
-                    dropZone.classList.remove("dragover");
-                });
-                dropZone.addEventListener("drop", function (e) {
-                    e.preventDefault();
-                    dropZone.classList.remove("dragover");
-                    if (e.dataTransfer.files.length) {
-                        selectFiles(e.dataTransfer.files);
-                    }
-                });
-                fileInput.addEventListener("change", function () {
-                    if (fileInput.files.length) selectFiles(fileInput.files);
-                });
+    function tr(key, fallback) {
+        return window.i18n ? window.i18n.t(key) : fallback;
+    }
 
-                clearBtn.addEventListener("click", function () {
-                    selectedFiles = [];
-                    fileInput.value = "";
-                    renderSelectedFilesLabel();
-                    importBtn.disabled = true;
-                    clearBtn.style.display = "none";
-                });
+    function escapeHtml(value) {
+        if (window.esc) return window.esc(value);
+        return String(value == null ? "" : value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
 
-                function selectFile(file) {
-                    var ext = file.name.split(".").pop().toLowerCase();
-                    if (
-                        ![
-                            "log",
-                            "txt",
-                            "json",
-                            "jsonl",
-                            "csv",
-                            "xml",
-                            "zip",
-                            "gz",
-                            "gzip",
-                            "tar",
-                            "tgz",
-                            "rar",
-                            "7z",
-                        ].includes(ext)
-                    ) {
-                        window.toast.error(
-                            window.i18n
-                                ? window.i18n.t("import.unsupported")
-                                : "Format non supporté",
-                        );
-                        return false;
-                    }
-                    return true;
-                }
+    function showToast(type, message) {
+        if (window.toast && typeof window.toast[type] === "function") {
+            window.toast[type](message);
+        }
+    }
 
-                // Plusieurs fichiers peuvent être sélectionnés ou déposés en une fois :
-                // ils sont importés les uns après les autres (file d'attente), et chaque
-                // archive ZIP/RAR est elle-même extraite et traitée automatiquement côté serveur.
-                function selectFiles(fileList) {
-                    var valid = Array.from(fileList).filter(selectFile);
-                    if (!valid.length) return;
-                    selectedFiles = selectedFiles.concat(valid);
-                    renderSelectedFilesLabel();
-                    uploadBtn.disabled = false;
-                }
+    var logoutBtn = document.getElementById("logout-btn");
+    if (logoutBtn) {
+        logoutBtn.addEventListener("click", function (event) {
+            event.preventDefault();
+            if (window.logout) window.logout();
+        });
+    }
 
-                function renderSelectedFilesLabel() {
-                    if (!selectedFiles.length) {
-                        dropZone.querySelector("p").textContent = window.i18n
-                            ? window.i18n.t("import.drop")
-                            : "Glissez un ou plusieurs fichiers ici, ou cliquez pour sélectionner";
-                        return;
-                    }
-                    var totalMo = selectedFiles
-                        .reduce(function (sum, f) { return sum + f.size; }, 0) / 1024 / 1024;
-                    dropZone.querySelector("p").textContent =
-                        selectedFiles.length +
-                        " fichier(s) sélectionné(s) (" +
-                        totalMo.toFixed(2) +
-                        " Mo) : " +
-                        selectedFiles.map(function (f) { return f.name; }).join(", ");
-                }
+    function isSupported(file) {
+        var extension = file.name.split(".").pop().toLowerCase();
+        var supported = ["log", "txt", "json", "jsonl", "csv", "xml", "zip", "gz", "gzip", "tar", "tgz", "rar", "7z"];
+        if (supported.indexOf(extension) >= 0) return true;
+        showToast("error", tr("import.unsupported", "Format non supporté : ") + file.name);
+        return false;
+    }
 
-                importBtn.addEventListener("click", async function () {
-                    if (!selectedFiles.length) return;
-                    uploadBtn.disabled = true;
-                    uploadQueueTotal = selectedFiles.length;
-                    uploadQueueDone = 0;
-                    document
-                        .getElementById("progress-section")
-                        .classList.remove("is-hidden");
-                    uploadNextFile();
-                });
+    function renderSelectedFiles() {
+        if (!selectedFiles.length) {
+            selectedContainer.style.display = "none";
+            clearBtn.style.display = "none";
+            importBtn.disabled = true;
+            return;
+        }
 
-                function uploadNextFile() {
-                    if (!selectedFiles.length) {
-                        uploadBtn.disabled = false;
-                        uploadBtn.textContent = "Importer";
-                        window.toast.success("Tous les imports sont terminés");
-                        return;
-                    }
-                    var file = selectedFiles.shift();
-                    renderSelectedFilesLabel();
-                    uploadOneFile(file);
-                }
+        selectedContainer.style.display = "block";
+        clearBtn.style.display = "inline-flex";
+        importBtn.disabled = false;
+        selectedList.innerHTML = selectedFiles.map(function (file) {
+            var sizeMb = (file.size / 1024 / 1024).toFixed(2);
+            return "<div class=\"selected-file\"><span>" + escapeHtml(file.name) +
+                "</span><span class=\"file-size\">" + sizeMb + " Mo</span></div>";
+        }).join("");
+    }
 
-                async function uploadOneFile(file) {
-                    uploadBtn.innerHTML =
-                        '<span class="spinner"></span> ' +
-                        (window.i18n
-                            ? window.i18n.t("import.uploading")
-                            : "Import...") +
-                        " (" +
-                        (uploadQueueDone + 1) +
-                        "/" +
-                        uploadQueueTotal +
-                        ")";
+    function addFiles(fileList) {
+        var validFiles = Array.from(fileList).filter(isSupported);
+        if (!validFiles.length) return;
+        var availableSlots = maxFiles - selectedFiles.length;
+        if (availableSlots <= 0) {
+            showToast("warning", "Maximum " + maxFiles + " fichiers par import");
+            return;
+        }
+        if (validFiles.length > availableSlots) {
+            validFiles = validFiles.slice(0, availableSlots);
+            showToast("warning", "Maximum " + maxFiles + " fichiers par import");
+        }
+        selectedFiles = selectedFiles.concat(validFiles);
+        fileInput.value = "";
+        renderSelectedFiles();
+    }
 
-                    var formData = new FormData();
-                    formData.append("file", file);
-                    var source = document.getElementById("import-source").value;
-                    var service =
-                        document.getElementById("import-service").value;
-                    var locale = document.getElementById("import-locale")
-                        ? document.getElementById("import-locale").value
-                        : null;
+    dropZone.addEventListener("click", function (event) {
+        if (event.target !== fileInput) fileInput.click();
+    });
+    dropZone.addEventListener("dragover", function (event) {
+        event.preventDefault();
+        dropZone.classList.add("dragover");
+    });
+    dropZone.addEventListener("dragleave", function () {
+        dropZone.classList.remove("dragover");
+    });
+    dropZone.addEventListener("drop", function (event) {
+        event.preventDefault();
+        dropZone.classList.remove("dragover");
+        if (event.dataTransfer && event.dataTransfer.files.length) addFiles(event.dataTransfer.files);
+    });
+    fileInput.addEventListener("change", function () {
+        if (fileInput.files.length) addFiles(fileInput.files);
+    });
 
-                    if (source) formData.append("source", source);
-                    if (service) formData.append("service", service);
-                    if (locale) formData.append("locale", locale);
+    clearBtn.addEventListener("click", function () {
+        selectedFiles = [];
+        fileInput.value = "";
+        renderSelectedFiles();
+    });
 
-                    try {
-                        var result = await api.upload(
-                            "/api/import/upload",
-                            formData,
-                        );
-                        currentJobId = result.job_id;
-                        window.toast.success(
-                            "Import démarré : " + file.name,
-                        );
-                        startPolling();
-                    } catch (err) {
-                        window.toast.error(
-                            (err.error || "Erreur lors de l'upload") +
-                                " (" + file.name + ")",
-                        );
-                        uploadQueueDone++;
-                        uploadNextFile();
-                    }
-                }
+    function resetProgress() {
+        progress.style.display = "none";
+        document.getElementById("progress-fill").style.width = "0%";
+        document.getElementById("progress-percentage").textContent = "0%";
+    }
 
-                function startPolling() {
-                    if (pollTimer) clearInterval(pollTimer);
-                    pollTimer = setInterval(function () {
-                        if (!currentJobId) {
-                            clearInterval(pollTimer);
-                            return;
-                        }
-                        api.get("/api/import/jobs/" + currentJobId)
-                            .then(function (job) {
-                                var total = job.total_lines || 1;
-                                var processed = job.processed_lines || 0;
-                                var pct = Math.round((processed / total) * 100);
-                                var progressFill = document.getElementById("progress-fill");
-                                var progressPercentage = document.getElementById("progress-percentage");
-                                var progressStatus = document.getElementById("progress-status");
-                                
-                                if (progressFill) progressFill.style.width = pct + "%";
-                                if (progressPercentage) progressPercentage.textContent = pct + "%";
-                                if (progressStatus) progressStatus.textContent =
-                                    processed +
-                                    " / " +
-                                    total +
-                                    " lignes, " +
-                                    job.error_count +
-                                    " erreurs";
+    function restoreImportButton() {
+        importBtn.disabled = selectedFiles.length === 0;
+        importBtn.innerHTML = '<span class="btn-icon">🚀</span><span data-i18n="import.start_import">' +
+            escapeHtml(tr("import.start_import", "Importer")) + "</span>";
+    }
 
-                                if (job.status === "completed") {
-                                    clearInterval(pollTimer);
-                                    var progressFill = document.getElementById("progress-fill");
-                                    var progressPercentage = document.getElementById("progress-percentage");
-                                    var progressStatus = document.getElementById("progress-status");
-                                    
-                                    if (progressStatus) progressStatus.textContent = "Import terminé !";
-                                    if (progressFill) progressFill.style.width = "100%";
-                                    if (progressPercentage) progressPercentage.textContent = "100%";
+    function updateProgress(job) {
+        var percent = Math.max(0, Math.min(100, Number(job.progress) || 0));
+        var processed = Number(job.logsProcessed) || 0;
+        var total = Number(job.logsTotal) || 0;
+        var fill = document.getElementById("progress-fill");
+        var percentage = document.getElementById("progress-percentage");
+        var status = document.getElementById("progress-status");
+        var labels = {
+            pending: "En attente…",
+            extracting: "Extraction des fichiers…",
+            parsing: "Analyse des journaux…",
+            inserting: "Enregistrement des journaux…"
+        };
+        fill.style.width = percent + "%";
+        percentage.textContent = percent + "%";
+        status.textContent = labels[job.status] ||
+            (processed + (total ? " / " + total : "") + " lignes traitées");
+    }
 
-                                    // Display quality summary
-                                    if (job.import_summary) {
-                                        var s = job.import_summary;
-                                        var total = job.total_lines || 0;
-                                        var inserted = job.processed_lines || 0;
-                                        var skipped = job.skipped_lines || 0;
-                                        var missingUser = s.missing_user || 0;
-                                        var missingTs =
-                                            s.missing_timestamp || 0;
-                                        var inferred =
-                                            s.timestamp_inferred_count || 0;
+    function completeJob(job) {
+        if (pollTimer) clearInterval(pollTimer);
+        pollTimer = null;
+        currentJobId = null;
+        progress.style.display = "none";
+        success.style.display = "block";
+        var inserted = Number(job.insertedLines) || 0;
+        var skipped = Number(job.skippedLines) || 0;
+        var errors = Number(job.errorCount) || 0;
+        document.getElementById("import-success-message").textContent =
+            inserted + " ligne(s) ajoutée(s), " + skipped + " doublon(s) ignoré(s), " + errors + " erreur(s).";
+        selectedFiles = [];
+        fileInput.value = "";
+        renderSelectedFiles();
+        restoreImportButton();
+        loadJobs();
+        showToast("success", "Import terminé avec succès");
+    }
 
-                                        var pctUser =
-                                            total > 0
-                                                ? Math.round(
-                                                      (1 -
-                                                          missingUser / total) *
-                                                          100,
-                                                  )
-                                                : 0;
-                                        var pctTs =
-                                            total > 0
-                                                ? Math.round(
-                                                      (1 - missingTs / total) *
-                                                          100,
-                                                  )
-                                                : 0;
+    function failJob(message) {
+        if (pollTimer) clearInterval(pollTimer);
+        pollTimer = null;
+        currentJobId = null;
+        resetProgress();
+        restoreImportButton();
+        loadJobs();
+        showToast("error", "Import échoué : " + (message || "Erreur inconnue"));
+    }
 
-                                        var t = window.i18n ? window.i18n.t : function(k) { return k; };
-                                        var summaryHtml =
-                                            '<div class="card mt-16" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px">';
-                                        summaryHtml +=
-                                            '<h4 style="margin:0 0 12px;font-size:14px;color:#1e293b">📊 ' + t('import.quality.title') + '</h4>';
-                                        summaryHtml +=
-                                            '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">';
-                                        summaryHtml +=
-                                            '<div style="text-align:center"><div style="font-size:22px;font-weight:700;color:#2563eb">' +
-                                            inserted +
-                                            '</div><div style="font-size:11px;color:#64748b">' + t('import.quality.imported') + '</div></div>';
-                                        summaryHtml +=
-                                            '<div style="text-align:center"><div style="font-size:22px;font-weight:700;color:' +
-                                            (pctTs >= 90
-                                                ? "#16a34a"
-                                                : pctTs >= 60
-                                                  ? "#d97706"
-                                                  : "#dc2626") +
-                                            '">' +
-                                            pctTs +
-                                            '%</div><div style="font-size:11px;color:#64748b">' + t('import.quality.dates') + '<br>' +
-                                            (missingTs > 0
-                                                ? t('import.quality.inferred', {count: missingTs})
-                                                : "✓ " + t('import.quality.all_extracted')) +
-                                            "</div></div>";
-                                        summaryHtml +=
-                                            '<div style="text-align:center"><div style="font-size:22px;font-weight:700;color:' +
-                                            (pctUser >= 70
-                                                ? "#16a34a"
-                                                : pctUser >= 40
-                                                  ? "#d97706"
-                                                  : "#94a3b8") +
-                                            '">' +
-                                            pctUser +
-                                            '%</div><div style="font-size:11px;color:#64748b">' + t('import.quality.with_user') + '<br>' +
-                                            (missingUser > 0
-                                                ? t('import.quality.not_found', {count: missingUser})
-                                                : "✓ " + t('import.quality.all_identified')) +
-                                            "</div></div>";
-                                        summaryHtml += "</div>";
-                                        if (skipped > 0)
-                                            summaryHtml +=
-                                                '<p style="font-size:12px;color:#dc2626;margin:8px 0 0">' +
-                                                t('import.quality.skipped_text', {count: skipped}) +
-                                                "</p>";
-                                        summaryHtml += "</div>";
-                                        document
-                                            .getElementById("import-progress")
-                                            .insertAdjacentHTML('afterend', summaryHtml);
-                                    }
+    async function pollJob(jobId) {
+        if (pollInFlight || currentJobId !== jobId) return;
+        pollInFlight = true;
+        try {
+            var job = await api.get("/api/import/jobs/" + encodeURIComponent(jobId) + "/status");
+            if (!job || !job.status) throw new Error("Réponse de suivi invalide");
+            updateProgress(job);
+            if (job.status === "completed") {
+                completeJob(job);
+            } else if (job.status === "failed") {
+                failJob(job.errorMessage || job.error_message);
+            }
+        } catch (error) {
+            failJob(error && error.error ? error.error : error.message);
+        } finally {
+            pollInFlight = false;
+        }
+    }
 
-                                    selectedFiles = [];
-                                    currentJobId = null;
-                                    uploadQueueDone++;
-                                    loadJobs();
-                                    uploadNextFile();
-                                } else if (job.status === "failed") {
-                                    clearInterval(pollTimer);
-                                    document.getElementById("import-progress").style.display = "none";
-                                    document.getElementById("import-success").style.display = "none";
-                                    var errorMsg = job.error_message || "Erreur inconnue";
-                                    window.toast.error(
-                                        "Import échoué : " + errorMsg,
-                                    );
-                                    currentJobId = null;
-                                    uploadQueueDone++;
-                                    loadJobs();
-                                    uploadNextFile();
-                                }
-                            })
-                            .catch(function (err) {
-                                window.toast.error(
-                                    "Erreur de polling import",
-                                );
-                            });
-                    }
-                                        var s = job.import_summary;
-                                        var total = job.total_lines || 0;
-                                        var inserted = job.processed_lines || 0;
-                                        var skipped = job.skipped_lines || 0;
-                                        var missingUser = s.missing_user || 0;
-                                        var missingTs =
-                                            s.missing_timestamp || 0;
-                                        var inferred =
-                                            s.timestamp_inferred_count || 0;
+    function startPolling(jobId) {
+        currentJobId = jobId;
+        if (pollTimer) clearInterval(pollTimer);
+        pollJob(jobId);
+        pollTimer = setInterval(function () { pollJob(jobId); }, 1500);
+    }
 
-                                        var pctUser =
-                                            total > 0
-                                                ? Math.round(
-                                                      (1 -
-                                                          missingUser / total) *
-                                                          100,
-                                                  )
-                                                : 0;
-                                        var pctTs =
-                                            total > 0
-                                                ? Math.round(
-                                                      (1 - missingTs / total) *
-                                                          100,
-                                                  )
-                                                : 0;
+    importBtn.addEventListener("click", async function () {
+        if (!selectedFiles.length || currentJobId) return;
+        importBtn.disabled = true;
+        success.style.display = "none";
+        progress.style.display = "block";
+        document.getElementById("progress-status").textContent = "Envoi des fichiers…";
 
-                                        var t = window.i18n ? window.i18n.t : function(k) { return k; };
-                                        var summaryHtml =
-                                            '<div class="card mt-16" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px">';
-                                        summaryHtml +=
-                                            '<h4 style="margin:0 0 12px;font-size:14px;color:#1e293b">📊 ' + t('import.quality.title') + '</h4>';
-                                        summaryHtml +=
-                                            '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">';
-                                        summaryHtml +=
-                                            '<div style="text-align:center"><div style="font-size:22px;font-weight:700;color:#2563eb">' +
-                                            inserted +
-                                            '</div><div style="font-size:11px;color:#64748b">' + t('import.quality.imported') + '</div></div>';
-                                        summaryHtml +=
-                                            '<div style="text-align:center"><div style="font-size:22px;font-weight:700;color:' +
-                                            (pctTs >= 90
-                                                ? "#16a34a"
-                                                : pctTs >= 60
-                                                  ? "#d97706"
-                                                  : "#dc2626") +
-                                            '">' +
-                                            pctTs +
-                                            '%</div><div style="font-size:11px;color:#64748b">' + t('import.quality.dates') + '<br>' +
-                                            (missingTs > 0
-                                                ? t('import.quality.inferred', {count: missingTs})
-                                                : "✓ " + t('import.quality.all_extracted')) +
-                                            "</div></div>";
-                                        summaryHtml +=
-                                            '<div style="text-align:center"><div style="font-size:22px;font-weight:700;color:' +
-                                            (pctUser >= 70
-                                                ? "#16a34a"
-                                                : pctUser >= 40
-                                                  ? "#d97706"
-                                                  : "#94a3b8") +
-                                            '">' +
-                                            pctUser +
-                                            '%</div><div style="font-size:11px;color:#64748b">' + t('import.quality.with_user') + '<br>' +
-                                            (missingUser > 0
-                                                ? t('import.quality.not_found', {count: missingUser})
-                                                : "✓ " + t('import.quality.all_identified')) +
-                                            "</div></div>";
-                                        summaryHtml += "</div>";
-                                        if (skipped > 0)
-                                            summaryHtml +=
-                                                '<p style="font-size:12px;color:#dc2626;margin:8px 0 0">' +
-                                                t('import.quality.skipped_text', {count: skipped}) +
-                                                "</p>";
-                                        summaryHtml += "</div>";
-                                        document
-                                            .getElementById("import-progress")
-                                            .insertAdjacentHTML(
-                                                "afterend",
-                                                summaryHtml,
-                                            );
-                                    }
+        var formData = new FormData();
+        selectedFiles.forEach(function (file) {
+            formData.append("files", file);
+        });
+        var sourceInput = document.getElementById("import-source");
+        var serviceInput = document.getElementById("import-service");
+        var localeInput = document.getElementById("import-locale");
+        if (sourceInput && sourceInput.value) formData.append("source", sourceInput.value);
+        if (serviceInput && serviceInput.value) formData.append("service", serviceInput.value);
+        if (localeInput && localeInput.value) formData.append("locale", localeInput.value);
 
-                                    window.toast.success(
-                                        "Import terminé avec succès",
-                                    );
-                                    importBtn.disabled = false;
-                                    importBtn.innerHTML = '<span class="btn-icon">🚀</span><span data-i18n="import.start_import">Importer</span>';
-                                    clearBtn.style.display = "none";
-                                    selectedFile = null;
-                                    currentJobId = null;
-                                    document.getElementById("import-progress").style.display = "none";
-                                    loadJobs();
-                                } else if (job.status === "failed") {
-                                    clearInterval(pollTimer);
-                                    var progressStatus = document.getElementById("progress-status");
-                                    if (progressStatus) progressStatus.textContent = "Import échoué";
-                                    
-                                    // Afficher un message d'erreur clair pour RAR sur Vercel
-                                    var errorMsg = job.error_message || "Erreur inconnue";
-                                    if (errorMsg && (errorMsg.includes("RAR") || errorMsg.includes("rar") || errorMsg.includes("unrar") || errorMsg.includes("archive"))) {
-                                        errorMsg = "Extraction RAR non disponible sur cette plateforme. Veuillez utiliser ZIP ou décompresser localement avant import.";
-                                    }
-                                    
-                                    window.toast.error(
-                                        "Import échoué : " + errorMsg,
-                                    );
-                                    importBtn.disabled = false;
-                                    importBtn.innerHTML = '<span class="btn-icon">🚀</span><span data-i18n="import.start_import">Importer</span>';
-                                    currentJobId = null;
-                                    document.getElementById("import-progress").style.display = "none";
-                                    loadJobs();
-                                }
-                            })
-                            .catch(function (err) {
-                                clearInterval(pollTimer);
-                                var progressStatus = document.getElementById("progress-status");
-                                if (progressStatus) progressStatus.textContent = "Erreur de polling import";
-                                window.toast.error(
-                                    err.error ||
-                                        "Erreur de communication avec le serveur",
-                                );
-                                importBtn.disabled = false;
-                                importBtn.innerHTML = '<span class="btn-icon">🚀</span><span data-i18n="import.start_import">Importer</span>';
-                                currentJobId = null;
-                                document.getElementById("import-progress").style.display = "none";
-                                loadJobs();
-                            });
-                    }, 1500);
-                }
+        try {
+            var response = await api.upload("/api/import/upload", formData);
+            if (!response || !response.jobId) throw new Error("L’API n’a pas renvoyé l’identifiant de l’import");
+            startPolling(response.jobId);
+        } catch (error) {
+            resetProgress();
+            restoreImportButton();
+            showToast("error", error && error.error ? error.error : error.message || "Erreur lors de l’envoi");
+        }
+    });
 
-                function loadJobs() {
-                    api.get("/api/import/jobs").then(function (jobs) {
-                        var tb = document.getElementById("jobs-body");
-                        if (!jobs.length) {
-                            tb.innerHTML =
-                                '<tr><td colspan="5" class="no-data" data-i18n="import.no_jobs">Aucun import</td></tr>';
-                            return;
-                        }
-                        tb.innerHTML = jobs
-                            .map(function (j) {
-                                var statusCls =
-                                    j.status === "completed"
-                                        ? "badge-status-resolved"
-                                        : j.status === "failed"
-                                          ? "badge-status-open"
-                                          : j.status === "processing"
-                                            ? "badge-status-new"
-                                            : "";
-                                return (
-                                    "<tr><td>" +
-                                    esc(j.filename) +
-                                    '</td><td><span class="badge ' +
-                                    statusCls +
-                                    '">' +
-                                    j.status +
-                                    "</span></td><td>" +
-                                    j.processed_lines +
-                                    " / " +
-                                    j.total_lines +
-                                    "</td><td>" +
-                                    j.error_count +
-                                    "</td><td>" +
-                                    fmtDT(j.created_at) +
-                                    "</td></tr>"
-                                );
-                            })
-                            .join("");
-                    });
-                }
+    document.getElementById("view-results-btn").addEventListener("click", function () {
+        window.location.href = "/search.html";
+    });
 
-                loadJobs();
-            })();
+    function loadJobs() {
+        api.get("/api/import/jobs").then(function (jobs) {
+            var body = document.getElementById("jobs-body");
+            if (!Array.isArray(jobs) || !jobs.length) {
+                body.innerHTML = '<tr><td colspan="5" class="no-data">Aucun import</td></tr>';
+                return;
+            }
+            body.innerHTML = jobs.map(function (job) {
+                var statusClass = job.status === "completed" ? "badge-status-resolved" :
+                    job.status === "failed" ? "badge-status-open" :
+                    job.status === "processing" || job.status === "extracting" || job.status === "parsing" || job.status === "inserting" ? "badge-status-new" : "";
+                var processed = Number(job.processed_lines || job.processedLines || 0);
+                var total = Number(job.total_lines || job.totalLines || 0);
+                return "<tr><td>" + escapeHtml(job.filename || job.originalName || "—") +
+                    '</td><td><span class="badge ' + statusClass + '">' + escapeHtml(job.status || "—") +
+                    "</span></td><td>" + processed + " / " + total + "</td><td>" +
+                    (Number(job.error_count) || 0) + "</td><td>" +
+                    escapeHtml(window.fmtDT ? window.fmtDT(job.created_at || job.createdAt) : (job.created_at || job.createdAt || "—")) +
+                    "</td></tr>";
+            }).join("");
+        }).catch(function (error) {
+            console.error("[IMPORT] Impossible de charger l’historique", error);
+        });
+    }
+
+    renderSelectedFiles();
+    loadJobs();
+})();
         </script>
         <script src="/js/mobile-nav.js" defer></script>
     </body>

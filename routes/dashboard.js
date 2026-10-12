@@ -11,6 +11,7 @@ import {
   toMysqlUtcDatetime,
   utcBoundsForCalendarDate,
   utcTodayBounds,
+  mysqlUtcMinutesAgo,
 } from '../lib/operationalTime.js';
 import alertWorker from '../workers/alertWorker.js';
 
@@ -19,6 +20,14 @@ function asInt(v, def = 10) {
   const n = parseInt(v, 10);
   return isNaN(n) ? def : n;
 }
+
+// One canonical source identity per log. Generic placeholders fall through to
+// the server/system fields and repeated values are counted once across logs.
+const SOURCE_IDENTITY_SQL = `LOWER(COALESCE(
+  CASE WHEN LOWER(TRIM(source)) IN ('unknown','inconnu','n/a','na','null','-','application','app','java','java application') THEN NULL ELSE NULLIF(TRIM(source), '') END,
+  CASE WHEN LOWER(TRIM(source_server)) IN ('unknown','inconnu','n/a','na','null','-','application','app','java','java application') THEN NULL ELSE NULLIF(TRIM(source_server), '') END,
+  CASE WHEN LOWER(TRIM(source_system)) IN ('unknown','inconnu','n/a','na','null','-','application','app','java','java application') THEN NULL ELSE NULLIF(TRIM(source_system), '') END
+))`;
 
 const router = Router();
 
@@ -121,14 +130,16 @@ router.get('/summary', async (req, res) => {
      * en parallèle avec Promise.all.
      */
     const { start: todayStartSql } = utcTodayBounds();
+    const sevenDaysAgoSql = mysqlUtcMinutesAgo(7 * 24 * 60);
+    const nowSql = toMysqlUtcDatetime(new Date());
     const alertFilter = alertScope(req);
 
     const [
       [importedToday],
       [errorCount],
       [unreadAlerts],
-      [fatalCount],
-      [criticalCount],
+      [fatalCountRaw],
+      [criticalCountRaw],
       [sourceCount],
       [levelRows],
       [userCount],
@@ -138,8 +149,8 @@ router.get('/summary', async (req, res) => {
         [todayStartSql, ...scope.params]
       ),
       pool.execute(
-        `SELECT COUNT(*) as cnt FROM logs WHERE ${OPERATIONAL_TS} >= ? AND log_level IN ('ERROR', 'CRITICAL', 'FATAL')` + scope.sql,
-        [todayStartSql, ...scope.params]
+        `SELECT COUNT(*) as cnt FROM logs WHERE ${OPERATIONAL_TS} >= ? AND ${OPERATIONAL_TS} <= ? AND log_level IN ('ERROR', 'CRITICAL', 'FATAL')` + scope.sql,
+        [sevenDaysAgoSql, nowSql, ...scope.params]
       ),
       pool.execute(
         "SELECT COUNT(*) as cnt FROM alerts WHERE status = 'new'" + alertFilter.sql,
@@ -154,7 +165,9 @@ router.get('/summary', async (req, res) => {
         scope.params
       ),
       pool.execute(
-        'SELECT COUNT(DISTINCT source) as cnt FROM logs WHERE source IS NOT NULL AND source != \'\'' + scope.sql,
+        `SELECT COUNT(DISTINCT ${SOURCE_IDENTITY_SQL}) as cnt
+         FROM logs
+         WHERE ${SOURCE_IDENTITY_SQL} IS NOT NULL` + scope.sql,
         scope.params
       ),
       pool.execute(
@@ -174,8 +187,8 @@ router.get('/summary', async (req, res) => {
 
     const importedTodayCount = Number(importedToday[0]?.cnt || 0);
     const errorCountVal = Number(errorCount[0]?.cnt || 0);
-    fatalCount = Number(fatalCount[0]?.cnt || 0);
-    criticalCount = Number(criticalCount[0]?.cnt || 0);
+    const fatalCount = Number(fatalCountRaw[0]?.cnt || 0);
+    const criticalCount = Number(criticalCountRaw[0]?.cnt || 0);
 
     const data = {
       // Standardized camelCase format
@@ -184,8 +197,8 @@ router.get('/summary', async (req, res) => {
       importedTodayCount: importedTodayCount,
       errorCount: errorCountVal,
       unreadAlerts: Number(unreadAlerts[0]?.cnt || 0),
-      fatal_count: Number(fatalCount[0]?.cnt || 0),
-      critical_count: Number(criticalCount[0]?.cnt || 0),
+      fatal_count: fatalCount,
+      critical_count: criticalCount,
       // BUGFIX: le frontend lit `source_count` (snake_case) ; ce champ manquait ici,
       // donc le KPI "Sources actives" du dashboard restait figé à 0.
       source_count: Number(sourceCount[0]?.cnt || 0),
@@ -207,8 +220,6 @@ router.get('/summary', async (req, res) => {
       imported_today_count: importedTodayCount,
       error_count: errorCountVal,
       unread_alerts: Number(unreadAlerts[0]?.cnt || 0),
-      fatal_count: fatalCount,
-      critical_count: criticalCount,
       levels_breakdown: levels,
     };
 
@@ -365,7 +376,7 @@ router.get('/trends', async (req, res) => {
     const [stats] = await pool.execute(
       `SELECT COUNT(*) as total_logs,
               COUNT(DISTINCT service) as unique_services,
-              COUNT(DISTINCT source) as unique_sources
+              COUNT(DISTINCT ${SOURCE_IDENTITY_SQL}) as unique_sources
        FROM logs
        WHERE ${OPERATIONAL_TS} IS NOT NULL 
          AND ${OPERATIONAL_TS} >= ? 
@@ -567,8 +578,10 @@ router.get('/recent-logs', async (req, res) => {
     }
     
     const [rows] = await pool.query(
-      `SELECT id, raw_log, timestamp, log_level, message, source, source_server, source_system,
-              service, target_user, imported_at, imported_by_user_id
+      `SELECT id, raw_log, timestamp, log_level, message, source, source_server, source_system, log_source, module,
+              service, target_user, imported_at, imported_by_user_id,
+              (SELECT COALESCE(NULLIF(display_name, ''), email) FROM users AS import_user WHERE import_user.id = logs.imported_by_user_id) AS importer_name,
+              (SELECT filename FROM import_jobs AS source_job WHERE source_job.id = logs.import_job_id) AS import_filename
        FROM logs WHERE 1=1${scope.sql}${filterSql}
        ORDER BY ${OPERATIONAL_TS_EXPR} DESC LIMIT ?`,
       [...scope.params, ...filterParams, limit]

@@ -791,43 +791,6 @@ router.post("/purge", validateBody(purgeSchema), async (req, res) => {
 
 // ─── SYSTEM STATS ──────────────────────────────────────
 
-router.get("/db-stats", async (req, res) => {
-  try {
-    const [tableStats] = await pool.execute(`
-      SELECT 
-        table_name, 
-        table_rows, 
-        ROUND(data_length / 1024 / 1024, 2) as data_mb,
-        ROUND(index_length / 1024 / 1024, 2) as index_mb,
-        ROUND((data_length + index_length) / 1024 / 1024, 2) as total_mb
-      FROM information_schema.tables
-      WHERE table_schema = DATABASE()
-      ORDER BY (data_length + index_length) DESC
-    `);
-    
-    const [totalSize] = await pool.execute(
-      "SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) as total_size_mb FROM information_schema.tables WHERE table_schema = DATABASE()",
-    );
-    
-    const [connectionStats] = await pool.execute("SHOW STATUS LIKE 'Threads_connected'");
-    const [connectionPool] = await pool.execute("SHOW STATUS LIKE 'Max_used_connections'");
-    
-    res.json({
-      success: true,
-      tables: tableStats,
-      total_size_mb: totalSize[0]?.total_size_mb || 0,
-      connections: {
-        current: parseInt(connectionStats[0]?.Value || 0),
-        max_used: parseInt(connectionPool[0]?.Value || 0)
-      },
-      timestamp: new Date().toISOString()
-    });
-  } catch (e) {
-    logger.error({ event: 'db_stats_error', error: e.message }, '[ADMIN]');
-    res.status(500).json({ error: "Erreur serveur" });
-  }
-});
-
 router.get("/system-stats", async (req, res) => {
   try {
     const [users] = await pool.execute("SELECT COUNT(*) as cnt FROM users");
@@ -894,68 +857,6 @@ router.get("/system-stats", async (req, res) => {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
-
-router.get("/system-status", async (req, res) => {
-  try {
-    const status = {
-      version: process.env.APP_VERSION || '6.0.0',
-      uptimeDays: Math.floor(process.uptime() / 86400),
-      uptime: Math.floor(process.uptime() / 86400) + ' days',
-    };
-
-    try {
-      await pool.execute('SELECT 1');
-      status.database = { connected: true, provider: 'Aiven MySQL' };
-    } catch (err) {
-      status.database = { connected: false, error: err.message };
-    }
-
-    try {
-      const { getCacheStatus } = await import('../services/cacheService.js');
-      const cache = await getCacheStatus();
-      status.redis = {
-        connected: Boolean(cache.connected),
-        memoryUsedMb: cache.memoryUsedMb || null,
-      };
-    } catch (err) {
-      status.redis = { connected: false, error: 'Cache disabled' };
-    }
-
-    try {
-      const os = await import('os');
-      const totalMem = os.totalmem();
-      const freeMem = os.freemem();
-      const usedPct = Math.round(((totalMem - freeMem) / totalMem) * 100);
-      status.disk = {
-        usage: usedPct + '%',
-        freeGb: (freeMem / 1024 / 1024 / 1024).toFixed(1),
-        totalGb: (totalMem / 1024 / 1024 / 1024).toFixed(1),
-        warning: usedPct > 90,
-      };
-    } catch (err) {
-      status.disk = { usage: 'N/A' };
-    }
-
-    const startMs = Date.now();
-    await pool.execute('SELECT 1');
-    status.apiResponseMs = { avg: Date.now() - startMs, p95: Date.now() - startMs };
-
-    const { getWatcherStatus } = await import('../services/watcherService.js');
-    const { getRetentionStats } = await import('../services/retentionService.js');
-    status.watcher = getWatcherStatus();
-    try {
-      status.retention = await getRetentionStats();
-    } catch (_) {
-      status.retention = null;
-    }
-
-    res.json(status);
-  } catch (e) {
-    logger.error({ event: 'system_status_error', error: e.message }, '[ADMIN]');
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
 
 // POST /alert-rules/seed-defaults — insérer les règles d'alerte par défaut
 router.post("/alert-rules/seed-defaults", async (req, res) => {

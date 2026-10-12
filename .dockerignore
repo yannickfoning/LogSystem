@@ -1,0 +1,10 @@
+node_modules/
+.git/
+logs/
+uploads/
+temp/
+.env
+.env.*
+!.env.example
+!.env.docker.example
+*.log

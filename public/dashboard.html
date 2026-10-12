@@ -2,12 +2,12 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>LogSystem — Tableau de bord</title>
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/css/responsive.css">
   <link rel="stylesheet" href="/dashboard.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" integrity="sha384-6ecfe77fd15b74da2e45b32215cadc65f2d760f2a23da1951a99556efedd2c610271c1170d6f92df38ea48a479644683+7y7v5q5z5z5q5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5z5.js" crossorigin="anonymous"></script>
+  <script src="/js/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -199,6 +199,7 @@
             </div>
             <div class="filter-toolbar">
               <select id="timeRangeFilter" class="form-select form-select-sm">
+                <option value="all">Toutes périodes</option>
                 <option value="24h">Dernières 24h</option>
                 <option value="7d">7 derniers jours</option>
                 <option value="30d">30 derniers jours</option>
@@ -492,7 +493,9 @@
         type: 'line',
         data: { labels: labels, datasets: datasets },
         options: {
-          responsive: true, maintainAspectRatio: false,
+          responsive: true, 
+          maintainAspectRatio: false,
+          resizeDelay: 0,
           interaction: { mode: 'index', intersect: false },
           plugins: {
             legend: {
@@ -989,9 +992,10 @@
           var dt = log.timestamp ? new Date(log.timestamp) : null;
           var timeStr = dt ? dt.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '—';
           var dateStr = dt ? dt.toLocaleDateString('fr-FR') : '—';
-          var source = log.source || '—';
-          var service = log.service || '—';
-          var user = log.target_user || '—';
+           var source = window.logMetadataLabel([log.source, log.source_server, log.module, log.log_source, log.source_system], log.import_filename ? 'Fichier : ' + log.import_filename : 'Non renseignée');
+          var service = window.logMetadataLabel(log.service);
+          var actor = window.logMetadataLabel(log.target_user, '');
+          var user = actor || 'Non renseigné';
           var message = log.message || '';
           var truncated = message.length > 80 ? message.substring(0, 80) + '…' : message;
           
@@ -1013,12 +1017,12 @@
 
     // ── Top erreurs ──
     function loadTopErrors() {
-      var timeRange = document.getElementById('timeRangeFilter')?.value || '24h';
+      var timeRange = document.getElementById('timeRangeFilter')?.value || 'all';
       var severity = document.getElementById('severityFilter')?.value || 'all';
       var search = document.getElementById('errorSearch')?.value || '';
       
       var url = '/api/dashboard/top-errors/top-errors-grouped?limit=10';
-      if (timeRange !== '24h') url += '&timeRange=' + timeRange;
+      if (timeRange !== 'all') url += '&timeRange=' + timeRange;
       if (severity !== 'all') url += '&severity=' + severity;
       if (search) url += '&search=' + encodeURIComponent(search);
       
@@ -1035,15 +1039,19 @@
           var occCount = g.occurrenceCount || { value: g.occurrence_count || 1, color: '#fbc02d' };
           var colorStyle = 'color: ' + occCount.color + '; background-color: ' + occCount.color + '20; border: 1px solid ' + occCount.color + '40;';
           return '<div class="err-group" data-sample-log-id="'+esc(sampleId)+'" data-fingerprint="'+esc(fp)+'" title="Details du groupe">'
-            + '<div class="err-count" style="'+colorStyle+'">🔴 '+occCount.value+'</div>'
+            + '<div class="err-count" title="'+esc(occCount.value+' occurrences de cette erreur')+'" aria-label="'+esc(occCount.value+' occurrences de cette erreur')+'" style="'+colorStyle+'">🔴 '+occCount.value+'</div>'
             + '<div class="flex-1 overflow-hidden">'
             + '<div class="err-title" title="'+esc(g.title)+'">'+esc(g.title||'Erreur inconnue')+'</div>'
-            + '<div class="err-meta">'+esc(g.event_type||'')+' · '+lvlBadge(g.severity_max)+'</div>'
+            + '<div class="err-meta">'+esc(g.eventType||g.event_type||'')+' · '+lvlBadge(g.severity||g.severity_max)+'</div>'
             + '<div class="err-meta text-kpi-trend">' +
-              '1re: '+esc(fmtDateTime(g.firstSeen)||'–')+' · Dernière: '+esc(fmtDateTime(g.lastSeen)||'–')+
+              '1re: '+esc(fmtDateTime(g.firstSeen||g.first_seen)||'–')+' · Dernière: '+esc(fmtDateTime(g.lastSeen||g.last_seen)||'–')+
             '</div>'
             + '</div></div>';
         }).join('');
+      }).catch(function(e){
+        var list = document.getElementById('top-errors-list');
+        list.innerHTML = '<p class="cell-error">Erreur de chargement des groupes d’erreurs</p>';
+        console.error('[ERROR] loadTopErrors failed:', e);
       });
     }
 
@@ -1353,20 +1361,16 @@ function showLogDetail(logId){
     window.refreshAll = function(){
       console.log('[DEBUG] refreshAll called');
       setRefreshing(true);
-      // FIX: Séquentialiser loadTrends et loadLevelChart pour éviter les courses sur le DOM
-      Promise.all([loadSummary(), loadRecentLogs(), loadTopErrors(), loadAlerts()])
-        .then(function(){
-          console.log('[DEBUG] Non-chart functions completed, loading charts sequentially');
-          // Initialiser les nouvelles fonctionnalités pour non-développeurs
-          setupAdvancedFilters();
-          setupClickableKPIs();
-          return loadTrends().then(function(){
-            console.log('[DEBUG] Trends chart loaded, now loading level chart');
-            return loadLevelChart();
-          });
-        })
+      Promise.allSettled([
+        loadSummary(),
+        loadRecentLogs(),
+        loadTopErrors(),
+        loadAlerts(),
+        loadTrends(),
+        loadLevelChart()
+      ])
         .then(function(){ 
-          console.log('[DEBUG] All dashboard functions completed');
+          console.log('[DEBUG] Dashboard widgets completed');
           if (isAdmin()) { loadWatchdogs(); initSystemStatus(); } 
           updateLastRefresh(); 
         })
@@ -1415,6 +1419,8 @@ function showLogDetail(logId){
     var btnRefresh = document.getElementById('btn-refresh');
     if (btnRefresh) btnRefresh.addEventListener('click', refreshAll);
     // -- Init --
+    setupAdvancedFilters();
+    setupClickableKPIs();
     refreshAll();
     // SSE remplacé par pollAlerts (setInterval 20s défini ci-dessus)
 

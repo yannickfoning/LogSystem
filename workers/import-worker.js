@@ -2,10 +2,13 @@ import logger from '../config/logger.js';
 import pool from '../config/database.js';
 import { extractArchive, isArchive, mapArchiveError, filterLogFiles } from '../lib/processing/archiveHandler.js';
 import { parseLogContent, detectFormat } from '../lib/processing/universalParser.js';
+import { parseJavaLog4jStream } from '../lib/processing/javaLog4jStreamParser.js';
 import { normalizeMessage } from '../lib/processing/normalize.js';
 import { classifyLog } from '../lib/processing/classify.js';
 import { generateFingerprint } from '../lib/processing/fingerprint.js';
 import { normalizeLevel } from '../services/logLevelUtils.js';
+import { invalidateDashboard } from '../services/cacheService.js';
+import { upsertErrorGroupsFromLogs } from '../services/errorGroupService.js';
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 import path from 'path';
@@ -89,7 +92,9 @@ class ImportWorker {
       this.activeJobs.set(jobId, { status: 'processing', startedAt: Date.now() });
 
       // ÉTAPE 1: DÉPÔT - Placer le fichier dans le répertoire de dépôt
-      await this.updateJobStatus(jobId, 'depositing', 0, 0);
+      // Keep worker states within the deployed import_jobs enum. Older Docker
+      // volumes may not have the optional 'depositing'/'counting' enum values.
+      await this.updateJobStatus(jobId, 'processing', 0, 0);
 
       const uniqueFilename = `${jobId}_${filename}`;
       filePath = path.join(UPLOAD_DEPOT_DIR, uniqueFilename);
@@ -147,24 +152,72 @@ class ImportWorker {
 
       let allParsedLogs = [];
       let totalLines = 0;
+      let streamingStats = { processedLines: 0, successfulLines: 0, skippedLines: 0, errorCount: 0 };
+      let streamingStarted = false;
 
       for (const file of filesToProcess) {
         const detectedFormat = detectFormat(file.content);
         logger.info({ event: 'format_detected', jobId, format: detectedFormat, file: file.filename });
+        const fallbackSource = source || path.basename(file.filename || filename);
 
         try {
+          // Large Java Log4j files must go through the streaming parser. The batch
+          // parser has a 100 MB ceiling and its text fallback splits stack traces
+          // into unrelated events, which loses both structure and metadata.
+          if (detectedFormat === 'java' && file.content.length > 10 * 1024 * 1024) {
+            const parseOptions = {
+              source: fallbackSource || null,
+              service: service || 'java',
+              locale: locale || 'fr',
+              batchSize: 500,
+            };
+            const { totalLogs: expectedLogs } = await parseJavaLog4jStream(file.content, parseOptions);
+            totalLines += expectedLogs;
+            await pool.execute('UPDATE import_jobs SET total_lines = ? WHERE id = ?', [totalLines, jobId]);
+
+            if (!streamingStarted) {
+              await this.updateJobStatus(jobId, 'inserting', 0, 0);
+              streamingStarted = true;
+            }
+            let streamedLogs = 0;
+            await parseLogContent(file.content, detectedFormat, {
+              ...parseOptions,
+              onBatch: async batch => {
+                const withMetadata = batch.map(log => ({
+                  ...log,
+                  source: log.source || fallbackSource || null,
+                  parser_format: detectedFormat,
+                  log_format: detectedFormat,
+                }));
+                streamedLogs += withMetadata.length;
+                streamingStats = await this.processLogsBatch(
+                  withMetadata, jobId, userId, source, service, streamingStats
+                );
+              },
+            });
+            if (streamedLogs !== expectedLogs) {
+              throw new Error(`Java stream count mismatch: expected ${expectedLogs}, parsed ${streamedLogs}`);
+            }
+            logger.info({ event: 'file_stream_parsed', jobId, file: file.filename, logs: streamedLogs });
+            continue;
+          }
+
           const parsedLogs = await parseLogContent(file.content, detectedFormat, {
-            source: source || null,
+            source: fallbackSource || null,
             service: service || null,
             locale: locale || 'fr',
           });
 
-          allParsedLogs = allParsedLogs.concat(parsedLogs);
+          allParsedLogs = allParsedLogs.concat(parsedLogs.map(log => ({
+            ...log,
+            source: log.source || fallbackSource || null,
+          })));
           totalLines += parsedLogs.length;
 
           logger.info({ event: 'file_parsed', jobId, file: file.filename, lines: parsedLogs.length });
         } catch (e) {
           logger.warn({ event: 'parsing_error', jobId, file: file.filename, error: e.message });
+          if (detectedFormat === 'java' && file.content.length > 10 * 1024 * 1024) throw e;
         }
       }
 
@@ -178,37 +231,56 @@ class ImportWorker {
 
       if (totalLines === 0) {
         await this.updateJobStatus(jobId, 'completed', 0, 0, 'No logs parsed');
+        await pool.execute(
+          'UPDATE import_jobs SET completed_at = NOW() WHERE id = ?',
+          [jobId]
+        );
         // Déplacer vers traité même si vide
         await this.moveToTreated(filePath, uniqueFilename);
         return;
       }
 
       // ÉTAPE 4: DÉCOMPTE ET INDEXATION - Insérer en BD par BATCH
-      await this.updateJobStatus(jobId, 'counting', 0, 0);
-
-      await this.processLogsBatch(allParsedLogs, jobId, userId, source, service);
+      if (!streamingStarted) await this.updateJobStatus(jobId, 'inserting', 0, 0);
+      const finalStats = allParsedLogs.length
+        ? await this.processLogsBatch(allParsedLogs, jobId, userId, source, service, streamingStats)
+        : streamingStats;
+      const { processedLines, successfulLines, skippedLines, errorCount } = finalStats;
 
       // ÉTAPE 5: DÉPLACEMENT VERS TRAITÉ
       await this.moveToTreated(filePath, uniqueFilename);
 
       // ÉTAPE 6: Marquer comme complété
-      await this.updateJobStatus(jobId, 'completed', totalLines, 0);
+      const finalStatus = errorCount > 0 && successfulLines === 0 && skippedLines === 0
+        ? 'failed'
+        : 'completed';
+      await this.updateJobStatus(jobId, finalStatus, processedLines, errorCount, successfulLines, skippedLines);
+      await pool.execute(
+        `UPDATE import_jobs SET completed_at = NOW(), error_message = ? WHERE id = ?`,
+        [finalStatus === 'failed' ? 'Aucune ligne n’a pu être enregistrée.' : null, jobId]
+      );
 
       logger.info({
-        event: 'import_completed',
+        event: finalStatus === 'completed' ? 'import_completed' : 'import_failed',
         jobId,
         totalLines,
-        processedLines: totalLines,
-        errorCount: 0
+        processedLines,
+        successfulLines,
+        skippedLines,
+        errorCount
       });
 
       this.activeJobs.set(jobId, {
-        status: 'completed',
+        status: finalStatus,
         completedAt: Date.now(),
         totalLines,
-        processedLines: totalLines,
-        errorCount: 0
+        processedLines,
+        successfulLines,
+        skippedLines,
+        errorCount
       });
+
+      if (processedLines > 0) await invalidateDashboard(userId);
 
     } catch (error) {
       logger.error({ event: 'import_failed', jobId, error: error.message, code: error.code });
@@ -243,130 +315,138 @@ class ImportWorker {
   }
 
   // Process logs in batch
-  async processLogsBatch(logs, jobId, userId, source, service) {
+  async processLogsBatch(logs, jobId, userId, source, service, initialStats = {}) {
     const batchSize = 500;
-    let processedLines = 0;
-    let errorCount = 0;
+    let processedLines = Number(initialStats.processedLines) || 0;
+    let successfulLines = Number(initialStats.successfulLines) || 0;
+    let skippedLines = Number(initialStats.skippedLines) || 0;
+    let errorCount = Number(initialStats.errorCount) || 0;
 
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
+      const columns = `raw_log, timestamp, created_time, timezone, log_level, source, source_server, source_system,
+        service, message, normalized_message, event_type, fingerprint, user_id, source_type, ingested_realtime,
+        client_ip, module, error_type, stack_trace, target_user, parser_format, timestamp_inferred,
+        classification_confidence, file_created_at, file_modified_at, imported_by_user_id, imported_at,
+        log_source, import_job_id`;
+      const singleInsert = `INSERT IGNORE INTO logs (${columns}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
-      for (let i = 0; i < logs.length; i++) {
-        try {
-          const logEntry = logs[i];
+      for (let start = 0; start < logs.length; start += batchSize) {
+        const end = Math.min(start + batchSize, logs.length);
+        const batchRows = [];
 
-          // Normaliser et enrichir le log
-          const normalized = {
-            raw_log: logEntry.raw_log || JSON.stringify(logEntry),
-            timestamp: logEntry.timestamp || new Date().toISOString().slice(0, 19).replace('T', ' '),
-            created_time: logEntry.created_time || String(logEntry.timestamp || '').slice(11, 19) || null,
-            timezone: logEntry.timezone || null,
-            log_level: normalizeLevel(logEntry.log_level || 'INFO'),
-            source: logEntry.source || source || null,
-            source_server: logEntry.source_server || logEntry.host || logEntry.source || null,
-            source_system: logEntry.source_system || logEntry.source || null,
-            service: logEntry.service || service || null,
-            message: logEntry.message || '',
-            normalized_message: normalizeMessage(logEntry.message || ''),
-            event_type: classifyLog(logEntry.message || '', logEntry.source || '', logEntry.service || ''),
-            fingerprint: generateFingerprint(
-              logEntry.service || '',
-              classifyLog(logEntry.message || '', logEntry.source || '', logEntry.service || ''),
-              normalizeMessage(logEntry.message || ''),
-              userId
-            ),
-            user_id: userId,
-            source_type: 'import',
-            ingested_realtime: 0,
-            client_ip: logEntry.ip_address || logEntry.client_ip || null,
-            module: logEntry.module || null,
-            error_type: logEntry.error_type || null,
-            stack_trace: logEntry.stack_trace || null,
-            target_user: logEntry.target_user || null,
-            parser_format: logEntry.log_format || null,
-            timestamp_inferred: logEntry.timestamp_inferred ? 1 : 0,
-            classification_confidence: logEntry.classification_confidence || null,
-            file_created_at: logEntry.file_created_at || null,
-            file_modified_at: logEntry.file_modified_at || null,
-            imported_by_user_id: userId,
-            imported_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
-            log_source: logEntry.source || source || null,
-            import_job_id: jobId,
-          };
+        for (let i = start; i < end; i++) {
+          try {
+            const logEntry = logs[i];
+            const message = logEntry.message || '';
+            const eventType = classifyLog(message, logEntry.source || '', logEntry.service || '');
+            const normalizedMessage = normalizeMessage(message);
+            const importedAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
-          // Insérer le log
-          await conn.execute(
-            `INSERT INTO logs (
-              raw_log, timestamp, created_time, timezone, log_level, source, source_server, source_system, service, message, normalized_message,
-              event_type, fingerprint, user_id, source_type, ingested_realtime, client_ip, module, error_type,
-              stack_trace, target_user, parser_format, timestamp_inferred, classification_confidence,
-              file_created_at, file_modified_at, imported_by_user_id, imported_at, log_source, import_job_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-              normalized.raw_log,
-              normalized.timestamp,
-              normalized.created_time,
-              normalized.timezone,
-              normalized.log_level,
-              normalized.source,
-              normalized.source_server,
-              normalized.source_system,
-              normalized.service,
-              normalized.message,
-              normalized.normalized_message,
-              normalized.event_type,
-              normalized.fingerprint,
-              normalized.user_id,
-              normalized.source_type,
-              normalized.ingested_realtime,
-              normalized.client_ip,
-              normalized.module,
-              normalized.error_type,
-              normalized.stack_trace,
-              normalized.target_user,
-              normalized.parser_format,
-              normalized.timestamp_inferred,
-              normalized.classification_confidence,
-              normalized.file_created_at,
-              normalized.file_modified_at,
-              normalized.imported_by_user_id,
-              normalized.imported_at,
-              normalized.log_source,
-              normalized.import_job_id,
-            ]
-          );
+            batchRows.push([
+              logEntry.raw_log || JSON.stringify(logEntry),
+              logEntry.timestamp || importedAt,
+              logEntry.created_time || String(logEntry.timestamp || '').slice(11, 19) || null,
+              logEntry.timezone || null,
+              normalizeLevel(logEntry.log_level || 'INFO'),
+              logEntry.source || source || null,
+              logEntry.source_server || logEntry.host || logEntry.source || null,
+              logEntry.source_system || logEntry.source || null,
+              logEntry.service || service || null,
+              message,
+              normalizedMessage,
+              eventType,
+              generateFingerprint(logEntry.service || '', eventType, normalizedMessage, userId),
+              userId,
+              'import',
+              0,
+              logEntry.ip_address || logEntry.client_ip || null,
+              logEntry.module || null,
+              logEntry.error_type || null,
+              logEntry.stack_trace || null,
+              logEntry.target_user || null,
+              logEntry.parser_format || logEntry.log_format || null,
+              logEntry.timestamp_inferred ? 1 : 0,
+              logEntry.classification_confidence || null,
+              logEntry.file_created_at || null,
+              logEntry.file_modified_at || null,
+              userId,
+              importedAt,
+              logEntry.source || source || null,
+              jobId,
+            ]);
+          } catch (e) {
+            processedLines++;
+            errorCount++;
+            logger.warn({ event: 'log_normalization_error', jobId, lineIndex: i, error: e.message });
+          }
+        }
 
-          processedLines++;
+        if (batchRows.length > 0) {
+          batchRows.sort((a, b) => {
+            const aFingerprint = String(a[12] || '');
+            const bFingerprint = String(b[12] || '');
+            if (aFingerprint !== bFingerprint) return aFingerprint < bFingerprint ? -1 : 1;
+            const aTimestamp = String(a[1] || '');
+            const bTimestamp = String(b[1] || '');
+            return aTimestamp === bTimestamp ? 0 : (aTimestamp < bTimestamp ? -1 : 1);
+          });
+          let insertedRows = [];
+          try {
+            const [insertResult] = await conn.query(`INSERT IGNORE INTO logs (${columns}) VALUES ?`, [batchRows]);
+            processedLines += batchRows.length;
+            successfulLines += Number(insertResult.affectedRows) || 0;
+            skippedLines += batchRows.length - (Number(insertResult.affectedRows) || 0);
+            insertedRows = batchRows;
+          } catch (batchError) {
+            logger.warn({
+              event: 'log_batch_insertion_error',
+              jobId,
+              startIndex: start,
+              endIndex: end - 1,
+              batchSize: batchRows.length,
+              error: batchError.message,
+            });
 
-          // Mettre à jour la progression tous les 100 lignes
-          if (processedLines % 100 === 0) {
-            await this.updateJobStatus(jobId, 'counting', processedLines, errorCount);
-
-            // Commit intermédiaire pour ne pas bloquer trop longtemps
-            await conn.commit();
-            await conn.beginTransaction();
+            // Isoler les éventuelles lignes invalides sans abandonner tout le lot.
+            for (let offset = 0; offset < batchRows.length; offset++) {
+              try {
+                const [insertResult] = await conn.execute(singleInsert, batchRows[offset]);
+                processedLines++;
+                if (Number(insertResult.affectedRows) > 0) successfulLines++;
+                else skippedLines++;
+                insertedRows.push(batchRows[offset]);
+              } catch (e) {
+                processedLines++;
+                errorCount++;
+                logger.warn({
+                  event: 'log_insertion_error',
+                  jobId,
+                  lineIndex: start + offset,
+                  error: e.message,
+                });
+              }
+            }
           }
 
-        } catch (e) {
-          errorCount++;
-          logger.warn({
-            event: 'log_insertion_error',
-            jobId,
-            lineIndex: i,
-            error: e.message
-          });
+          await this.upsertErrorGroups(conn, insertedRows);
         }
-      }
 
-      await conn.commit();
+        await this.updateJobStatus(jobId, 'inserting', processedLines, errorCount, successfulLines, skippedLines);
+        await conn.commit();
+        if (end < logs.length) await conn.beginTransaction();
+      }
 
       logger.info({
         event: 'batch_processed',
         jobId,
         processedLines,
+        successfulLines,
+        skippedLines,
         errorCount
       });
+      return { processedLines, successfulLines, skippedLines, errorCount };
 
     } catch (e) {
       await conn.rollback();
@@ -374,6 +454,22 @@ class ImportWorker {
     } finally {
       conn.release();
     }
+  }
+
+  async upsertErrorGroups(conn, logRows) {
+    const records = logRows.map(row => ({
+      fingerprint: row[12],
+      log_level: row[4],
+      timestamp: row[1],
+      message: row[9],
+      event_type: row[11],
+      source_server: row[6],
+      service: row[8],
+      error_type: row[18],
+    }));
+    const userId = logRows[0]?.[13] ?? null;
+    const returnGapDays = Number.parseInt(process.env.ERROR_RETURN_GAP_DAYS || '7', 10);
+    await upsertErrorGroupsFromLogs(conn, userId, records, returnGapDays);
   }
 
   // Déplacer un fichier traité vers le répertoire traité
@@ -399,12 +495,20 @@ class ImportWorker {
   }
 
   // Mettre à jour le status du job
-  async updateJobStatus(jobId, status, processedLines, errorCount) {
-    await pool.execute(
-      `UPDATE import_jobs SET status = ?, processed_lines = ?, error_count = ?, updated_at = NOW()
-       WHERE id = ?`,
-      [status, processedLines, errorCount, jobId]
-    );
+  async updateJobStatus(jobId, status, processedLines, errorCount, successfulLines = null, skippedLines = null) {
+    if (successfulLines == null || skippedLines == null) {
+      await pool.execute(
+        `UPDATE import_jobs SET status = ?, processed_lines = ?, error_count = ?, updated_at = NOW()
+         WHERE id = ?`,
+        [status, processedLines, errorCount, jobId]
+      );
+    } else {
+      await pool.execute(
+        `UPDATE import_jobs SET status = ?, processed_lines = ?, successful_lines = ?, skipped_lines = ?,
+         error_count = ?, updated_at = NOW() WHERE id = ?`,
+        [status, processedLines, successfulLines, skippedLines, errorCount, jobId]
+      );
+    }
 
     logger.info({
       event: 'job_status_updated',
