@@ -130,21 +130,19 @@ describe('[PERF-01] Recherche FULLTEXT', () => {
   });
 });
 
-// ── CORRECTIF 6 : SRI sur Chart.js ──────────────────────────────────────────
-describe('[SEC-06] Subresource Integrity (SRI)', () => {
-  it('dashboard.html doit avoir un attribut integrity sur le script CDN Chart.js', async () => {
+// ── CORRECTIF 6 : Chart.js servi localement ─────────────────────────────────
+describe('[SEC-06] Chargement local de Chart.js', () => {
+  it('dashboard.html utilise le bundle local et ne dépend pas du CDN', async () => {
     const { readFileSync } = await import('fs');
     const html = readFileSync('./public/dashboard.html', 'utf8');
-    const chartScriptMatch = html.match(/script[^>]*cdnjs[^>]*chart[^>]*/i);
+    const chartScriptMatch = html.match(/<script\b[^>]*src=["']\/js\/chart\.umd\.min\.js["'][^>]*><\/script>/i);
     expect(chartScriptMatch).not.toBeNull();
-    expect(chartScriptMatch[0]).toContain('integrity=');
-    expect(chartScriptMatch[0]).toContain('crossorigin=');
+    expect(html).not.toMatch(/<script\b[^>]*src=["']https?:\/\/cdnjs[^"']*chart/i);
   });
 
-  it('le hash SRI doit être de type sha384', async () => {
-    const { readFileSync } = await import('fs');
-    const html = readFileSync('./public/dashboard.html', 'utf8');
-    expect(html).toContain('sha384-');
+  it('le bundle Chart.js local existe et n’est pas vide', async () => {
+    const { statSync } = await import('fs');
+    expect(statSync('./public/js/chart.umd.min.js').size).toBeGreaterThan(1024);
   });
 });
 
@@ -396,27 +394,27 @@ describe('[VALID] Schémas de validation Zod', () => {
 // ── Normalisation des niveaux de log ────────────────────────────────────────
 describe('[PROC] Normalisation des niveaux', () => {
   it('doit normaliser "warn" → WARNING', async () => {
-    const { normalizeLevel } = await import('../lib/levels.js');
+    const { normalizeLevel } = await import('../services/logLevelUtils.js');
     expect(normalizeLevel('warn')).toBe('WARNING');
   });
 
   it('doit normaliser "err" → ERROR', async () => {
-    const { normalizeLevel } = await import('../lib/levels.js');
+    const { normalizeLevel } = await import('../services/logLevelUtils.js');
     expect(normalizeLevel('err')).toBe('ERROR');
   });
 
   it('doit retourner INFO pour une valeur inconnue', async () => {
-    const { normalizeLevel } = await import('../lib/levels.js');
+    const { normalizeLevel } = await import('../services/logLevelUtils.js');
     expect(normalizeLevel('GARBAGE')).toBe('INFO');
   });
 
   it('doit retourner INFO pour une valeur undefined', async () => {
-    const { normalizeLevel } = await import('../lib/levels.js');
+    const { normalizeLevel } = await import('../services/logLevelUtils.js');
     expect(normalizeLevel(undefined)).toBe('INFO');
   });
 
   it('doit retourner INFO pour null', async () => {
-    const { normalizeLevel } = await import('../lib/levels.js');
+    const { normalizeLevel } = await import('../services/logLevelUtils.js');
     expect(normalizeLevel(null)).toBe('INFO');
   });
 });

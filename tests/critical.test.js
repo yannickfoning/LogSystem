@@ -8,7 +8,7 @@ import pool from '../config/database.js';
 import { normalizeMessage } from '../lib/processing/normalize.js';
 import { classifyLog } from '../lib/processing/classify.js';
 import { generateFingerprint } from '../lib/processing/fingerprint.js';
-import { levelSeverity, normalizeLevel } from '../config/database.js';
+import { levelSeverity, normalizeLevel } from '../services/logLevelUtils.js';
 import { detectFormat, parseLogContent } from '../lib/processing/universalParser.js';
 import { detectEncoding, convertToUtf8 } from '../lib/processing/encodingDetector.js';
 import { isArchive, detectArchiveType } from '../lib/processing/archiveHandler.js';
@@ -110,10 +110,10 @@ describe('Log Processing', () => {
       expect(normalizeLevel('FATAL')).toBe('FATAL');
     });
 
-    it('should fallback to INFO for unknown levels', () => {
+    it('should normalize common aliases and fallback for unknown levels', () => {
       expect(normalizeLevel('unknown')).toBe('INFO');
-      expect(normalizeLevel('warn')).toBe('INFO');
-      expect(normalizeLevel('err')).toBe('INFO');
+      expect(normalizeLevel('warn')).toBe('WARNING');
+      expect(normalizeLevel('err')).toBe('ERROR');
     });
   });
 

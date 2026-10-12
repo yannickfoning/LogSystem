@@ -21,13 +21,97 @@ describe('Dashboard API trends logic', () => {
     const src = readFileSync(path.join(root, 'routes/dashboard.js'), 'utf8');
     expect(src).toContain('sample_log_id: r.sample_log_id || (samples[0]');
   });
+
+  it('uses one normalized distinct source identity for dashboard and trend counts', () => {
+    const src = readFileSync(path.join(root, 'routes/dashboard.js'), 'utf8');
+    const usages = src.match(/COUNT\(DISTINCT \$\{SOURCE_IDENTITY_SQL\}\)/g) || [];
+    expect(src).toContain('const SOURCE_IDENTITY_SQL = `LOWER(COALESCE(');
+    expect(src).toContain("'application','app','java','java application'");
+    expect(usages).toHaveLength(2);
+  });
+});
+
+describe('Top repeated errors', () => {
+  it('counts matching error logs and sorts the highest occurrence count first', () => {
+    const route = readFileSync(path.join(root, 'routes/dashboard/top-errors-advanced.js'), 'utf8');
+    expect(route).toContain('FROM logs l');
+    expect(route).toContain('COUNT(DISTINCT l.id) AS occurrence_count');
+    expect(route).toContain("l.log_level IN ('ERROR', 'CRITICAL', 'FATAL')");
+    expect(route).toContain('HAVING ${havingFilters.join(\' AND \')}');
+    expect(route).toContain('ORDER BY occurrence_count DESC, most_recent DESC');
+  });
+
+  it('shows all imported history by default and keeps the time filter optional', () => {
+    const route = readFileSync(path.join(root, 'routes/dashboard/top-errors-advanced.js'), 'utf8');
+    const html = readFileSync(path.join(root, 'public/dashboard.html'), 'utf8');
+    expect(route).toContain("req.query.timeRange || 'all'");
+    expect(route).toContain("const rangeFilter = rangeFilters[timeRange] || ''");
+    expect(html).toContain('<option value="all">Toutes périodes</option>');
+    expect(html).toContain("|| 'all'");
+  });
+});
+
+describe('Watcher ingestion reliability', () => {
+  it('retries lock conflicts and only advances offsets after committed inserts', () => {
+    const watcher = readFileSync(path.join(root, 'services/watcherService.js'), 'utf8');
+    const commitIndex = watcher.indexOf('await conn.commit();');
+    const persistedOffsetIndex = watcher.indexOf('fileOffsets.set(filePath, currentSize);', commitIndex);
+
+    expect(watcher).toContain('function isRetryableLockError(error)');
+    expect(watcher).toContain("logger.warn({ event: 'batch_insert_retry'");
+    expect(watcher).toContain('if (Number(insertResult.affectedRows) > 0) insertedEntries.push(entry)');
+    expect(watcher).toContain('await upsertErrorGroupsFromLogs(conn, userId, insertedEntries, RETURN_GAP_DAYS)');
+    expect(watcher).toContain('if (fs.existsSync(row.path))');
+    expect(watcher).toContain("watcher.on('unlink'");
+    expect(commitIndex).toBeGreaterThanOrEqual(0);
+    expect(persistedOffsetIndex).toBeGreaterThan(commitIndex);
+    expect(watcher).toContain('alertWorker.broadcastLogBatch(insertedEntries, { userId })');
+  });
+});
+
+describe('Error group count consistency', () => {
+  it('reconciles cached groups to real log occurrences and preserves resolved status on replay', () => {
+    const service = readFileSync(path.join(root, 'services/errorGroupService.js'), 'utf8');
+    const worker = readFileSync(path.join(root, 'workers/import-worker.js'), 'utf8');
+    const importer = readFileSync(path.join(root, 'routes/import.js'), 'utf8');
+
+    expect(service).toContain('COUNT(*) AS occurrence_count');
+    expect(service).toContain('occurrence_count = VALUES(occurrence_count)');
+    expect(service).toContain("IF(VALUES(last_seen) > last_seen, 'open', status)");
+    expect(worker).toContain('upsertErrorGroupsFromLogs(conn, userId, records, returnGapDays)');
+    expect(importer).toContain('upsertErrorGroupsFromLogs(conn, userId, orderedBatch, RETURN_GAP_DAYS)');
+  });
+
+  it('routes single-log ingestion through the same handler as batch ingestion', () => {
+    const route = readFileSync(path.join(root, 'routes/logs-ingestion.js'), 'utf8');
+    expect(route).toContain("router.post('/ingest', handleIngestBatch)");
+    expect(route).toContain('return handleIngestBatch(req, res)');
+    expect(route).toContain('upsertErrorGroupsFromLogs(conn, userId, insertedLogs)');
+    expect(route).not.toContain('` + scope.sql');
+  });
+
+  it('does not flag recurring log fingerprints as database duplicates in the audit', () => {
+    const audit = readFileSync(path.join(root, 'scripts/audit/production-audit.js'), 'utf8');
+    expect(audit).toContain('FROM error_groups');
+    expect(audit).toContain('GROUP BY fingerprint, user_id HAVING cnt > 1');
+    expect(audit).not.toContain('FROM logs \n      WHERE fingerprint IS NOT NULL \n      GROUP BY fingerprint HAVING cnt > 1');
+  });
+
+  it('keeps runtime logs and uploads out of the Docker build context', () => {
+    const dockerignore = readFileSync(path.join(root, '.dockerignore'), 'utf8');
+    expect(dockerignore).toContain('logs/');
+    expect(dockerignore).toContain('uploads/');
+    expect(dockerignore).toContain('.env.*');
+  });
 });
 
 describe('Dashboard frontend', () => {
-  it('uses local fmtDate not UTC toISOString', () => {
+  it('formats date bounds with UTC calendar components', () => {
     const html = readFileSync(path.join(root, 'public/dashboard.html'), 'utf8');
     expect(html).not.toMatch(/function fmtDate\(d\)\{\s*return d\.toISOString\(\)/);
-    expect(html).toContain('d.getFullYear()');
+    expect(html).toContain('d.getUTCFullYear()');
+    expect(html).toContain('d.getUTCMonth()');
+    expect(html).toContain('d.getUTCDate()');
   });
 
   it('modal sample log button handler on modal-detail-body', () => {
@@ -78,6 +162,16 @@ describe('Search API', () => {
     const src = readFileSync(path.join(root, 'routes/api/search.js'), 'utf8');
     expect(src).toContain('async function runLogsSearch');
     expect(src).toContain('search_fallback');
+  });
+
+  it('error directory uses safe literal pagination values for MySQL', () => {
+    const src = readFileSync(path.join(root, 'routes/api/search.js'), 'utf8');
+    const route = src.slice(src.indexOf("router.get('/error-directory'"), src.indexOf("router.get('/trends'"));
+
+    expect(route).toContain('Number.isSafeInteger(requestedLimit)');
+    expect(route).toContain('Number.isSafeInteger(requestedOffset)');
+    expect(route).toContain('LIMIT ${limitNum} OFFSET ${offsetNum}');
+    expect(route).not.toMatch(/LIMIT\s+\?\s+OFFSET\s+\?/);
   });
 });
 

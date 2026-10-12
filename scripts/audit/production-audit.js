@@ -81,15 +81,16 @@ async function auditDatabase() {
       AUDIT_RESULTS.database.issues.push(`${orphaned[0].cnt} logs orphelins (user_id = NULL) détectés`);
     }
     
-    // Check for duplicate fingerprints
+    // Repeated log fingerprints are expected: they represent recurring errors.
+    // Only duplicate cached error groups indicate a consistency problem.
     const [duplicates] = await pool.execute(`
-      SELECT fingerprint, COUNT(*) as cnt FROM logs 
-      WHERE fingerprint IS NOT NULL 
-      GROUP BY fingerprint HAVING cnt > 1 LIMIT 10
+      SELECT fingerprint, user_id, COUNT(*) as cnt FROM error_groups
+      WHERE fingerprint IS NOT NULL
+      GROUP BY fingerprint, user_id HAVING cnt > 1 LIMIT 10
     `);
     
     if (duplicates.length > 0) {
-      AUDIT_RESULTS.database.issues.push(`${duplicates.length} fingerprints avec duplicatas détectés`);
+      AUDIT_RESULTS.database.issues.push(`${duplicates.length} groupes d’erreurs dupliqués détectés`);
     }
     
     if (AUDIT_RESULTS.database.issues.length === 0) {

@@ -347,8 +347,8 @@ describe('Logs CRUD and Import', () => {
     });
 
     it('should normalize log levels', async () => {
-      const { normalizeLevel } = await import('../../lib/processing/logLevelUtils.js');
-      
+      const { normalizeLevel } = await import('../../services/logLevelUtils.js');
+
       expect(normalizeLevel('warn')).toBe('WARNING');
       expect(normalizeLevel('err')).toBe('ERROR');
       expect(normalizeLevel('debug')).toBe('DEBUG');

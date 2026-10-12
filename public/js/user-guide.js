@@ -147,6 +147,7 @@ function showBeginnerGuide() {
     align-items: center;
     justify-content: center;
     z-index: 100000;
+    pointer-events: none;
   `;
   
   const content = guide.querySelector('.guide-content');
@@ -156,12 +157,30 @@ function showBeginnerGuide() {
     border-radius: 12px;
     max-width: 500px;
     color: var(--text);
+    pointer-events: none;
   `;
-  
-  guide.querySelector('#close-guide').addEventListener('click', () => {
+
+  const closeGuideButton = guide.querySelector('#close-guide');
+  closeGuideButton.style.pointerEvents = 'auto';
+
+  function dismissGuide() {
     guide.remove();
     localStorage.setItem('beginnerGuideSeen', 'true');
-  });
+    document.removeEventListener('keydown', onGuideKeydown);
+    document.removeEventListener('click', onGuideOutsideClick, true);
+  }
+
+  function onGuideKeydown(event) {
+    if (event.key === 'Escape') dismissGuide();
+  }
+
+  function onGuideOutsideClick(event) {
+    if (!guide.contains(event.target)) dismissGuide();
+  }
+
+  closeGuideButton.addEventListener('click', dismissGuide);
+  document.addEventListener('keydown', onGuideKeydown);
+  document.addEventListener('click', onGuideOutsideClick, true);
   
   document.body.appendChild(guide);
 }

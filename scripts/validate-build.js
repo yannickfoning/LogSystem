@@ -19,7 +19,7 @@ function collectJsFiles(dir, files = []) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       collectJsFiles(fullPath, files);
-    } else if (/\.(js|mjs)$/.test(entry.name)) {
+    } else if (/\.(js|mjs)$/.test(entry.name) && !/(?:\.backup|-backup)\.(?:js|mjs)$/i.test(entry.name)) {
       files.push(fullPath);
     }
   }

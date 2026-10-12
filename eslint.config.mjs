@@ -12,6 +12,7 @@ export default [
       'logs/**',
       'upload/**',
       'public/**/*.min.js',
+      '**/*-backup.js',
     ],
   },
   js.configs.recommended,
