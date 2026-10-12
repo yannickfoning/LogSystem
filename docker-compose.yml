@@ -6,22 +6,20 @@ services:
     container_name: logsystem
     restart: unless-stopped
     ports:
-      - "${PORT:-10000}:10000"
-    env_file:
-      - .env.docker
+      - "10000:10000"
     environment:
-      - NODE_ENV=${NODE_ENV:-production}
+      - NODE_ENV=development
       - PORT=10000
       - DB_HOST=mysql
       - DB_PORT=3306
-      - DB_USER=${DB_USER:-logsystem}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_NAME=${DB_NAME:-logsystem}
+      - DB_USER=logsystem
+      - DB_PASSWORD=LogSystem2024!
+      - DB_NAME=logsystem
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-      - SESSION_SECRET=${SESSION_SECRET}
-      - CSRF_SECRET=${CSRF_SECRET}
+      - REDIS_PASSWORD=LogSystemRedis2024!
+      - SESSION_SECRET=LogSystemSessionSecret2024ChangeThisToSomethingMoreSecure!
+      - CSRF_SECRET=LogSystemCSRFSecret2024ChangeThisToSomethingMoreSecure!
       - RUN_MIGRATIONS_ON_START=true
       - START_BACKGROUND_JOBS=true
       - WATCH_DIR_USER_MAP=/app/logs:1
@@ -48,10 +46,10 @@ services:
     container_name: logsystem-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
-      MYSQL_DATABASE: ${DB_NAME:-logsystem}
-      MYSQL_USER: ${DB_USER:-logsystem}
-      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: LogSystem2024!
+      MYSQL_DATABASE: logsystem
+      MYSQL_USER: logsystem
+      MYSQL_PASSWORD: LogSystem2024!
       MYSQL_ROOT_HOST: '%'
     volumes:
       - logsystem-mysql:/var/lib/mysql
@@ -60,7 +58,7 @@ services:
     networks:
       - logsystem
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pLogSystem2024!"]
       interval: 10s
       timeout: 5s
       retries: 10

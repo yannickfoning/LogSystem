@@ -68,9 +68,9 @@
       var resp = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': getCsrfToken()
+          'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify({
           email: emailInput.value,
           password: pwdInput.value
@@ -82,14 +82,20 @@
       if (!resp.ok) {
         errorDiv.textContent = data.error || (window.i18n ? window.i18n.t('login.error.invalid') : 'Identifiants invalides');
         errorDiv.style.display = 'block';
+        loginBtn.disabled = false;
+        loginBtn.textContent = window.i18n ? window.i18n.t('login.btn') : 'Se connecter';
         return;
       }
 
-      window.location.href = data.role === 'admin' ? '/admin.html' : '/dashboard.html';
+      console.log('Login successful:', data);
+      localStorage.setItem('user', JSON.stringify(data));
+      setTimeout(function() {
+        window.location.href = '/dashboard.html';
+      }, 100);
     } catch (_err) {
+      console.error('Login error:', _err);
       errorDiv.textContent = window.i18n ? window.i18n.t('login.error.network') : 'Erreur réseau. Vérifiez votre connexion.';
       errorDiv.style.display = 'block';
-    } finally {
       loginBtn.disabled = false;
       loginBtn.textContent = window.i18n ? window.i18n.t('login.btn') : 'Se connecter';
     }

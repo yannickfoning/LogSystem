@@ -4,6 +4,110 @@ import { requireAuth, userScope } from '../../middleware/auth.js';
 import logger from '../../config/logger.js';
 import { searchLimiter } from '../../lib/rateLimiter.js';
 
+// Fonction utilitaire pour obtenir une recommandation pour un log
+async function getRecommendationForLog(logId, scope) {
+  try {
+    const [logs] = await pool.execute(
+      `SELECT id, error_type, event_type, parser_format, log_level, message, fingerprint
+       FROM logs WHERE id = ?${scope.sql} LIMIT 1`,
+      [logId, ...scope.params],
+    );
+    if (!logs.length) return null;
+
+    const log = logs[0];
+    
+    // Check if already resolved
+    if (log.fingerprint) {
+      const [errorGroups] = await pool.execute(
+        `SELECT status, solution_applied, solution_applied_at
+         FROM error_groups
+         WHERE fingerprint = ?${scope.sql} AND status = 'resolved'
+         LIMIT 1`,
+        [log.fingerprint, ...scope.params],
+      );
+      if (errorGroups.length > 0) {
+        return {
+          type: 'resolved',
+          message: `Ce probleme a deja ete resolu. Solution appliquee : ${errorGroups[0].solution_applied}`,
+          solution_applied: errorGroups[0].solution_applied,
+          solution_applied_at: errorGroups[0].solution_applied_at
+        };
+      }
+    }
+
+    // Get recommendation from error_recommendations table
+    const [recommendations] = await pool.execute(
+      `SELECT recommendation, has_solution, solution_details
+       FROM error_recommendations
+       WHERE is_active = 1 AND has_solution = 0 AND (
+         (? <> '' AND error_type = ? AND (log_format IS NULL OR log_format = ?)) OR
+         (error_type = '*' AND (
+           (? <> '' AND event_type = ?) OR
+           (? <> '' AND log_format = ?) OR
+           (? <> '' AND log_level = ?)
+         ))
+       )
+       ORDER BY
+         CASE
+           WHEN ? <> '' AND error_type = ? AND (log_format IS NULL OR log_format = ?) THEN 0
+           WHEN ? <> '' AND error_type = '*' AND event_type = ? THEN 1
+           WHEN ? <> '' AND error_type = '*' AND log_format = ? THEN 2
+           WHEN ? <> '' AND error_type = '*' AND log_level = ? THEN 3
+           ELSE 4
+         END,
+         priority DESC
+       LIMIT 1`,
+      [
+        log.error_type || '', log.error_type || '', log.parser_format || null,
+        log.event_type || '', log.event_type || '',
+        log.parser_format || '', log.parser_format || '',
+        log.log_level || '', log.log_level || '',
+        log.error_type || '', log.error_type || '', log.parser_format || null,
+        log.event_type || '', log.event_type || '',
+        log.parser_format || '', log.parser_format || '',
+        log.log_level || '', log.log_level || '',
+      ]
+    );
+
+    if (recommendations.length > 0) {
+      return {
+        type: 'recommendation',
+        message: recommendations[0].recommendation,
+        has_solution: recommendations[0].has_solution,
+        solution_details: recommendations[0].solution_details
+      };
+    }
+
+    // Generate generic advice based on error type and target user
+    const errorType = String(log.error_type || '').toLowerCase();
+    const eventType = String(log.event_type || '').toLowerCase();
+    const message = String(log.message || '').toLowerCase();
+    const targetUser = log.target_user;
+    const context = `${errorType} ${eventType} ${message}`;
+    
+    let genericAdvice = `Analysez ce log dans le contexte de votre application. Utilisateur responsable : ${targetUser}.`;
+    
+    if (/database|sql|query|ora-|deadlock|constraint/.test(context)) {
+      genericAdvice = `Pour ce motif de base de donnees (utilisateur : ${targetUser}), verifiez la requete et ses parametres, puis controlez le schema, les droits et les verrous dans le service concerne. Verifiez aussi les permissions de l utilisateur ${targetUser} sur la base de donnees.`;
+    } else if (/invalid|validation|format|parse/.test(context)) {
+      genericAdvice = `Pour cette erreur de validation (utilisateur : ${targetUser}), relevez le champ et la valeur rejetes dans le message complet, comparez avec une execution reussie du meme service et corrigez le format a la source. Verifiez les donnees fournies par l utilisateur ${targetUser}.`;
+    } else if (/auth|credential|permission|unauthorized|forbidden|401|403/.test(context)) {
+      genericAdvice = `Pour cette erreur d acces (utilisateur : ${targetUser}), verifiez les roles et les droits du service cible. Controlez aussi l expiration des identifiants de l utilisateur ${targetUser} sans les inscrire dans les logs.`;
+    } else if (/timeout|timed out|econnrefused|network|connection/.test(context)) {
+      genericAdvice = `Pour cette erreur de connexion (utilisateur : ${targetUser}), verifiez l etat du service distant, son adresse et son port, puis controlez les delais d attente et les traces reseau a la meme heure. Verifiez si l utilisateur ${targetUser} a acces au service.`;
+    }
+
+    return {
+      type: 'generic',
+      message: genericAdvice,
+      target_user: targetUser
+    };
+  } catch (e) {
+    logger.error({ event: 'get_recommendation_error', error: e.message }, '[SEARCH]');
+    return null;
+  }
+}
+
 const router = Router();
 router.use(requireAuth);
 router.use(searchLimiter);
@@ -279,6 +383,16 @@ router.get('/', async (req, res) => {
 
     const logs = await runLogsSearch(whereClause, params, limitNum, offsetNum);
 
+    // Ajouter des recommandations pour chaque log
+    const enrichedLogs = [];
+    for (const log of logs) {
+      const recommendation = await getRecommendationForLog(log.id, scope);
+      enrichedLogs.push({
+        ...log,
+        recommendation: recommendation || null
+      });
+    }
+
     const facetsLevel = await runFacetQuery(
       `SELECT log_level AS facet_key, COUNT(*) AS cnt FROM logs WHERE ${whereClause} GROUP BY log_level`,
       params,
@@ -309,7 +423,7 @@ router.get('/', async (req, res) => {
 
     // [FIX-20] Masquer stack_trace pour les utilisateurs non-admins — peut contenir des chemins système internes
     const isAdmin = req.session?.user?.role === 'admin';
-    const sanitizedLogs = isAdmin ? logs : logs.map(log => ({ ...log, stack_trace: undefined }));
+    const sanitizedLogs = isAdmin ? enrichedLogs : enrichedLogs.map(log => ({ ...log, stack_trace: undefined }));
 
     res.json({
       logs: sanitizedLogs,

@@ -791,7 +791,7 @@
          ['Type evenement',l.event_type],['IP client',l.client_ip],
          ['Utilisateur cible',l.target_user],['Type erreur',l.error_type]
         ].forEach(function(kv){ if(kv[1]!=null&&kv[1]!=='') html+='<p><strong>'+esc(kv[0])+':</strong> '+esc(String(kv[1]))+'</p>'; });
-        
+
         // Ajout des informations SIEM de provenance et temporalite
         const st = l.source_type || 'watch';
         const conf = SOURCE_CONFIG[st] || SOURCE_CONFIG.watch;
@@ -800,18 +800,75 @@
         html += `<p><strong>Provenance:</strong> <span style="font-size:10px; padding: 2px 6px; border: 1px solid ${conf.color}; color: ${conf.color}; background: ${conf.color}11; border-radius: 4px; font-weight: bold;">${conf.label}</span></p>`;
         html += `<p><strong style="color:#f59e0b">Temps Événement:</strong> ${fmtDT(l.timestamp)}</p>`;
         html += `<p><strong style="color:#3b82f6">Temps Ingestion:</strong> ${ingestedAt ? fmtDT(ingestedAt) : 'N/A'}</p>`;
-        
+
         html += '<p><strong>Message:</strong></p><pre style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;white-space:pre-wrap;font-size:11px;max-height:150px;overflow:auto">'+esc(l.message||'')+'</pre>';
         if (l.stack_trace) html += '<p><strong>Stack trace:</strong></p><pre style="background:rgba(80,0,0,0.3);color:#ff9999;padding:10px;border-radius:6px;white-space:pre-wrap;font-size:10px;max-height:150px;overflow:auto">'+esc(l.stack_trace)+'</pre>';
         html += '</div>';
-        var modal = document.getElementById('wl-modal-detail');
-        if (modal) {
-          var t=modal.querySelector('#wl-modal-title');
-          var b=modal.querySelector('#wl-modal-body');
-          if(t) t.textContent='Log #'+l.id;
-          if(b) b.innerHTML=html;
-          modal.classList.add('is-open');
-        }
+
+        // Load recommendation with enriched data
+        const errorType = l.error_type || null;
+        const recommendationPromise = api.get('/api/recommendations/match?log_id=' + encodeURIComponent(logId) +
+          (errorType ? '&error_type=' + encodeURIComponent(errorType) : '') +
+          (l.parser_format ? '&log_format=' + encodeURIComponent(l.parser_format) : '') +
+          (l.event_type ? '&event_type=' + encodeURIComponent(l.event_type) : '') +
+          (l.log_level ? '&log_level=' + encodeURIComponent(l.log_level) : ''));
+
+        recommendationPromise.then(function(recData) {
+          const recommendation = recData && recData.recommendation ? recData.recommendation : null;
+          const errorInfo = recData && recData.errorInfo ? recData.errorInfo : null;
+          const fixSuggestion = recData && recData.fixSuggestion ? recData.fixSuggestion : null;
+
+          // Add enhanced recommendation section with solution steps
+          if (recommendation || fixSuggestion) {
+            html += '<div style="background:rgba(16,185,129,0.08);border-left:4px solid #10b981;padding:16px;border-radius:8px;margin:16px 0">';
+            html += '<div style="font-size:14px;font-weight:600;color:#059669;margin-bottom:12px">💡 Recommandation pour résoudre ce problème</div>';
+
+            // Show error info if available
+            if (errorInfo) {
+              html += '<div style="margin-bottom:12px">';
+              html += '<div style="font-size:12px;color:#6b7280;margin-bottom:4px">Catégorie : ' + esc(errorInfo.category || 'Général') + '</div>';
+              html += '<div style="font-size:12px;color:#6b7280">Gravité : ';
+              const severityColors = { 'critical': '#dc2626', 'high': '#ea580c', 'medium': '#ca8a04', 'low': '#059669' };
+              const severityLabel = errorInfo.severity || 'medium';
+              html += '<span style="color:' + (severityColors[severityLabel] || '#6b7280') + ';font-weight:500">' + severityLabel.toUpperCase() + '</span>';
+              html += '</div></div>';
+            }
+
+            // Show the main recommendation
+            if (recommendation) {
+              html += '<div style="margin-bottom:12px;line-height:1.6">' + esc(recommendation).replace(/\n/g, '<br>') + '</div>';
+            }
+
+            // Show detailed fix suggestion with steps
+            if (fixSuggestion && fixSuggestion !== 'Aucune suggestion automatique disponible. Consultez la documentation du module ou cherchez l\'erreur exacte dans la communauté.') {
+              html += '<div style="background:rgba(59,130,246,0.08);border-radius:6px;padding:12px;margin-top:12px">';
+              html += '<div style="font-size:13px;font-weight:600;color:#2563eb;margin-bottom:8px">🔧 Étapes de résolution :</div>';
+              html += '<div style="line-height:1.7">' + esc(fixSuggestion).replace(/\n/g, '<br>') + '</div>';
+              html += '</div>';
+            }
+
+            html += '</div>';
+          }
+
+          var modal = document.getElementById('wl-modal-detail');
+          if (modal) {
+            var t=modal.querySelector('#wl-modal-title');
+            var b=modal.querySelector('#wl-modal-body');
+            if(t) t.textContent='Log #'+l.id;
+            if(b) b.innerHTML=html;
+            modal.classList.add('is-open');
+          }
+        }).catch(function() {
+          // If recommendation fails, still show the log details
+          var modal = document.getElementById('wl-modal-detail');
+          if (modal) {
+            var t=modal.querySelector('#wl-modal-title');
+            var b=modal.querySelector('#wl-modal-body');
+            if(t) t.textContent='Log #'+l.id;
+            if(b) b.innerHTML=html;
+            modal.classList.add('is-open');
+          }
+        });
       }).catch(function(){});
     });
 

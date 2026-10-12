@@ -83,6 +83,7 @@ router.get('/top-errors-grouped', requireAuth, async (req, res) => {
        WHERE l.user_id = ?
          AND l.fingerprint IS NOT NULL AND TRIM(l.fingerprint) <> ''
          AND l.log_level IN ('ERROR', 'CRITICAL', 'FATAL')
+         AND (eg.status IS NULL OR eg.status != 'resolved')
          ${rangeFilter}
        GROUP BY l.fingerprint
        HAVING ${havingFilters.join(' AND ')}

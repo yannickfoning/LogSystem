@@ -58,7 +58,7 @@
   };
 
   /** Render standardized log metadata block for detail modals. */
-  window.renderLogDetailHtml = function (log, esc, fmtDT, badge, recommendation, history) {
+  window.renderLogDetailHtml = function (log, esc, fmtDT, badge, recommendation, history, errorInfo, fixSuggestion) {
     if (!log) return '';
     var eventTs = window.logEventTime(log);
     var html = '<div style="font-size:13px;line-height:1.8">';
@@ -72,7 +72,10 @@
     html += '<p><strong>Niveau:</strong> ' + badge(log.log_level) + '</p>';
     html += '<p><strong>Source:</strong> ' + esc(window.logMetadataLabel([log.source, log.source_server, log.module, log.log_source, log.source_system], log.import_filename ? 'Fichier : ' + log.import_filename : 'Non renseignée')) + '</p>';
     html += '<p><strong>Service:</strong> ' + esc(window.logMetadataLabel(log.service)) + '</p>';
-    html += '<p><strong>Utilisateur responsable du log:</strong> ' + esc(window.logMetadataLabel(log.target_user, 'Non renseigné dans le log')) + '</p>';
+    var actor = window.logMetadataLabel(log.target_user, '');
+    var clientIp = log.client_ip || log.ip_address || '';
+    var userDisplay = actor || (clientIp ? 'IP: ' + clientIp : '') || 'Non renseigné dans le log';
+    html += '<p><strong>Utilisateur responsable du log:</strong> ' + esc(userDisplay) + '</p>';
     if (log.importer_name) html += '<p><strong>Importé par:</strong> ' + esc(log.importer_name) + '</p>';
     if (log.log_origin) html += '<p><strong>Origine:</strong> ' + esc(log.log_origin) + '</p>';
     html += '<hr style="border-color:var(--border);margin:12px 0">';
@@ -80,8 +83,36 @@
     if (log.stack_trace) {
       html += '<p style="margin-top:8px"><strong>Stack trace:</strong></p><pre style="background:#1a0000;color:#ff6b6b;padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-all;font-size:11px;max-height:200px;overflow:auto">' + esc(log.stack_trace) + '</pre>';
     }
-    if (recommendation) {
-      html += '<div style="background:rgba(16,185,129,0.1);border-left:4px solid #10b981;padding:12px 16px;border-radius:6px;font-size:13px;margin:12px 0"><strong style="color:#10b981">💡 Recommandation :</strong><br><br>' + esc(recommendation) + '</div>';
+    // Add enhanced recommendation section with solution steps
+    if (recommendation || fixSuggestion) {
+      html += '<div style="background:rgba(16,185,129,0.08);border-left:4px solid #10b981;padding:16px;border-radius:8px;margin:16px 0">';
+      html += '<div style="font-size:14px;font-weight:600;color:#059669;margin-bottom:12px">💡 Recommandation pour résoudre ce problème</div>';
+
+      // Show error info if available
+      if (errorInfo) {
+        html += '<div style="margin-bottom:12px">';
+        html += '<div style="font-size:12px;color:#6b7280;margin-bottom:4px">Catégorie : ' + esc(errorInfo.category || 'Général') + '</div>';
+        html += '<div style="font-size:12px;color:#6b7280">Gravité : ';
+        var severityColors = { 'critical': '#dc2626', 'high': '#ea580c', 'medium': '#ca8a04', 'low': '#059669' };
+        var severityLabel = errorInfo.severity || 'medium';
+        html += '<span style="color:' + (severityColors[severityLabel] || '#6b7280') + ';font-weight:500">' + severityLabel.toUpperCase() + '</span>';
+        html += '</div></div>';
+      }
+
+      // Show the main recommendation
+      if (recommendation) {
+        html += '<div style="margin-bottom:12px;line-height:1.6">' + esc(recommendation).replace(/\n/g, '<br>') + '</div>';
+      }
+
+      // Show detailed fix suggestion with steps
+      if (fixSuggestion && fixSuggestion !== 'Aucune suggestion automatique disponible. Consultez la documentation du module ou cherchez l\'erreur exacte dans la communauté.') {
+        html += '<div style="background:rgba(59,130,246,0.08);border-radius:6px;padding:12px;margin-top:12px">';
+        html += '<div style="font-size:13px;font-weight:600;color:#2563eb;margin-bottom:8px">🔧 Étapes de résolution :</div>';
+        html += '<div style="line-height:1.7">' + esc(fixSuggestion).replace(/\n/g, '<br>') + '</div>';
+        html += '</div>';
+      }
+
+      html += '</div>';
     }
     if (history) {
       var sameCount = Number(history.sameFingerprintOccurrences || 0);

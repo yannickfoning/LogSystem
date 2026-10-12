@@ -25,9 +25,9 @@ body.has-bottom-nav {
 }
 
 @media (min-width: 1025px) {
-  .stats-grid { grid-template-columns: repeat(6, 1fr); }
-  .kpi-row { grid-template-columns: repeat(6, 1fr); }
-  .kpi-row-2 { grid-template-columns: repeat(6, 1fr); }
+  .stats-grid { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+  .kpi-row { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+  .kpi-row-2 { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
 }
 
 @media (min-width: 769px) and (max-width: 1024px) {

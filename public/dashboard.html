@@ -8,6 +8,70 @@
   <link rel="stylesheet" href="/css/responsive.css">
   <link rel="stylesheet" href="/dashboard.css">
   <script src="/js/chart.umd.min.js"></script>
+  <style>
+    /* Désactiver les animations d'entrée sur le dashboard pour éviter le zoom au rechargement */
+    .kpi-card-v2 {
+      animation: none !important;
+    }
+    .kpi-row .kpi-card-v2:nth-child(1),
+    .kpi-row .kpi-card-v2:nth-child(2),
+    .kpi-row .kpi-card-v2:nth-child(3),
+    .kpi-row .kpi-card-v2:nth-child(4),
+    .kpi-row .kpi-card-v2:nth-child(5),
+    .kpi-row .kpi-card-v2:nth-child(6) {
+      animation-delay: 0s !important;
+    }
+    .card {
+      animation: none !important;
+    }
+    .card:nth-child(2),
+    .card:nth-child(3),
+    .card:nth-child(4),
+    .card:nth-child(n+5) {
+      animation-delay: 0s !important;
+    }
+
+    /* Forcer tout à tenir sur une seule page sans scroll */
+    body {
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+    .dash-layout {
+      height: calc(100vh - 56px);
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 10px 20px 20px;
+      gap: 10px;
+      max-width: 100%;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .kpi-row {
+      gap: 8px;
+    }
+    .kpi-card-v2 {
+      padding: 12px 14px;
+    }
+    .kpi-value-v2 {
+      font-size: 22px;
+    }
+    .card-v2-header {
+      padding: 10px 14px;
+    }
+    .card-v2-body {
+      padding: 10px 14px;
+    }
+    .scroll-y {
+      max-height: 200px;
+    }
+    #trends-wrapper {
+      height: 180px;
+    }
+    .chart-box-sm {
+      height: 180px;
+    }
+  </style>
 </head>
 <body>
 
@@ -493,9 +557,10 @@
         type: 'line',
         data: { labels: labels, datasets: datasets },
         options: {
-          responsive: true, 
+          responsive: true,
           maintainAspectRatio: false,
           resizeDelay: 0,
+          animation: false,
           interaction: { mode: 'index', intersect: false },
           plugins: {
             legend: {
@@ -525,8 +590,7 @@
               grid: { color: 'rgba(255,255,255,0.04)' },
               ticks: { color: '#8b92a8', font: { size: 11 }, precision: 0 }
             }
-          },
-          animation: { duration: 500 }
+          }
         }
       });
     }
@@ -658,6 +722,7 @@
             responsive: true,
             maintainAspectRatio: false,
             cutout: '70%',
+            animation: false,
             plugins: {
               legend: { display: false },
               tooltip: {
@@ -787,11 +852,8 @@
 
     function animateValue(id, target) {
       var el=document.getElementById(id); if(!el) return;
-      var start=parseInt(el.textContent)||0, dur=600, t0=Date.now();
-      (function tick(){ var p=Math.min((Date.now()-t0)/dur,1);
-        var cur=Math.round(start+(target-start)*(1-Math.pow(1-p,3)));
-        el.textContent=fmt(cur); if(p<1)requestAnimationFrame(tick); else el.textContent=fmt(target);
-      })();
+      // Désactiver l'animation pour éviter l'effet d'agrandissement
+      el.textContent=fmt(target);
     }
 
     // ── Gestion des filtres avancés pour non-développeurs ──
@@ -995,7 +1057,8 @@
            var source = window.logMetadataLabel([log.source, log.source_server, log.module, log.log_source, log.source_system], log.import_filename ? 'Fichier : ' + log.import_filename : 'Non renseignée');
           var service = window.logMetadataLabel(log.service);
           var actor = window.logMetadataLabel(log.target_user, '');
-          var user = actor || 'Non renseigné';
+          var clientIp = log.client_ip || log.ip_address || '';
+          var user = actor || (clientIp ? 'IP: ' + clientIp : '') || 'Non renseigné';
           var message = log.message || '';
           var truncated = message.length > 80 ? message.substring(0, 80) + '…' : message;
           
@@ -1198,31 +1261,61 @@ function showLogDetail(logId){
       openModal('modal-detail');
       document.getElementById('modal-detail-title').textContent = 'Détails du log #' + logId;
       document.getElementById('modal-detail-body').innerHTML = 'Chargement…';
-      
+
       // Load log details first
       api.get('/api/logs/'+logId).then(function(log){
         var body = document.getElementById('modal-detail-body');
         var l = log && (log.data||log);
         if (!l) { body.innerHTML = '<p style="color:var(--text2);">Log introuvable</p>'; return; }
-        
+
         var errorType = l.error_type || null;
-        
-        // Load recommendation based on error type if available
-        var recommendationPromise = errorType ? 
-          api.get('/api/recommendations/match/' + encodeURIComponent(errorType) + 
-            (l.event_type ? '?event_type=' + encodeURIComponent(l.event_type) : '') +
-            (l.log_level ? (l.event_type ? '&' : '?') + 'log_level=' + encodeURIComponent(l.log_level) : '')) :
-          Promise.resolve({ recommendation: null });
+
+        // Load recommendation based on log ID to get enriched data
+        var recommendationPromise = api.get('/api/recommendations/match?log_id=' + encodeURIComponent(logId) +
+          (errorType ? '&error_type=' + encodeURIComponent(errorType) : '') +
+          (l.parser_format ? '&log_format=' + encodeURIComponent(l.parser_format) : '') +
+          (l.event_type ? '&event_type=' + encodeURIComponent(l.event_type) : '') +
+          (l.log_level ? '&log_level=' + encodeURIComponent(l.log_level) : ''));
         
         recommendationPromise.then(function(recData) {
           var recommendation = recData && recData.recommendation ? recData.recommendation : null;
-          
+          var errorInfo = recData && recData.errorInfo ? recData.errorInfo : null;
+          var fixSuggestion = recData && recData.fixSuggestion ? recData.fixSuggestion : null;
+
           var html = '<div class="section-title">Log</div>' + renderKV(l);
-          
-          if (recommendation) {
-            html += '<div style="background:rgba(16,185,129,0.1);border-left:4px solid #10b981;padding:12px 16px;border-radius:6px;font-size:13px;margin:12px 0"><strong style="color:#10b981">💡 Recommandation :</strong><br><br>' + esc(recommendation) + '</div>';
+
+          // Add enhanced recommendation section with solution steps
+          if (recommendation || fixSuggestion) {
+            html += '<div style="background:rgba(16,185,129,0.08);border-left:4px solid #10b981;padding:16px;border-radius:8px;margin:16px 0">';
+            html += '<div style="font-size:14px;font-weight:600;color:#059669;margin-bottom:12px">💡 Recommandation pour résoudre ce problème</div>';
+
+            // Show error info if available
+            if (errorInfo) {
+              html += '<div style="margin-bottom:12px">';
+              html += '<div style="font-size:12px;color:#6b7280;margin-bottom:4px">Catégorie : ' + esc(errorInfo.category || 'Général') + '</div>';
+              html += '<div style="font-size:12px;color:#6b7280">Gravité : ';
+              var severityColors = { 'critical': '#dc2626', 'high': '#ea580c', 'medium': '#ca8a04', 'low': '#059669' };
+              var severityLabel = errorInfo.severity || 'medium';
+              html += '<span style="color:' + (severityColors[severityLabel] || '#6b7280') + ';font-weight:500">' + severityLabel.toUpperCase() + '</span>';
+              html += '</div></div>';
+            }
+
+            // Show the main recommendation
+            if (recommendation) {
+              html += '<div style="margin-bottom:12px;line-height:1.6">' + esc(recommendation).replace(/\n/g, '<br>') + '</div>';
+            }
+
+            // Show detailed fix suggestion with steps
+            if (fixSuggestion && fixSuggestion !== 'Aucune suggestion automatique disponible. Consultez la documentation du module ou cherchez l\'erreur exacte dans la communauté.') {
+              html += '<div style="background:rgba(59,130,246,0.08);border-radius:6px;padding:12px;margin-top:12px">';
+              html += '<div style="font-size:13px;font-weight:600;color:#2563eb;margin-bottom:8px">🔧 Étapes de résolution :</div>';
+              html += '<div style="line-height:1.7">' + esc(fixSuggestion).replace(/\n/g, '<br>') + '</div>';
+              html += '</div>';
+            }
+
+            html += '</div>';
           }
-          
+
           html += '<div id="related-alert"></div><div id="related-watchdogs"></div>';
           body.innerHTML = html;
         }).catch(function() {
@@ -1418,6 +1511,16 @@ function showLogDetail(logId){
 
     var btnRefresh = document.getElementById('btn-refresh');
     if (btnRefresh) btnRefresh.addEventListener('click', refreshAll);
+    // -- Fix zoom au rechargement --
+    (function() {
+      // Forcer le conteneur principal à ne pas dépasser
+      var dashLayout = document.querySelector('.dash-layout');
+      if (dashLayout) {
+        dashLayout.style.maxWidth = '1600px';
+        dashLayout.style.margin = '0 auto';
+      }
+    })();
+
     // -- Init --
     setupAdvancedFilters();
     setupClickableKPIs();
