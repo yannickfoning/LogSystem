@@ -1,0 +1,68 @@
+# Configuration Apache pour LogSystem (au niveau du dossier public)
+# Ce fichier configure le routing et les options pour Apache
+
+# Activer le réécriture d'URL
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Rediriger toutes les requêtes API vers le backend Node.js
+    RewriteCond %{REQUEST_URI} ^/api/
+    RewriteRule ^api/(.*)$ http://localhost:3000/api/$1 [P,L]
+
+    # Rediriger les requêtes SSE vers le backend Node.js
+    RewriteCond %{REQUEST_URI} ^/sse/
+    RewriteRule ^sse/(.*)$ http://localhost:3000/sse/$1 [P,L]
+
+    # Pour les routes SPA (Single Page Application), rediriger vers index.html
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} !^/api/
+    RewriteCond %{REQUEST_URI} !^/sse/
+    RewriteRule ^(.*)$ index.html [L]
+</IfModule>
+
+# Headers de sécurité
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# Compression
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json
+</IfModule>
+
+# Cache statique pour les assets
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/jpg "access plus 1 year"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/ico "access plus 1 year"
+    ExpiresByType image/svg+xml "access plus 1 year"
+    ExpiresByType text/css "access plus 1 year"
+    ExpiresByType application/javascript "access plus 1 year"
+    ExpiresByType font/woff "access plus 1 year"
+    ExpiresByType font/woff2 "access plus 1 year"
+</IfModule>
+
+# MIME types
+<IfModule mod_mime.c>
+    AddType application/javascript .js
+    AddType text/css .css
+    AddType image/svg+xml .svg
+    AddType font/woff .woff
+    AddType font/woff2 .woff2
+</IfModule>
+
+# Empêcher l'accès aux fichiers sensibles
+<FilesMatch "\.(env|git|md)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Options du dossier
+Options -Indexes +FollowSymLinks

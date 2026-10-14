@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>LogSystem — Plateforme de gestion des logs</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/css/responsive.css">
+  <style>
+    /* Hero section pour la page d'accueil */
+    .hero-section {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, var(--bg) 0%, #1a1d2e 100%);
+      padding: 40px 20px;
+      text-align: center;
+    }
+
+    .hero-logo {
+      width: 120px;
+      height: auto;
+      margin-bottom: 30px;
+      filter: drop-shadow(0 8px 24px rgba(0,0,0,0.4));
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    .hero-title {
+      font-size: 64px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 16px;
+      letter-spacing: -2px;
+      background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-cyan) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-subtitle {
+      font-size: 24px;
+      color: var(--text2);
+      margin-bottom: 40px;
+      max-width: 600px;
+    }
+
+    .hero-features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+      max-width: 1200px;
+      margin: 60px 0;
+      width: 100%;
+    }
+
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 12px 32px rgba(0,0,0,0.3);
+      border-color: var(--accent-blue);
+    }
+
+    .feature-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .feature-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 12px;
+    }
+
+    .feature-description {
+      font-size: 14px;
+      color: var(--text2);
+      line-height: 1.6;
+    }
+
+    .hero-cta {
+      display: flex;
+      gap: 16px;
+      margin-top: 40px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .btn-large {
+      padding: 16px 40px;
+      font-size: 16px;
+      font-weight: 600;
+      border-radius: 12px;
+      text-decoration: none;
+      transition: all 0.3s;
+    }
+
+    .btn-primary-large {
+      background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-cyan) 100%);
+      color: #fff;
+      box-shadow: 0 8px 24px rgba(79,142,247,0.3);
+    }
+
+    .btn-primary-large:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 32px rgba(79,142,247,0.4);
+    }
+
+    .btn-secondary-large {
+      background: var(--surface);
+      color: var(--text);
+      border: 2px solid var(--border);
+    }
+
+    .btn-secondary-large:hover {
+      background: var(--surface2);
+      border-color: var(--accent-blue);
+    }
+
+    .stats-row {
+      display: flex;
+      gap: 48px;
+      margin: 60px 0;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .stat-item {
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 48px;
+      font-weight: 700;
+      color: var(--accent-blue);
+      margin-bottom: 8px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    @media (max-width: 768px) {
+      .hero-title {
+        font-size: 42px;
+      }
+      .hero-subtitle {
+        font-size: 18px;
+      }
+      .hero-features {
+        grid-template-columns: 1fr;
+      }
+      .stats-row {
+        gap: 24px;
+      }
+      .stat-value {
+        font-size: 36px;
+      }
+    }
+  </style>
+</head>
+<body class="login-hero">
+  <button type="button" class="lang-toggle-btn" id="lang-toggle-btn" aria-label="Changer la langue">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M2 12h20"/>
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+    </svg>
+    <span id="lang-text">FR</span>
+  </button>
+
+  <div class="hero-section">
+    <img class="hero-logo" src="/image/coleps.png" alt="Coleps Logo">
+    <h1 class="hero-title">LogSystem</h1>
+    <p class="hero-subtitle">Plateforme professionnelle de gestion et monitoring de logs</p>
+
+    <div class="stats-row">
+      <div class="stat-item">
+        <div class="stat-value">6.0</div>
+        <div class="stat-label">Version</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">24/7</div>
+        <div class="stat-label">Monitoring</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">∞</div>
+        <div class="stat-label">Scalable</div>
+      </div>
+    </div>
+
+    <div class="hero-features">
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <h3 class="feature-title">Dashboard Intelligent</h3>
+        <p class="feature-description">Visualisation en temps réel de vos logs avec graphiques interactifs et KPIs personnalisés</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔍</div>
+        <h3 class="feature-title">Recherche Avancée</h3>
+        <p class="feature-description">Filtrage multi-critères, recherche par empreinte, et analyse de patterns d'erreurs</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔔</div>
+        <h3 class="feature-title">Alertes Automatiques</h3>
+        <p class="feature-description">Détection d'anomalies en temps réel avec notifications et suggestions de solutions</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📥</div>
+        <h3 class="feature-title">Import Multi-Format</h3>
+        <p class="feature-description">Support de ZIP, RAR, TAR et formats de logs Java Log4j, Apache, Nginx, Splunk</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">💡</div>
+        <h3 class="feature-title">Suggestions IA</h3>
+        <p class="feature-description">Recommandations automatiques basées sur l'historique et les solutions connues</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔒</div>
+        <h3 class="feature-title">Sécurité Renforcée</h3>
+        <p class="feature-description">Authentification sécurisée, gestion des rôles et protection des données sensibles</p>
+      </div>
+    </div>
+
+    <div class="hero-cta">
+      <a href="/login.html" class="btn btn-large btn-primary-large">Se Connecter</a>
+      <a href="#features" class="btn btn-large btn-secondary-large">En Savoir Plus</a>
+    </div>
+  </div>
+
+  <script src="/i18n.js"></script>
+  <script>
+    // Toggle langue
+    document.getElementById('lang-toggle-btn').addEventListener('click', function() {
+      const langText = document.getElementById('lang-text');
+      if (langText.textContent === 'FR') {
+        langText.textContent = 'EN';
+        document.documentElement.lang = 'en';
+      } else {
+        langText.textContent = 'FR';
+        document.documentElement.lang = 'fr';
+      }
+    });
+  </script>
+</body>
+</html>
