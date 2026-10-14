@@ -1,352 +1,331 @@
-# 🐳 Docker Setup Guide - LogSystem
+# Configuration Docker pour LogSystem avec MariaDB
 
-Ce guide explique comment configurer et exécuter LogSystem avec Docker Compose.
+Ce guide explique comment démarrer LogSystem avec Docker Compose en utilisant MariaDB comme base de données.
 
-## 📋 Prérequis
+## Prérequis
 
-- Docker Desktop installé ([https://www.docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop))
-- PowerShell (sur Windows) ou Bash (sur Linux/Mac)
-- Au moins 4GB de RAM disponibles pour Docker
+1. **Docker Desktop** installé
+   - Téléchargez depuis https://www.docker.com/products/docker-desktop
+   - Version 20.10+ requise
 
-## 🚀 Démarrage Rapide
+2. **Git** (optionnel, pour cloner le dépôt)
 
-### 1. Cloner le repository (si pas déjà fait)
+## Architecture Docker
+
+L'application utilise 3 conteneurs :
+
+- **logsystem** : Application Node.js (Express)
+- **logsystem-mariadb** : Base de données MariaDB 11.4
+- **logsystem-redis** : Cache Redis (optionnel, pour la performance)
+
+## Démarrage rapide
+
+### Windows
+
+```batch
+docker-start.bat
+```
+
+### Linux/macOS
 
 ```bash
-git clone <repository-url>
-cd LogSystem
+chmod +x docker-start.sh
+./docker-start.sh
 ```
 
-### 2. Lancer le setup automatique
+Ou manuellement :
 
-```powershell
-.\docker-setup.ps1
+```bash
+docker compose up -d
 ```
 
-Ce script va:
-- ✅ Vérifier que Docker est installé
-- ✅ Construire les images Docker
-- ✅ Démarrer MySQL, Redis et l'application
-- ✅ Attendre que les services soient prêts
-- ✅ Tester la connexion à l'application
+## Configuration
 
-### 3. Accéder à l'application
+### Variables d'environnement
 
-Ouvrez votre navigateur sur: **http://localhost:10000**
+Les variables sont définies dans `docker-compose.yml` :
 
-Identifiants par défaut:
-- **Admin**: admin@logsystem.local / Admin@1234
-- **User**: user@logsystem.local / User@1234
-
-## 📁 Structure Docker
-
-```
-LogSystem/
-├── Dockerfile              # Image de l'application
-├── docker-compose.yml     # Orchestration des services
-├── .env.docker            # Configuration Docker
-├── docker-setup.ps1       # Script de setup
-├── docker-stop.ps1        # Script d'arrêt
-├── docker-logs.ps1        # Script de logs
-├── docker-reset.ps1       # Script de reset
-└── docker-shell.ps1       # Script d'accès shell
-```
-
-## 🔧 Services Docker
-
-L'application utilise 3 conteneurs:
-
-### 1. **app** (LogSystem)
-- Port: 10000
-- Dépend: mysql, redis
-- Healthcheck: HTTP /health
-- Volumes: uploads, logs, temp
-
-### 2. **mysql** (MySQL 8.0)
-- Port: 3306 (interne)
-- Database: logsystem
-- Volume: logsystem-mysql
-- Init: schema.sql + migrations
-
-### 3. **redis** (Redis 7)
-- Port: 6379 (interne)
-- Volume: logsystem-redis
-- Persistence: AOF enabled
-
-## 📝 Scripts Utilitaires
-
-### docker-setup.ps1
-Configure et lance tous les services Docker.
-
-```powershell
-.\docker-setup.ps1
-```
-
-### docker-stop.ps1
-Arrête les services sans supprimer les données.
-
-```powershell
-.\docker-stop.ps1
-```
-
-### docker-logs.ps1
-Affiche les logs des services.
-
-```powershell
-# Tous les services
-.\docker-logs.ps1
-
-# Service spécifique
-.\docker-logs.ps1 app
-.\docker-logs.ps1 mysql
-.\docker-logs.ps1 redis
-```
-
-### docker-reset.ps1
-⚠️ **Attention**: Supprime tous les conteneurs et volumes (données perdues).
-
-```powershell
-.\docker-reset.ps1
-```
-
-### docker-shell.ps1
-Accès au shell d'un conteneur.
-
-```powershell
-# Application shell
-.\docker-shell.ps1 app
-
-# MySQL client
-.\docker-shell.ps1 mysql
-
-# Redis CLI
-.\docker-shell.ps1 redis
-```
-
-## 🔐 Configuration
-
-Les variables d'environnement sont définies dans `.env.docker`:
-
-### Database
-```env
-DB_HOST=mysql
+```yaml
+DB_HOST=mariadb
 DB_PORT=3306
 DB_USER=logsystem
-DB_PASSWORD=LogSystemDocker2024!
+DB_PASSWORD=LogSystem2024!
 DB_NAME=logsystem
 ```
 
-### Redis
-```env
-REDIS_HOST=redis
-REDIS_PORT=6379
-REDIS_PASSWORD=LogSystemRedis2024!
-```
+**⚠️ IMPORTANT** : Changez les mots de passe par défaut en production !
 
-### Sécurité
-```env
-SESSION_SECRET=LogSystemSessionSecret2024DockerDeployment
-CSRF_SECRET=LogSystemCSRFSecret2024DockerDeployment
-```
+### Modifier les mots de passe
 
-⚠️ **Important**: Changez ces secrets en production!
+1. Éditez `docker-compose.yml`
+2. Modifiez les variables :
+   - `MARIADB_ROOT_PASSWORD`
+   - `MARIADB_PASSWORD`
+   - `DB_PASSWORD`
+   - `REDIS_PASSWORD`
+   - `SESSION_SECRET`
+   - `CSRF_SECRET`
 
-## 🛠️ Commandes Docker Compose
+3. Recréez les conteneurs :
+   ```bash
+   docker compose down
+   docker compose up -d
+   ```
 
-### Démarrer les services
+## Initialisation de la base de données
+
+La base de données est automatiquement initialisée au premier démarrage :
+
+- Le fichier `db/schema.sql` est exécuté
+- Les migrations dans `db/migrations/` sont appliquées
+
+### Initialisation manuelle
+
+Si nécessaire :
+
 ```bash
-docker compose --env-file .env.docker up -d
+# Windows
+docker exec -it logsystem-mariadb mariadb -u root -pLogSystem2024! logsystem
+
+# Linux/macOS
+docker exec -it logsystem-mariadb mariadb -u root -pLogSystem2024! logsystem
+```
+
+Puis dans MariaDB :
+
+```sql
+-- Vérifier la base de données
+SHOW DATABASES;
+USE logsystem;
+SHOW TABLES;
+```
+
+## Créer l'utilisateur admin
+
+Le script `create-default-users.js` crée automatiquement un utilisateur admin au démarrage.
+
+Par défaut :
+- Email : `admin@logsystem.local`
+- Mot de passe : `CHANGE_THIS_STRONG_PASSWORD_IMMEDIATELY`
+
+**⚠️ Changez immédiatement ce mot de passe après la première connexion !**
+
+### Créer un admin manuellement
+
+```bash
+docker exec -it logsystem node scripts/create-default-users.js
+```
+
+## Commandes Docker utiles
+
+### Voir les logs
+
+```bash
+# Tous les services
+docker compose logs -f
+
+# Un service spécifique
+docker compose logs -f logsystem
+docker compose logs -f mariadb
+docker compose logs -f redis
 ```
 
 ### Arrêter les services
+
 ```bash
-docker compose --env-file .env.docker down
+docker compose down
 ```
 
-### Voir l'état
-```bash
-docker compose --env-file .env.docker ps
-```
+### Redémarrer les services
 
-### Voir les logs
 ```bash
-docker compose --env-file .env.docker logs -f
-docker compose --env-file .env.docker logs -f app
+docker compose restart
 ```
 
 ### Reconstruire les images
+
 ```bash
-docker compose --env-file .env.docker build
-docker compose --env-file .env.docker up -d
+docker compose down
+docker compose build
+docker compose up -d
 ```
 
-### Redémarrer un service
+### Accéder à MariaDB
+
 ```bash
-docker compose --env-file .env.docker restart app
+docker exec -it logsystem-mariadb mariadb -u root -pLogSystem2024!
 ```
 
-## 🗄️ Base de Données
+### Accéder à Redis
 
-### Accéder à MySQL
-```powershell
-.\docker-shell.ps1 mysql
-```
-
-Ou directement:
 ```bash
-docker compose --env-file .env.docker exec mysql mysql -u logsystem -p logsystem
+docker exec -it logsystem-redis redis-cli -a LogSystemRedis2024!
 ```
 
-### Sauvegarder la base de données
+### Nettoyer tout (données incluses)
+
 ```bash
-docker compose --env-file .env.docker exec mysql mysqldump -u logsystem -p logsystem > backup.sql
+docker compose down -v
 ```
 
-### Restaurer la base de données
+⚠️ Cela supprime toutes les données !
+
+## Volumes Docker
+
+Les données sont persistées dans les volumes suivants :
+
+- `logsystem-mariadb` : Données MariaDB
+- `logsystem-redis` : Données Redis
+- `logsystem-uploads` : Fichiers uploadés
+- `logsystem-logs` : Logs de l'application
+- `logsystem-temp` : Fichiers temporaires
+
+### Lister les volumes
+
 ```bash
-docker compose --env-file .env.docker exec -T mysql mysql -u logsystem -p logsystem < backup.sql
+docker volume ls
 ```
 
-## 🔄 Mises à jour
+### Sauvegarder les volumes
 
-### Mettre à jour l'application
-```powershell
-# Arrêter
-.\docker-stop.ps1
-
-# Pull les changements
-git pull
-
-# Reconstruire et démarrer
-docker compose --env-file .env.docker build
-docker compose --env-file .env.docker up -d
-```
-
-### Mettre à jour uniquement le code (sans rebuild)
 ```bash
-docker compose --env-file .env.docker up -d --build app
+# Sauvegarder MariaDB
+docker run --rm -v logsystem-mariadb:/data -v $(pwd):/backup alpine tar czf /backup/mariadb-backup.tar.gz /data
+
+# Restaurer MariaDB
+docker run --rm -v logsystem-mariadb:/data -v $(pwd):/backup alpine sh -c "cd /data && tar xzf /backup/mariadb-backup.tar.gz --strip 1"
 ```
 
-## 🐛 Dépannage
+## Accès à l'application
+
+Une fois démarré, accédez à :
+
+- **Application** : http://localhost:10000
+- **Dashboard** : http://localhost:10000/dashboard.html
+- **Login** : http://localhost:10000/login.html
+
+## Ports utilisés
+
+- **10000** : Application Node.js
+- **3306** : MariaDB (interne au réseau Docker)
+- **6379** : Redis (interne au réseau Docker)
+
+Pour accéder à MariaDB depuis l'hôte, ajoutez dans `docker-compose.yml` :
+
+```yaml
+mariadb:
+  ports:
+    - "3306:3306"
+```
+
+## Dépannage
+
+### Les conteneurs ne démarrent pas
+
+```bash
+# Voir les logs
+docker compose logs
+
+# Vérifier l'état
+docker compose ps
+```
+
+### Erreur de connexion à MariaDB
+
+1. Vérifiez que MariaDB est prêt :
+   ```bash
+   docker exec logsystem-mariadb mariadb-admin ping -h localhost -u root -pLogSystem2024!
+   ```
+
+2. Vérifiez les logs MariaDB :
+   ```bash
+   docker compose logs mariadb
+   ```
+
+### Erreur de connexion Redis
+
+1. Vérifiez que Redis est prêt :
+   ```bash
+   docker exec logsystem-redis redis-cli -a LogSystemRedis2024! ping
+   ```
 
 ### L'application ne démarre pas
 
-1. Vérifier les logs:
-   ```powershell
-   .\docker-logs.ps1 app
-   ```
-
-2. Vérifier l'état des services:
+1. Vérifiez les logs de l'application :
    ```bash
-   docker compose --env-file .env.docker ps
+   docker compose logs logsystem
    ```
 
-3. Vérifier que les ports ne sont pas utilisés:
+2. Vérifiez que Node.js a réussi à se connecter à MariaDB
+
+3. Recréez les conteneurs :
    ```bash
-   netstat -ano | findstr :10000
+   docker compose down
+   docker compose up -d
    ```
 
-### MySQL ne se connecte pas
+### Port déjà utilisé
 
-1. Vérifier que MySQL est healthy:
-   ```bash
-   docker compose --env-file .env.docker ps mysql
+Si le port 10000 est déjà utilisé :
+
+1. Modifiez le port dans `docker-compose.yml` :
+   ```yaml
+   app:
+     ports:
+       - "8080:10000"
    ```
 
-2. Voir les logs MySQL:
-   ```powershell
-   .\docker-logs.ps1 mysql
-   ```
-
-3. Réinitialiser MySQL (attention: données perdues):
-   ```powershell
-   .\docker-reset.ps1
-   ```
-
-### Problèmes de permissions
-
-Sur Linux/Mac, vous pourriez avoir des problèmes de permissions avec les volumes. Pour corriger:
-
-```bash
-docker compose --env-file .env.docker down
-sudo rm -rf volumes/
-docker compose --env-file .env.docker up -d
-```
+2. Ou arrêtez le service utilisant le port 10000
 
 ### Mémoire insuffisante
 
-Si Docker manque de mémoire:
+Docker Desktop a besoin de 4GB+ de RAM. Configurez dans Docker Desktop :
 
-1. Ouvrir Docker Desktop
-2. Settings → Resources
-3. Augmenter la mémoire allouée (min 4GB)
-4. Appliquer et redémarrer Docker
+1. Settings → Resources → Memory
+2. Augmentez à 4GB ou plus
+3. Appliquez et redémarrez Docker
 
-## 📊 Monitoring
+## Mise à jour
 
-### Voir l'utilisation des ressources
+Pour mettre à jour l'application :
+
 ```bash
-docker stats
+git pull
+docker compose down
+docker compose build
+docker compose up -d
 ```
 
-### Voir l'espace disque utilisé
-```bash
-docker system df
+## Production
+
+Pour un déploiement en production :
+
+1. Changez tous les mots de passe par défaut
+2. Utilisez des secrets Docker ou un gestionnaire de secrets
+3. Activez HTTPS (configurez un reverse proxy comme Nginx)
+4. Configurez les backups automatiques
+5. Surveillez les logs et les métriques
+6. Configurez les limites de ressources
+
+### Exemple de configuration Nginx (reverse proxy)
+
+```nginx
+server {
+    listen 80;
+    server_name logsystem.example.com;
+
+    location / {
+        proxy_pass http://localhost:10000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
 ```
 
-### Nettoyer les ressources inutilisées
-```bash
-docker system prune -a
-```
+## Ressources
 
-## 🔒 Sécurité en Production
-
-Avant de déployer en production:
-
-1. **Changer les secrets par défaut** dans `.env.docker`
-2. **Utiliser des mots de passe forts** pour MySQL et Redis
-3. **Configurer HTTPS** (utiliser un reverse proxy comme Nginx)
-4. **Limiter l'accès réseau** (utiliser Docker networks)
-5. **Activer les backups automatiques** de la base de données
-6. **Surveiller les logs** pour les activités suspectes
-
-## 📚 Ressources
-
-- [Docker Documentation](https://docs.docker.com/)
-- [Docker Compose Documentation](https://docs.docker.com/compose/)
-- [LogSystem Documentation](./ARCHITECTURE.md)
-
-## 💡 Astuces
-
-### Démarrage rapide (développement)
-```bash
-docker compose --env-file .env.docker up -d app mysql redis
-```
-
-### Démarrer en mode foreground (voir les logs)
-```bash
-docker compose --env-file .env.docker up
-```
-
-### Exécuter une commande dans le conteneur
-```bash
-docker compose --env-file .env.docker exec app npm run create-admin
-```
-
-### Copier des fichiers vers le conteneur
-```bash
-docker cp test.log logsystem:/app/logs/
-```
-
-## 🆘 Support
-
-En cas de problème:
-
-1. Vérifier les logs: `.\docker-logs.ps1`
-2. Vérifier la documentation: `./docs/`
-3. Ouvrir une issue sur GitHub
-
----
-
-**Version**: 6.0.0  
-**Dernière mise à jour**: 2026-09-30
+- Documentation Docker : https://docs.docker.com/
+- Documentation Docker Compose : https://docs.docker.com/compose/
+- Documentation MariaDB : https://mariadb.com/kb/en/
