@@ -12,7 +12,7 @@ CREATE TABLE `users` (
   `last_login` DATETIME,
   `session_version` INT DEFAULT 0,
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 DROP TABLE IF EXISTS `logs`;
 CREATE TABLE `logs` (
@@ -67,7 +67,7 @@ CREATE TABLE `logs` (
   INDEX `idx_user_error_type_ts` (`user_id`, `error_type`, `timestamp` DESC),
   INDEX `idx_user_fingerprint_ts` (`user_id`, `fingerprint`, `timestamp` DESC),
   CONSTRAINT `fk_logs_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 DROP TABLE IF EXISTS `error_groups`;
 CREATE TABLE `error_groups` (
@@ -94,7 +94,7 @@ CREATE TABLE `error_groups` (
   INDEX `idx_error_groups_user_id` (`user_id`),
   INDEX `idx_error_groups_status_last` (`status`, `last_seen` DESC),
   INDEX `idx_error_groups_error_type` (`error_type`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 DROP TABLE IF EXISTS `alert_rules`;
 CREATE TABLE `alert_rules` (
@@ -113,7 +113,7 @@ CREATE TABLE `alert_rules` (
   `created_by` INT,
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT `fk_alert_rules_user` FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 DROP TABLE IF EXISTS `alerts`;
 CREATE TABLE `alerts` (
@@ -133,7 +133,7 @@ CREATE TABLE `alerts` (
   INDEX `idx_alerts_status` (`status`),
   INDEX `idx_alerts_user_status` (`user_id`, `status`),
   CONSTRAINT `fk_alerts_rule` FOREIGN KEY (`rule_id`) REFERENCES `alert_rules`(`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 DROP TABLE IF EXISTS `import_jobs`;
 CREATE TABLE `import_jobs` (
@@ -161,7 +161,7 @@ CREATE TABLE `import_jobs` (
   `depot_path` VARCHAR(512) DEFAULT NULL,
   `treated_path` VARCHAR(512) DEFAULT NULL,
   CONSTRAINT `fk_import_jobs_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 DROP TABLE IF EXISTS `audit_log`;
 CREATE TABLE `audit_log` (
@@ -180,7 +180,7 @@ CREATE TABLE `audit_log` (
   INDEX `idx_audit_resource` (`resource_type`),
   INDEX `idx_audit_created` (`created_at`),
   INDEX `idx_audit_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Watcher file offsets use a stable path hash as primary key to avoid indexing long paths.
 DROP TABLE IF EXISTS `watch_offsets`;
@@ -190,6 +190,6 @@ CREATE TABLE `watch_offsets` (
   `offset` BIGINT DEFAULT 0,
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX `idx_watch_offsets_updated` (`updated_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;

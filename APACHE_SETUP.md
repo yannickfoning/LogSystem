@@ -11,10 +11,9 @@ Ce guide explique comment configurer Apache pour servir LogSystem sur Windows.
 2. **Node.js** installé (version 22.x)
    - Téléchargez depuis https://nodejs.org/
 
-3. **MariaDB** installé et configuré (compatible MySQL)
-   - Téléchargez depuis https://mariadb.org/download/
-   - MariaDB est un fork de MySQL et est 100% compatible
-   - Alternative : MySQL depuis https://dev.mysql.com/downloads/mysql/
+3. **MySQL 8** installé et configuré
+   - Téléchargez depuis https://dev.mysql.com/downloads/mysql/
+   - MySQL 8.0+ requis pour le support complet du JSON et des collations UTF8MB4
 
 ## Installation
 
@@ -79,7 +78,7 @@ npm install
 
 # Configurer l'environnement
 cp .env.example .env
-# Éditez .env avec vos credentials MariaDB/MySQL
+# Éditez .env avec vos credentials MySQL
 
 # Exécuter les migrations
 npm run create-admin

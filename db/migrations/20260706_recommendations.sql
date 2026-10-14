@@ -18,4 +18,4 @@ CREATE TABLE IF NOT EXISTS error_recommendations (
   INDEX idx_log_level (log_level),
   INDEX idx_is_active (is_active),
   FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

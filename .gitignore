@@ -16,3 +16,6 @@ npm-debug.log
 .DS_Store
 Thumbs.db
 qa-results*.json
+*.log
+test-report-*.json
+server-runtime.log

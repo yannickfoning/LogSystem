@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script de démarrage Docker pour LogSystem avec MariaDB
+# Script de démarrage Docker pour LogSystem avec MySQL
 
 set -e
 
@@ -34,7 +34,7 @@ echo "[INFO] Construction des images Docker..."
 docker-compose build 2>/dev/null || docker compose build
 
 # Démarrer les services
-echo "[INFO] Démarrage des services (MariaDB, Redis, LogSystem)..."
+echo "[INFO] Démarrage des services (MySQL, Redis, LogSystem)..."
 docker-compose up -d 2>/dev/null || docker compose up -d
 
 echo ""
@@ -43,18 +43,18 @@ echo "LogSystem est en cours de démarrage"
 echo "========================================"
 echo ""
 echo "Services:"
-echo "  - MariaDB: localhost:3306"
+echo "  - MySQL: localhost:3306"
 echo "  - Redis: localhost:6379"
 echo "  - LogSystem: http://localhost:10000"
 echo ""
 echo "Attendez 30-60 secondes pour que les services démarrent..."
 echo ""
 
-# Attendre que MariaDB soit prêt
-echo "[INFO] Attente de MariaDB..."
+# Attendre que MySQL soit prêt
+echo "[INFO] Attente de MySQL..."
 for i in {1..30}; do
-    if docker exec logsystem-mariadb mariadb-admin ping -h localhost -u root -pLogSystem2024! &> /dev/null; then
-        echo "[OK] MariaDB est prêt"
+    if docker exec logsystem-mysql mysqladmin ping -h localhost -u root -pLogSystem2024! &> /dev/null; then
+        echo "[OK] MySQL est prêt"
         break
     fi
     echo "  - Tentative $i/30..."
@@ -87,5 +87,5 @@ echo "Commandes utiles:"
 echo "  - Voir les logs: docker-compose logs -f"
 echo "  - Arrêter: docker-compose down"
 echo "  - Redémarrer: docker-compose restart"
-echo "  - Accéder à MariaDB: docker exec -it logsystem-mariadb mariadb -u root -p"
+echo "  - Accéder à MySQL: docker exec -it logsystem-mysql mysql -u root -p"
 echo ""

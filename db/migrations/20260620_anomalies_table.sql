@@ -9,4 +9,4 @@ CREATE TABLE IF NOT EXISTS `anomalies` (
   `metadata` JSON,
   INDEX `idx_anomalies_user` (`user_id`),
   INDEX `idx_anomalies_detected` (`detected_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

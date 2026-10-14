@@ -1,5 +1,5 @@
 @echo off
-REM Script de démarrage Docker pour LogSystem avec MariaDB (Windows)
+REM Script de démarrage Docker pour LogSystem avec MySQL 8 (Windows)
 
 setlocal enabledelayedexpansion
 
@@ -46,7 +46,7 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 REM Démarrer les services
-echo [INFO] Démarrage des services (MariaDB, Redis, LogSystem)...
+echo [INFO] Démarrage des services (MySQL, Redis, LogSystem)...
 docker compose up -d
 if %ERRORLEVEL% NEQ 0 (
     echo [ERREUR] Erreur lors du démarrage des services
@@ -60,29 +60,29 @@ echo LogSystem est en cours de démarrage
 echo ========================================
 echo.
 echo Services:
-echo   - MariaDB: localhost:3306
+echo   - MySQL: localhost:3306
 echo   - Redis: localhost:6379
 echo   - LogSystem: http://localhost:10000
 echo.
 echo Attendez 30-60 secondes pour que les services démarrent...
 echo.
 
-REM Attendre que MariaDB soit prêt
-echo [INFO] Attente de MariaDB...
+REM Attendre que MySQL soit prêt
+echo [INFO] Attente de MySQL...
 set /a count=0
-:wait_mariadb
-docker exec logsystem-mariadb mariadb-admin ping -h localhost -u root -pLogSystem2024! >nul 2>nul
+:wait_mysql
+docker exec logsystem-mysql mysqladmin ping -h localhost -u root -pLogSystem2024! >nul 2>nul
 if %ERRORLEVEL% EQU 0 (
-    echo [OK] MariaDB est prêt
+    echo [OK] MySQL est prêt
     goto wait_app
 )
 set /a count+=1
 if %count% LEQ 30 (
     echo   - Tentative !count!/30...
     timeout /t 2 /nobreak >nul
-    goto wait_mariadb
+    goto wait_mysql
 )
-echo [AVERTISSEMENT] MariaDB ne semble pas prêt, continuation...
+echo [AVERTISSEMENT] MySQL ne semble pas prêt, continuation...
 
 REM Attendre que l'application soit prête
 :wait_app
@@ -118,6 +118,6 @@ echo Commandes utiles:
 echo   - Voir les logs: docker compose logs -f
 echo   - Arrêter: docker compose down
 echo   - Redémarrer: docker compose restart
-echo   - Accéder à MariaDB: docker exec -it logsystem-mariadb mariadb -u root -p
+echo   - Accéder à MySQL: docker exec -it logsystem-mysql mysql -u root -p
 echo.
 pause

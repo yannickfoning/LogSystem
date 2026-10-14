@@ -89,7 +89,7 @@ SET @sql = IF(@table_exists = 0,
     INDEX `idx_occurrence` (`occurrence_count` DESC),
     CONSTRAINT `fk_rec_freq_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
     CONSTRAINT `fk_rec_freq_rec` FOREIGN KEY (`recommendation_id`) REFERENCES `error_recommendations`(`id`) ON DELETE SET NULL
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci',
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci',
   'SELECT "Table recommendation_frequency already exists" AS message');
 
 PREPARE stmt FROM @sql;

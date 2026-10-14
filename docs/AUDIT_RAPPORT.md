@@ -73,7 +73,7 @@ Ajouts :
 **À surveiller :**
 - Table `watch_offsets` optionnelle (avertissement au démarrage si absente)
 - Redis optionnel (mode dégradé)
-- `npm run schema` : vérifier compatibilité MariaDB (`multipleStatements`)
+- `npm run schema` : vérifier compatibilité MySQL 8 (`multipleStatements`)
 
 ---
 

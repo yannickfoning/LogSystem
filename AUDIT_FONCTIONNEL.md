@@ -18,7 +18,7 @@
 - **Statut**: ❓ Non testable en l'état
 - **Raison**: Le projet semble être une architecture hybride Express uniquement, pas de serveur Next.js détecté. Aucun fichier `next.config.js` ou dossier `pages/` Next.js trouvé.
 
-### 1.3 Connexion MySQL/MariaDB
+### 1.3 Connexion MySQL 8
 - **Statut**: ✅ Fonctionne
 - **Preuve**:
   - Logs serveur: `{"level":30,"event":"db_connected","env":"development","database":"root@127.0.0.1/log","ssl":"disabled"}`

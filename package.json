@@ -1,7 +1,7 @@
 {
   "name": "logsystem",
   "version": "6.0.0",
-  "description": "LogSystem - Plateforme de gestion et monitoring de logs (compatible MySQL/MariaDB)",
+  "description": "LogSystem - Plateforme de gestion et monitoring de logs (MySQL 8)",
   "type": "module",
   "packageManager": "npm@10.0.0",
   "engines": {

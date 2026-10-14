@@ -20,16 +20,16 @@ async function fixPlatformPermanently() {
   console.log('🔧 RÉPARATION DÉFINITIVE DE LA PLATEFORME');
   console.log('=====================================\n');
   
-  // 1. Vérifier si MySQL/MariaDB est en cours d'exécution
-  console.log('1️⃣ VÉRIFICATION SERVICE MySQL/MariaDB');
+  // 1. Vérifier si MySQL est en cours d'exécution
+  console.log('1️⃣ VÉRIFICATION SERVICE MySQL');
   try {
     const connection = await mysql.createConnection(dbConfig);
     await connection.execute('SELECT 1');
     await connection.end();
-    console.log('✅ MySQL/MariaDB accessible');
+    console.log('✅ MySQL accessible');
   } catch (e) {
-    console.log('❌ MySQL/MariaDB inaccessible:', e.message);
-    console.log('💡 Solution: Démarrer MySQL/MariaDB manuellement');
+    console.log('❌ MySQL inaccessible:', e.message);
+    console.log('💡 Solution: Démarrer MySQL manuellement');
     console.log('   - Sur Windows: Services.msc → MySQL → Démarrer');
     console.log('   - Ou: net start mysql');
     return;

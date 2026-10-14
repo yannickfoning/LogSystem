@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS `shared_links` (
   INDEX `idx_shared_links_user` (`user_id`),
   INDEX `idx_shared_links_expires` (`expires_at`),
   CONSTRAINT `fk_shared_links_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Add audit log entries for sharing activities
 INSERT INTO `audit_log` (`user_id`, `user_email`, `action`, `resource_type`, `resource_id`, `details`, `status`)

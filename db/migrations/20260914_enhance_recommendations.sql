@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS `recommendation_frequency` (
   INDEX `idx_occurrence` (`occurrence_count` DESC),
   CONSTRAINT `fk_rec_freq_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_rec_freq_rec` FOREIGN KEY (`recommendation_id`) REFERENCES `error_recommendations`(`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Update existing recommendations with default categories (only if columns exist)
 SET @column_exists = (SELECT COUNT(*) FROM information_schema.columns

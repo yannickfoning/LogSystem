@@ -1,6 +1,8 @@
-# Configuration Docker pour LogSystem avec MariaDB
+# Configuration Docker pour LogSystem avec MySQL
 
-Ce guide explique comment démarrer LogSystem avec Docker Compose en utilisant MariaDB comme base de données.
+Ce guide explique comment démarrer LogSystem avec Docker Compose en utilisant MySQL comme base de données.
+
+Cette configuration est optimisée pour le déploiement sur Render, qui utilise MySQL nativement.
 
 ## Prérequis
 
@@ -15,7 +17,7 @@ Ce guide explique comment démarrer LogSystem avec Docker Compose en utilisant M
 L'application utilise 3 conteneurs :
 
 - **logsystem** : Application Node.js (Express)
-- **logsystem-mariadb** : Base de données MariaDB 11.4
+- **logsystem-mysql** : Base de données MySQL 8.0
 - **logsystem-redis** : Cache Redis (optionnel, pour la performance)
 
 ## Démarrage rapide
@@ -46,7 +48,7 @@ docker compose up -d
 Les variables sont définies dans `docker-compose.yml` :
 
 ```yaml
-DB_HOST=mariadb
+DB_HOST=mysql
 DB_PORT=3306
 DB_USER=logsystem
 DB_PASSWORD=LogSystem2024!
@@ -59,8 +61,8 @@ DB_NAME=logsystem
 
 1. Éditez `docker-compose.yml`
 2. Modifiez les variables :
-   - `MARIADB_ROOT_PASSWORD`
-   - `MARIADB_PASSWORD`
+   - `MYSQL_ROOT_PASSWORD`
+   - `MYSQL_PASSWORD`
    - `DB_PASSWORD`
    - `REDIS_PASSWORD`
    - `SESSION_SECRET`
@@ -85,13 +87,13 @@ Si nécessaire :
 
 ```bash
 # Windows
-docker exec -it logsystem-mariadb mariadb -u root -pLogSystem2024! logsystem
+docker exec -it logsystem-mysql mysql -u root -pLogSystem2024! logsystem
 
 # Linux/macOS
-docker exec -it logsystem-mariadb mariadb -u root -pLogSystem2024! logsystem
+docker exec -it logsystem-mysql mysql -u root -pLogSystem2024! logsystem
 ```
 
-Puis dans MariaDB :
+Puis dans MySQL :
 
 ```sql
 -- Vérifier la base de données
@@ -126,7 +128,7 @@ docker compose logs -f
 
 # Un service spécifique
 docker compose logs -f logsystem
-docker compose logs -f mariadb
+docker compose logs -f mysql
 docker compose logs -f redis
 ```
 
@@ -150,10 +152,10 @@ docker compose build
 docker compose up -d
 ```
 
-### Accéder à MariaDB
+### Accéder à MySQL
 
 ```bash
-docker exec -it logsystem-mariadb mariadb -u root -pLogSystem2024!
+docker exec -it logsystem-mysql mysql -u root -pLogSystem2024!
 ```
 
 ### Accéder à Redis
@@ -174,7 +176,7 @@ docker compose down -v
 
 Les données sont persistées dans les volumes suivants :
 
-- `logsystem-mariadb` : Données MariaDB
+- `logsystem-mysql` : Données MySQL
 - `logsystem-redis` : Données Redis
 - `logsystem-uploads` : Fichiers uploadés
 - `logsystem-logs` : Logs de l'application
@@ -189,11 +191,11 @@ docker volume ls
 ### Sauvegarder les volumes
 
 ```bash
-# Sauvegarder MariaDB
-docker run --rm -v logsystem-mariadb:/data -v $(pwd):/backup alpine tar czf /backup/mariadb-backup.tar.gz /data
+# Sauvegarder MySQL
+docker run --rm -v logsystem-mysql:/data -v $(pwd):/backup alpine tar czf /backup/mysql-backup.tar.gz /data
 
-# Restaurer MariaDB
-docker run --rm -v logsystem-mariadb:/data -v $(pwd):/backup alpine sh -c "cd /data && tar xzf /backup/mariadb-backup.tar.gz --strip 1"
+# Restaurer MySQL
+docker run --rm -v logsystem-mysql:/data -v $(pwd):/backup alpine sh -c "cd /data && tar xzf /backup/mysql-backup.tar.gz --strip 1"
 ```
 
 ## Accès à l'application
@@ -207,13 +209,13 @@ Une fois démarré, accédez à :
 ## Ports utilisés
 
 - **10000** : Application Node.js
-- **3306** : MariaDB (interne au réseau Docker)
+- **3306** : MySQL (interne au réseau Docker)
 - **6379** : Redis (interne au réseau Docker)
 
-Pour accéder à MariaDB depuis l'hôte, ajoutez dans `docker-compose.yml` :
+Pour accéder à MySQL depuis l'hôte, ajoutez dans `docker-compose.yml` :
 
 ```yaml
-mariadb:
+mysql:
   ports:
     - "3306:3306"
 ```
@@ -230,16 +232,16 @@ docker compose logs
 docker compose ps
 ```
 
-### Erreur de connexion à MariaDB
+### Erreur de connexion à MySQL
 
-1. Vérifiez que MariaDB est prêt :
+1. Vérifiez que MySQL est prêt :
    ```bash
-   docker exec logsystem-mariadb mariadb-admin ping -h localhost -u root -pLogSystem2024!
+   docker exec logsystem-mysql mysqladmin ping -h localhost -u root -pLogSystem2024!
    ```
 
-2. Vérifiez les logs MariaDB :
+2. Vérifiez les logs MySQL :
    ```bash
-   docker compose logs mariadb
+   docker compose logs mysql
    ```
 
 ### Erreur de connexion Redis
@@ -256,7 +258,7 @@ docker compose ps
    docker compose logs logsystem
    ```
 
-2. Vérifiez que Node.js a réussi à se connecter à MariaDB
+2. Vérifiez que Node.js a réussi à se connecter à MySQL
 
 3. Recréez les conteneurs :
    ```bash
@@ -328,4 +330,4 @@ server {
 
 - Documentation Docker : https://docs.docker.com/
 - Documentation Docker Compose : https://docs.docker.com/compose/
-- Documentation MariaDB : https://mariadb.com/kb/en/
+- Documentation MySQL : https://dev.mysql.com/doc/

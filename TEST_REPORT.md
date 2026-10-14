@@ -1,7 +1,7 @@
 # Rapport de Test - LogSystem Nouvelle Base de Données
 
 ## Date: 2026-09-14
-## Base de données: logsystem (MySQL/MariaDB)
+## Base de données: logsystem (MySQL 8)
 
 ---
 

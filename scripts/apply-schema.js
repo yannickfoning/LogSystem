@@ -20,7 +20,7 @@ async function main() {
   try {
     const dbName = process.env.DB_NAME || 'logsystem';
     await connection.execute(
-      `CREATE DATABASE IF NOT EXISTS \`${dbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
+      `CREATE DATABASE IF NOT EXISTS \`${dbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci`
     );
 
     // Optional: clean existing tables to avoid tablespace import conflicts.
@@ -49,7 +49,7 @@ async function main() {
 
     const rawSql = fs.readFileSync(schemaPath, 'utf8');
 
-    // Statement-by-statement execution for resilience with MariaDB/MySQL + SET statements.
+    // Statement-by-statement execution for resilience with MySQL + SET statements.
     // We also strip a few known SET statements.
     const statements = rawSql
       .split(/;\s*(?:\r?\n|$)/)

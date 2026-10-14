@@ -1,3 +1,12 @@
+# Build stage
+FROM node:22-alpine AS builder
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci --legacy-peer-deps
+
+# Runtime stage
 FROM node:22-alpine AS runner
 
 RUN apk add --no-cache openssl curl unzip p7zip
@@ -8,9 +17,8 @@ ENV NODE_ENV=production
 
 RUN addgroup -g 1001 -S nodejs && adduser -S logsystem -u 1001
 
+COPY --chown=logsystem:nodejs --from=builder /app/node_modules ./node_modules
 COPY --chown=logsystem:nodejs package*.json ./
-RUN npm install --legacy-peer-deps --production
-
 COPY --chown=logsystem:nodejs . .
 
 RUN mkdir -p /app/uploads /app/logs /app/temp && \

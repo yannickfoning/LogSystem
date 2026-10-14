@@ -13,7 +13,7 @@ services:
         value: production
       - key: RENDER
         value: "true"
-      # Base de données Aiven MySQL
+      # Base de données MySQL 8 (Aiven ou autre provider)
       - key: DB_HOST
         sync: false
       - key: DB_PORT

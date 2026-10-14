@@ -73,7 +73,7 @@ async function manualStartFix() {
     await connection.end();
   } catch (e) {
     console.log(`❌ Erreur base: ${e.message}`);
-    console.log('💡 Solution: Démarrez MySQL/MariaDB');
+    console.log('💡 Solution: Démarrez MySQL');
     return;
   }
   
