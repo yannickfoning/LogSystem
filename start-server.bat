@@ -73,11 +73,11 @@ if %ERRORLEVEL% EQU 0 (
     echo.
 )
 
-REM Vérifier la connexion MySQL
-echo [INFO] Vérification de la connexion MySQL...
-node -e "const pool = require('./config/database.js'); pool.getConnection().then(conn => { console.log('[OK] Connexion MySQL réussie'); conn.release(); process.exit(0); }).catch(err => { console.log('[ERREUR] Connexion MySQL échouée:', err.message); process.exit(1); });"
+REM Vérifier la connexion MariaDB/MySQL
+echo [INFO] Vérification de la connexion MariaDB/MySQL...
+node -e "const pool = require('./config/database.js'); pool.getConnection().then(conn => { console.log('[OK] Connexion MariaDB/MySQL réussie'); conn.release(); process.exit(0); }).catch(err => { console.log('[ERREUR] Connexion MariaDB/MySQL échouée:', err.message); process.exit(1); });"
 if %ERRORLEVEL% NEQ 0 (
-    echo [ERREUR] Impossible de se connecter à MySQL
+    echo [ERREUR] Impossible de se connecter à MariaDB/MySQL
     echo Vérifiez votre configuration dans .env
     pause
     exit /b 1
