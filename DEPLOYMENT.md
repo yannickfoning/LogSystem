@@ -212,17 +212,101 @@ docker compose logs -f redis
 docker stats
 ```
 
-## Déploiement sur Render
+## Déploiement sur Render (Plan Gratuit)
 
-1. Créez une base de données MySQL managée (Aiven, AWS RDS, etc.)
-2. Push le code sur GitHub
-3. Connectez votre dépôt Render
-4. Configurez les variables d'environnement dans le dashboard Render :
-   - `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`
+### Architecture recommandée
+- **App Node** : Render Web Service Free (mise en veille après 15 min sans trafic)
+- **MySQL** : Aiven for MySQL Free (1 CPU, 1 Go RAM, 1 Go disque)
+- **Redis** : Render Key Value Free (cache optionnel)
+- **Anti-veille** : UptimeRobot (ping `/health` toutes les 5 min)
+
+### Étape 1 : Créer la base Aiven MySQL
+
+1. Allez sur [aiven.io](https://aiven.io)
+2. Créez un compte gratuit (sans carte bancaire)
+3. Créez un service "Aiven for MySQL" avec le plan Free
+4. Notez les informations de connexion :
+   - Hôte (ex: `mysql-xxx.aivencloud.com`)
+   - Port (ex: `21661`)
+   - Utilisateur (ex: `avnadmin`)
+   - Mot de passe
+   - Nom de la base (ex: `defaultdb`)
+5. Téléchargez le certificat CA depuis "Connection information"
+
+### Étape 2 : Encoder le certificat CA
+
+**Linux/macOS :**
+```bash
+base64 -i ca.pem | tr -d '\n'
+```
+
+**PowerShell :**
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("ca.pem"))
+```
+
+Conservez cette chaîne base64.
+
+### Étape 3 : Déployer sur Render
+
+1. Push le code sur GitHub
+2. Connectez votre dépôt Render
+3. Créez un "New Blueprint" ou utilisez `render.yaml`
+4. Configurez les variables d'environnement :
+   - `DB_HOST` : hôte Aiven
+   - `DB_PORT` : port Aiven
+   - `DB_USER` : utilisateur Aiven
+   - `DB_PASSWORD` : mot de passe Aiven
+   - `DB_NAME` : nom de la base
    - `DB_SSL=true`
-   - `DB_SSL_CA_PATH` (si requis)
-   - `SESSION_SECRET`, `CSRF_SECRET` (générés automatiquement ou manuellement)
+   - `DB_SSL_CA_BASE64` : votre certificat encodé en base64
+   - `DB_SSL_REJECT_UNAUTHORIZED=true`
+   - `SESSION_SECRET` : généré automatiquement
+   - `CSRF_SECRET` : généré automatiquement
 5. Déployez
+
+### Étape 4 : Créer l'admin (depuis votre PC)
+
+Le plan gratuit n'a pas de shell SSH. Créez l'admin localement :
+
+```bash
+# Configurez .env local avec les creds Aiven
+DB_HOST=mysql-xxx.aivencloud.com
+DB_PORT=21661
+DB_USER=avnadmin
+DB_PASSWORD=votre_mot_de_passe
+DB_NAME=defaultdb
+DB_SSL=true
+DB_SSL_CA_PATH=/path/to/ca.pem
+
+# Lancez la création d'admin
+npm run create-admin
+```
+
+Changez ensuite les mots de passe par défaut depuis l'interface.
+
+### Étape 5 : Configurer UptimeRobot
+
+1. Créez un compte gratuit sur [uptimerobot.com](https://uptimerobot.com)
+2. Ajoutez un nouveau monitor
+3. Type : HTTP(s)
+4. URL : `https://votre-app.onrender.com/health`
+5. Interval : 5 minutes
+6. Activez le monitor
+
+### Limites du plan gratuit
+
+- **Mise en veille** : Le service s'endort après 15 min sans trafic (réveil ~1 min)
+- **Moteur d'alertes** : Ne tourne que si le service est éveillé
+- **SSE** : Les connexions sont coupées au redémarrage
+- **Disque** : 1 Go sur Aiven (configurez une rétention courte)
+- **Fichiers locaux** : Perdus à chaque redémarrage (utilisez l'upload)
+- **RAR** : `unrar` système peut ne pas être disponible (testez après déploiement)
+- **RAM** : 512 Mo (limites d'upload réduites à 200 Mo)
+
+### Pour éviter la mise en veille
+
+Si vous voulez éviter ces limitations, passez au plan Render Starter (7$/mois) en changeant `plan: free` → `plan: starter` dans `render.yaml`.
 
 ## Sécurité
 

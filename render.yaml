@@ -3,8 +3,8 @@ services:
     name: logsystem
     env: node
     region: frankfurt
-    plan: starter
-    buildCommand: npm ci
+    plan: free
+    buildCommand: npm install --legacy-peer-deps
     startCommand: npm start
     healthCheckPath: /health
     autoDeploy: false
@@ -26,14 +26,12 @@ services:
         sync: false
       - key: DB_SSL
         value: "true"
-      - key: DB_SSL_CA_PATH
+      - key: DB_SSL_CA_BASE64
         sync: false
       - key: DB_SSL_REJECT_UNAUTHORIZED
         value: "true"
       - key: DB_KEEPALIVE
         value: "true"
-      - key: DB_CONNECTION_LIMIT
-        value: "5"
       # Sécurité
       - key: SESSION_SECRET
         generateValue: true
@@ -45,10 +43,15 @@ services:
       - key: PORT
         value: "10000"
       - key: IMPORT_BATCH_SIZE
-        value: "1000"
+        value: "500"
       - key: ALERT_EVAL_INTERVAL
         value: "60000"
       - key: RETENTION_CRON_HOUR
+        value: "3"
+      # Limites pour plan gratuit (512 Mo RAM)
+      - key: UPLOAD_MAX_SIZE
+        value: "209715200"
+      - key: DB_CONNECTION_LIMIT
         value: "3"
       # Redis (Render Key Value) — cache du dashboard
       - key: REDIS_URL
