@@ -17,9 +17,9 @@ import path from 'path';
 const LARGE_FILE_THRESHOLD = 10 * 1024 * 1024;
 
 // Répertoires de dépôt selon le cahier des charges
-const UPLOAD_DEPOT_DIR = process.env.UPLOAD_DEPOT_DIR || './uploads/depot';
+const UPLOAD_DEPOT_DIR = path.resolve(process.cwd(), process.env.UPLOAD_DEPOT_DIR || path.join('uploads', 'depot'));
 // Chemin ASCII uniquement (évite les échecs mkdir/rename sur Linux/Render)
-const UPLOAD_TRAITED_DIR = process.env.UPLOAD_TRAITED_DIR || './uploads/processed';
+const UPLOAD_TRAITED_DIR = path.resolve(process.cwd(), process.env.UPLOAD_TRAITED_DIR || path.join('uploads', 'processed'));
 
 // Créer les répertoires au démarrage
 [UPLOAD_DEPOT_DIR, UPLOAD_TRAITED_DIR].forEach(dir => {
@@ -38,12 +38,12 @@ class ImportWorker {
   }
 
   // Ajouter un job à la queue
-  async enqueue(jobId, buffer, filename, userId, source, service, locale) {
+  async enqueue(jobId, sourcePath, filename, userId, source, service, locale) {
     logger.info({ event: 'import_enqueue_called', jobId, filename, userId }, '[IMPORT-WORKER]');
 
     this.queue.push({
       jobId,
-      buffer,
+      sourcePath,
       filename,
       userId,
       source,
@@ -87,7 +87,7 @@ class ImportWorker {
   }
 
   // Traiter UN job complet avec dissociation import/décompte
-  async handleJob({ jobId, buffer, filename, userId, source, service, locale }) {
+  async handleJob({ jobId, sourcePath, filename, userId, source, service, locale }) {
     let filePath = null;
     try {
       this.activeJobs.set(jobId, { status: 'processing', startedAt: Date.now() });
@@ -97,10 +97,16 @@ class ImportWorker {
       // volumes may not have the optional 'depositing'/'counting' enum values.
       await this.updateJobStatus(jobId, 'processing', 0, 0);
 
-      const uniqueFilename = `${jobId}_${filename}`;
+      const uniqueFilename = `${jobId}_${path.basename(filename)}`;
       filePath = path.join(UPLOAD_DEPOT_DIR, uniqueFilename);
-
-      fs.writeFileSync(filePath, buffer);
+      try {
+        fs.renameSync(sourcePath, filePath);
+      } catch (moveError) {
+        if (moveError.code !== 'EXDEV') throw moveError;
+        fs.copyFileSync(sourcePath, filePath);
+        fs.unlinkSync(sourcePath);
+      }
+      const buffer = fs.readFileSync(filePath);
       logger.info({ event: 'file_deposited', jobId, filePath }, '[IMPORT-WORKER]');
 
       // ÉTAPE 2: EXTRACTION - Extraire l'archive si nécessaire
@@ -137,12 +143,7 @@ class ImportWorker {
 
           const userError = mapArchiveError(error);
 
-          if (userError.code === 'RAR_ENCRYPTED' || userError.code === 'RAR_CORRUPT' || userError.code === 'FILE_TOO_LARGE') {
-            throw userError;
-          }
-
-          logger.warn({ event: 'fallback_to_raw_processing', jobId, filename, originalError: error.message });
-          filesToProcess = [{ filename, content: buffer }];
+          throw userError;
         }
       } else {
         filesToProcess = [{ filename, content: buffer }];
@@ -151,7 +152,6 @@ class ImportWorker {
       // ÉTAPE 3: PARSING - Parser les fichiers (séparé du décompte)
       await this.updateJobStatus(jobId, 'parsing', 0, 0);
 
-      let allParsedLogs = [];
       let totalLines = 0;
       let streamingStats = { processedLines: 0, successfulLines: 0, skippedLines: 0, errorCount: 0 };
       let streamingStarted = false;
@@ -203,22 +203,38 @@ class ImportWorker {
             continue;
           }
 
-          const parsedLogs = await parseLogContent(file.content, detectedFormat, {
-            source: fallbackSource || null,
-            service: service || null,
-            locale: locale || 'fr',
-          });
+          let parsedLogs;
+          try {
+            parsedLogs = await parseLogContent(file.content, detectedFormat, {
+              source: fallbackSource || null,
+              service: service || null,
+              locale: locale || 'fr',
+            });
+          } catch (parseError) {
+            logger.warn({ event: 'parsing_error', jobId, file: file.filename, error: parseError.message });
+            if (detectedFormat === 'java' && file.content.length > 10 * 1024 * 1024) throw parseError;
+            continue;
+          }
 
-          allParsedLogs = allParsedLogs.concat(parsedLogs.map(log => ({
+          const logsWithMetadata = parsedLogs.map(log => ({
             ...log,
             source: log.source || fallbackSource || null,
-          })));
+          }));
           totalLines += parsedLogs.length;
-
           logger.info({ event: 'file_parsed', jobId, file: file.filename, lines: parsedLogs.length });
+
+          if (logsWithMetadata.length > 0) {
+            if (!streamingStarted) {
+              await this.updateJobStatus(jobId, 'inserting', 0, 0);
+              streamingStarted = true;
+            }
+            streamingStats = await this.processLogsBatch(
+              logsWithMetadata, jobId, userId, source, service, streamingStats
+            );
+          }
         } catch (e) {
-          logger.warn({ event: 'parsing_error', jobId, file: file.filename, error: e.message });
-          if (detectedFormat === 'java' && file.content.length > 10 * 1024 * 1024) throw e;
+          logger.error({ event: 'file_processing_error', jobId, file: file.filename, error: e.message });
+          throw e;
         }
       }
 
@@ -243,9 +259,7 @@ class ImportWorker {
 
       // ÉTAPE 4: DÉCOMPTE ET INDEXATION - Insérer en BD par BATCH
       if (!streamingStarted) await this.updateJobStatus(jobId, 'inserting', 0, 0);
-      const finalStats = allParsedLogs.length
-        ? await this.processLogsBatch(allParsedLogs, jobId, userId, source, service, streamingStats)
-        : streamingStats;
+      const finalStats = streamingStats;
       const { processedLines, successfulLines, skippedLines, errorCount } = finalStats;
 
       // ÉTAPE 5: DÉPLACEMENT VERS TRAITÉ
@@ -535,7 +549,10 @@ class ImportWorker {
 let importWorkerInstance = null;
 function getImportWorkerInstance() {
   if (!importWorkerInstance) {
-    importWorkerInstance = new ImportWorker(3); // Max 3 imports parallèles
+    const isRender = !!(process.env.RENDER || process.env.RENDER_SERVICE_NAME);
+    const defaultConcurrency = isRender ? 1 : 3;
+    const concurrency = Math.max(1, Number.parseInt(process.env.IMPORT_CONCURRENCY || `${defaultConcurrency}`, 10) || defaultConcurrency);
+    importWorkerInstance = new ImportWorker(concurrency);
   }
   return importWorkerInstance;
 }

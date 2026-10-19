@@ -171,7 +171,7 @@
 
     var api = window.api;
     var selectedFiles = [];
-    var currentJobId = null;
+    var currentJobIds = [];
     var pollTimer = null;
     var pollInFlight = false;
     var maxFiles = 10;
@@ -314,7 +314,7 @@
     function completeJob(job) {
         if (pollTimer) clearInterval(pollTimer);
         pollTimer = null;
-        currentJobId = null;
+        currentJobIds = [];
         progress.style.display = "none";
         success.style.display = "block";
         var inserted = Number(job.insertedLines) || 0;
@@ -333,24 +333,58 @@
     function failJob(message) {
         if (pollTimer) clearInterval(pollTimer);
         pollTimer = null;
-        currentJobId = null;
+        currentJobIds = [];
         resetProgress();
         restoreImportButton();
         loadJobs();
         showToast("error", "Import échoué : " + (message || "Erreur inconnue"));
     }
 
-    async function pollJob(jobId) {
-        if (pollInFlight || currentJobId !== jobId) return;
+    async function pollJobs(jobIds) {
+        if (pollInFlight || currentJobIds.join("|") !== jobIds.join("|")) return;
         pollInFlight = true;
         try {
-            var job = await api.get("/api/import/jobs/" + encodeURIComponent(jobId) + "/status");
-            if (!job || !job.status) throw new Error("Réponse de suivi invalide");
-            updateProgress(job);
-            if (job.status === "completed") {
-                completeJob(job);
-            } else if (job.status === "failed") {
-                failJob(job.errorMessage || job.error_message);
+            var jobs = await Promise.all(jobIds.map(function (jobId) {
+                return api.get("/api/import/jobs/" + encodeURIComponent(jobId) + "/status");
+            }));
+            if (jobs.some(function (job) { return !job || !job.status; })) {
+                throw new Error("Réponse de suivi invalide");
+            }
+
+            var failedJobs = jobs.map(function (job, index) {
+                return { job: job, index: index };
+            }).filter(function (item) { return item.job.status === "failed"; });
+            var allFinished = jobs.every(function (job) {
+                return job.status === "completed" || job.status === "failed";
+            });
+            if (allFinished && failedJobs.length) {
+                var failureMessage = failedJobs.map(function (item) {
+                    var prefix = jobIds.length > 1 ? "Fichier " + (item.index + 1) + " : " : "";
+                    return prefix + (item.job.errorMessage || item.job.error_message || "Erreur inconnue");
+                }).join("; ");
+                failJob(failureMessage);
+                return;
+            }
+
+            var processed = jobs.reduce(function (sum, job) { return sum + (Number(job.logsProcessed) || 0); }, 0);
+            var total = jobs.reduce(function (sum, job) { return sum + (Number(job.logsTotal) || 0); }, 0);
+            var allCompleted = jobs.every(function (job) { return job.status === "completed"; });
+            var activeJob = jobs.find(function (job) {
+                return job.status !== "completed" && job.status !== "failed";
+            });
+            updateProgress({
+                progress: allCompleted ? 100 : (total ? Math.round(processed / total * 100) : 0),
+                logsProcessed: processed,
+                logsTotal: total,
+                status: activeJob ? activeJob.status : "completed"
+            });
+
+            if (allCompleted) {
+                completeJob({
+                    insertedLines: jobs.reduce(function (sum, job) { return sum + (Number(job.insertedLines) || 0); }, 0),
+                    skippedLines: jobs.reduce(function (sum, job) { return sum + (Number(job.skippedLines) || 0); }, 0),
+                    errorCount: jobs.reduce(function (sum, job) { return sum + (Number(job.errorCount) || 0); }, 0)
+                });
             }
         } catch (error) {
             failJob(error && error.error ? error.error : error.message);
@@ -359,15 +393,15 @@
         }
     }
 
-    function startPolling(jobId) {
-        currentJobId = jobId;
+    function startPolling(jobIds) {
+        currentJobIds = jobIds;
         if (pollTimer) clearInterval(pollTimer);
-        pollJob(jobId);
-        pollTimer = setInterval(function () { pollJob(jobId); }, 1500);
+        pollJobs(jobIds);
+        pollTimer = setInterval(function () { pollJobs(jobIds); }, 1500);
     }
 
     importBtn.addEventListener("click", async function () {
-        if (!selectedFiles.length || currentJobId) return;
+        if (!selectedFiles.length || currentJobIds.length) return;
         importBtn.disabled = true;
         success.style.display = "none";
         progress.style.display = "block";
@@ -387,7 +421,7 @@
         try {
             var response = await api.upload("/api/import/upload", formData);
             if (!response || !response.jobId) throw new Error("L’API n’a pas renvoyé l’identifiant de l’import");
-            startPolling(response.jobId);
+            startPolling(Array.isArray(response.jobIds) && response.jobIds.length ? response.jobIds : [response.jobId]);
         } catch (error) {
             resetProgress();
             restoreImportButton();

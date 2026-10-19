@@ -27,15 +27,27 @@ import path from 'path';
 const router = Router();
 router.use(requireAuth);
 const RETURN_GAP_DAYS = parseInt(process.env.ERROR_RETURN_GAP_DAYS || "7", 10);
+const UPLOAD_MAX_FILES = Math.max(1, Number.parseInt(process.env.UPLOAD_MAX_FILES || "10", 10) || 10);
+const IS_RENDER = !!(process.env.RENDER || process.env.RENDER_SERVICE_NAME);
+const DEFAULT_UPLOAD_MAX_SIZE = IS_RENDER ? 104857600 : 5242880000;
+const UPLOAD_MAX_SIZE = Math.max(1, Number.parseInt(process.env.UPLOAD_MAX_SIZE || `${DEFAULT_UPLOAD_MAX_SIZE}`, 10) || DEFAULT_UPLOAD_MAX_SIZE);
+
+function uploadValidationError(message) {
+  const error = new Error(message);
+  error.status = 400;
+  return error;
+}
 
 const upload = multer({
   // Use disk storage for better memory management with large files
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
-      const uploadDir = process.env.UPLOAD_TEMP_DIR || path.join(process.cwd(), 'uploads', 'tmp');
+      const uploadDir = path.resolve(process.cwd(), process.env.UPLOAD_TEMP_DIR || path.join('uploads', 'tmp'));
       // Ensure upload directory exists
-      if (!fs.existsSync(uploadDir)) {
+      try {
         fs.mkdirSync(uploadDir, { recursive: true });
+      } catch (error) {
+        return cb(error);
       }
       cb(null, uploadDir);
     },
@@ -45,25 +57,22 @@ const upload = multer({
     }
   }),
   limits: {
-    files: parseInt(process.env.UPLOAD_MAX_FILES || "10", 10),
-    // La plateforme doit pouvoir traiter des fichiers jusqu'à 5000 MB (5 GB)
-    // Utilise la limite UPLOAD_MAX_SIZE avec Infinity comme fallback
-    fileSize: parseInt(process.env.UPLOAD_MAX_SIZE || "5242880000", 10),
+    files: UPLOAD_MAX_FILES,
+    fileSize: UPLOAD_MAX_SIZE,
   },
   fileFilter: (req, file, cb) => {
     const filename = file.originalname;
     if (!filename || filename.trim().length === 0)
-      return cb(new Error("Nom de fichier requis"));
+      return cb(uploadValidationError("Nom de fichier requis"));
     if (filename.length > 255)
-      return cb(new Error("Nom de fichier trop long (max 255 caractères)"));
+      return cb(uploadValidationError("Nom de fichier trop long (max 255 caractères)"));
 
-    const validNamePattern = /^[a-zA-Z0-9._\-\s]+$/;
+    const validNamePattern = /^[\p{L}\p{M}\p{N}._\-\s()]+$/u;
     if (!validNamePattern.test(filename))
       return cb(
-        new Error("Nom de fichier contient des caractères non autorisés"),
+        uploadValidationError("Nom de fichier contient des caractères non autorisés"),
       );
 
-    const isRender = !!(process.env.RENDER || process.env.RENDER_SERVICE_NAME);
     const allowedMimeTypes = [
       "text/plain",
       "text/log",
@@ -88,7 +97,7 @@ const upload = multer({
       "application/x-rar-compressed",
     ];
     if (file.mimetype && !allowedMimeTypes.includes(file.mimetype)) {
-      return cb(new Error(`Type MIME non supporté: ${file.mimetype}`));
+      return cb(uploadValidationError(`Type MIME non supporté: ${file.mimetype}`));
     }
 
     const ext = filename.split(".").pop().toLowerCase();
@@ -124,7 +133,7 @@ const upload = multer({
 
     if (!allowedExtensions.includes(ext)) {
       return cb(
-        new Error(
+        uploadValidationError(
           `Extension non supportée. Utilisez: ${allowedExtensions.join(", ")}`,
         ),
       );
@@ -744,69 +753,50 @@ async function insertBatch(conn, batch, userId) {
 router.post(
   "/upload",
   importLimiter,
-  upload.array("files", 20), // Support jusqu'à 20 fichiers
+  upload.array("files", UPLOAD_MAX_FILES),
   async (req, res) => {
     try {
       const files = req.files;
       if (!files || files.length === 0)
         return res.status(400).json({ error: "Aucun fichier fourni" });
 
-      const jobId = uuidv4();
       const userId = req.session.user.id;
       const source = req.body.source || null;
       const service = req.body.service || null;
       const locale = req.body.locale || null;
       const totalFiles = files.length;
 
-      // Créer le job dans la BD avec informations multi-fichiers
-      await pool.execute(
-        "INSERT INTO import_jobs (id, filename, file_size, import_ip_address, user_id, import_source, import_service, status, total_files) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)",
-        [
-          jobId,
-          totalFiles > 1 ? `${totalFiles} fichiers` : files[0].originalname,
-          files.reduce((sum, f) => sum + (f.size || 0), 0),
-          req.ip,
-          userId,
-          source,
-          service,
-          totalFiles
-        ],
-      );
-
-      // Envoyer tous les fichiers au worker asynchrone
+      const jobs = [];
       for (const file of files) {
-        // Read file content from disk for disk storage
-        let fileContent;
-        try {
-          fileContent = fs.readFileSync(file.path);
-        } catch (error) {
-          logger.error({ event: 'upload_file_read_error', path: file.path, error: error.message }, '[IMPORT]');
-          continue;
-        }
-        
+        const jobId = uuidv4();
+        await pool.execute(
+          "INSERT INTO import_jobs (id, filename, file_size, import_ip_address, user_id, import_source, import_service, status, total_files) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 1)",
+          [jobId, file.originalname, file.size || 0, req.ip, userId, source, service],
+        );
+        jobs.push({ jobId, filename: file.originalname, path: file.path });
+      }
+
+      for (const job of jobs) {
+        // Passer le chemin au worker évite de charger tous les fichiers en RAM
+        // pendant la requête d'upload et permet de traiter chaque fichier séparément.
         await importWorker.enqueue(
-          jobId,
-          fileContent,
-          file.originalname,
+          job.jobId,
+          job.path,
+          job.filename,
           userId,
           source,
           service,
           locale
         );
-        
-        // Clean up temporary file
-        try {
-          fs.unlinkSync(file.path);
-        } catch (error) {
-          logger.warn({ event: 'temp_file_cleanup_error', path: file.path, error: error.message }, '[IMPORT]');
-        }
       }
 
       await invalidateDashboard(userId);
 
       res.json({
         success: true,
-        jobId,
+        jobId: jobs[0].jobId,
+        jobIds: jobs.map(job => job.jobId),
+        jobs: jobs.map(({ jobId, filename }) => ({ jobId, filename })),
         message: totalFiles > 1 
           ? `Import de ${totalFiles} fichiers démarré en arrière-plan`
           : 'Import démarré en arrière-plan',
@@ -816,6 +806,13 @@ router.post(
 
     } catch (e) {
       logger.error({ event: 'import_upload_error', error: e.message }, '[IMPORT]');
+      for (const file of req.files || []) {
+        try {
+          if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+        } catch (cleanupError) {
+          logger.warn({ event: 'temp_file_cleanup_error', path: file.path, error: cleanupError.message }, '[IMPORT]');
+        }
+      }
       if (!res.headersSent) res.status(500).json({ error: "Erreur lors de l'import" });
     }
   }
@@ -1032,18 +1029,22 @@ export default router;
 // [FIX-12] Gestionnaire d'erreur Multer — doit être APRÈS export default et les routes
 // pour être capturé par Express comme middleware d'erreur (4 paramètres)
 export function multerErrorHandler(err, req, res, next) {
-  if (err && err.code && err.code.startsWith('LIMIT_')) {
-    // MulterError : trop de fichiers, champ inconnu...
+  const isImportUpload = req.originalUrl?.split('?')[0] === '/api/import/upload';
+  if (isImportUpload && err instanceof multer.MulterError) {
     const messages = {
       LIMIT_FILE_COUNT: 'Trop de fichiers',
       LIMIT_UNEXPECTED_FILE: 'Champ de fichier inattendu',
+      LIMIT_FILE_SIZE: `Fichier trop volumineux (maximum ${Math.round(UPLOAD_MAX_SIZE / 1024 / 1024)} Mo par fichier)`,
     };
     const message = messages[err.code] || 'Erreur de téléversement';
     logger.warn({ event: 'multer_error', code: err.code, field: err.field }, `[IMPORT] ${message}`);
-    // Check if headers have already been sent to avoid "Cannot set headers after they are sent" error
     if (!res.headersSent) {
-      return res.status(400).json({ error: message });
+      return res.status(err.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({ error: message });
     }
+  }
+  if (isImportUpload && err?.status === 400) {
+    logger.warn({ event: 'upload_validation_error', error: err.message }, '[IMPORT]');
+    if (!res.headersSent) return res.status(400).json({ error: err.message });
   }
   next(err);
 }

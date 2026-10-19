@@ -508,12 +508,14 @@
       // Couleurs solides pour les bordures/points, très transparentes pour le fill
       // pour éviter que les zones se mélangent visuellement
       var SERIES = [
+        { label:'TRACE',    solid:'#9ca3af', fill:'rgba(156,163,175,0.05)' },
         { label:'INFO',     solid:'#4f8ef7', fill:'rgba(79,142,247,0.08)'   },
         { label:'WARNING',  solid:'#f59e0b', fill:'rgba(245,158,11,0.08)'   },
         { label:'ERROR',    solid:'#ef4444', fill:'rgba(239,68,68,0.08)'    },
         { label:'CRITICAL', solid:'#8b5cf6', fill:'rgba(139,92,246,0.08)'   },
         { label:'FATAL',    solid:'#fc5c65', fill:'rgba(252,92,101,0.08)'   },
-        { label:'DEBUG',    solid:'#6b7280', fill:'rgba(107,114,128,0.05)'  }
+        { label:'DEBUG',    solid:'#6b7280', fill:'rgba(107,114,128,0.05)'  },
+        { label:'SECURITY', solid:'#14b8a6', fill:'rgba(20,184,166,0.06)'   }
       ];
       return SERIES.map(function(ds) {
         var data = series[ds.label] || [];
@@ -537,7 +539,7 @@
       
       // [FIX] Vérifier si on a des données
       var hasData = false;
-      var levels = ['INFO','WARNING','ERROR','CRITICAL','FATAL','DEBUG'];
+      var levels = ['TRACE','INFO','WARNING','ERROR','CRITICAL','FATAL','DEBUG','SECURITY'];
       levels.forEach(function(l) {
         var serie = payload.series ? payload.series[l] : payload[l.toLowerCase()];
         if (serie && serie.some(function(v) { return v > 0; })) hasData = true;
@@ -614,7 +616,7 @@
         var prev = wrapper.querySelector('.trends-empty');
         if (prev) prev.remove();
 
-        var hasAny = ['INFO','WARNING','ERROR','CRITICAL','FATAL','DEBUG'].some(function(k){
+        var hasAny = ['TRACE','INFO','WARNING','ERROR','CRITICAL','FATAL','DEBUG','SECURITY'].some(function(k){
           return ((d.series||{})[k]||[]).some(function(v){ return Number(v)>0; });
         });
 
@@ -667,8 +669,8 @@
           console.error('[ERROR] Canvas element not found');
           return;
         }
-        var levels = ['TRACE','INFO','WARNING','ERROR','CRITICAL','FATAL','DEBUG'];
-        var colors = ['#9ca3af','#4f8ef7','#f59e0b','#ef4444','#8b5cf6','#fc5c65','#6b7280'];
+        var levels = ['TRACE','INFO','WARNING','ERROR','CRITICAL','FATAL','DEBUG','SECURITY'];
+        var colors = ['#9ca3af','#4f8ef7','#f59e0b','#ef4444','#8b5cf6','#fc5c65','#6b7280','#14b8a6'];
         
         // [FIX] Lire depuis /per-level qui retourne { INFO: N, WARNING: N, ... }
         var data = levels.map(function(l) { return Number(d[l] || d[l.toLowerCase()] || 0); });

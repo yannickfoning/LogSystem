@@ -1276,7 +1276,7 @@ table .text-truncate {
 
 /* ─── Charts adaptatifs ────────────────────────────────────────────────── */
 .chart-container { position: relative; width: 100%; min-height: 200px; }
-canvas { max-width: 100% !important; height: auto !important; }
+canvas { max-width: 100% !important; }
 
 /* ─── Stats/KPI grid ────────────────────────────────────────────────────── */
 .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }

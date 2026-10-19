@@ -283,15 +283,15 @@ router.get('/trends', async (req, res) => {
     // Génération des jours pour la période
     if (req.query.interval === 'hour') {
       const labels = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, '0') + ':00');
-      const levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL', 'FATAL'];
+      const levels = ['TRACE', 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL', 'FATAL', 'SECURITY'];
       const seriesData = {};
       levels.forEach(l => { seriesData[l] = new Array(24).fill(0); });
       const scope = userScope(req);
       const [rows] = await pool.execute(
-        `SELECT HOUR(${OPERATIONAL_TS}) AS hour, UPPER(log_level) AS log_level, COUNT(*) AS cnt
+        `SELECT HOUR(${OPERATIONAL_TS_EXPR}) AS hour, UPPER(log_level) AS log_level, COUNT(*) AS cnt
          FROM logs
-         WHERE ${OPERATIONAL_TS} IS NOT NULL AND ${OPERATIONAL_TS} >= ? AND ${OPERATIONAL_TS} <= ?${scope.sql}
-         GROUP BY HOUR(${OPERATIONAL_TS}), UPPER(log_level)
+         WHERE ${OPERATIONAL_TS_EXPR} IS NOT NULL AND ${OPERATIONAL_TS_EXPR} >= ? AND ${OPERATIONAL_TS_EXPR} <= ?${scope.sql}
+         GROUP BY HOUR(${OPERATIONAL_TS_EXPR}), UPPER(log_level)
          ORDER BY hour ASC`,
         [startSql, endSql, ...scope.params]
       );
@@ -328,7 +328,7 @@ router.get('/trends', async (req, res) => {
       current.setUTCDate(current.getUTCDate() + 1);
     }
 
-    const levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL', 'FATAL'];
+    const levels = ['TRACE', 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL', 'FATAL', 'SECURITY'];
     const seriesData = {};
     levels.forEach(l => { seriesData[l] = new Array(dates.length).fill(0); });
 
@@ -336,14 +336,14 @@ router.get('/trends', async (req, res) => {
     // Use imported_at to show import trends
     const scope = userScope(req);
     const [rows] = await pool.execute(
-      `SELECT DATE_FORMAT(${OPERATIONAL_TS}, '%Y-%m-%d') AS day,
+      `SELECT DATE_FORMAT(${OPERATIONAL_TS_EXPR}, '%Y-%m-%d') AS day,
               UPPER(log_level) AS log_level,
               COUNT(*) AS cnt
        FROM logs
-       WHERE ${OPERATIONAL_TS} IS NOT NULL 
-         AND ${OPERATIONAL_TS} >= ? 
-         AND ${OPERATIONAL_TS} <= ?${scope.sql}
-       GROUP BY DATE_FORMAT(${OPERATIONAL_TS}, '%Y-%m-%d'), UPPER(log_level)
+       WHERE ${OPERATIONAL_TS_EXPR} IS NOT NULL
+         AND ${OPERATIONAL_TS_EXPR} >= ?
+         AND ${OPERATIONAL_TS_EXPR} <= ?${scope.sql}
+       GROUP BY DATE_FORMAT(${OPERATIONAL_TS_EXPR}, '%Y-%m-%d'), UPPER(log_level)
        ORDER BY day ASC`,
       [startSql, endSql, ...scope.params]
     );
@@ -378,9 +378,9 @@ router.get('/trends', async (req, res) => {
               COUNT(DISTINCT service) as unique_services,
               COUNT(DISTINCT ${SOURCE_IDENTITY_SQL}) as unique_sources
        FROM logs
-       WHERE ${OPERATIONAL_TS} IS NOT NULL 
-         AND ${OPERATIONAL_TS} >= ? 
-         AND ${OPERATIONAL_TS} <= ?${scope.sql}`,
+       WHERE ${OPERATIONAL_TS_EXPR} IS NOT NULL
+         AND ${OPERATIONAL_TS_EXPR} >= ?
+         AND ${OPERATIONAL_TS_EXPR} <= ?${scope.sql}`,
       [startSql, endSql, ...scope.params]
     );
 
@@ -389,9 +389,9 @@ router.get('/trends', async (req, res) => {
       [topFingerprints] = await pool.execute(
         `SELECT fingerprint, COUNT(*) as cnt
          FROM logs
-         WHERE ${OPERATIONAL_TS} IS NOT NULL 
-           AND ${OPERATIONAL_TS} >= ? 
-           AND ${OPERATIONAL_TS} <= ? 
+         WHERE ${OPERATIONAL_TS_EXPR} IS NOT NULL
+           AND ${OPERATIONAL_TS_EXPR} >= ?
+           AND ${OPERATIONAL_TS_EXPR} <= ?
            AND fingerprint IS NOT NULL${scope.sql}
          GROUP BY fingerprint
          ORDER BY cnt DESC
@@ -767,7 +767,7 @@ router.get('/per-level', async (req, res) => {
       [...scope.params]
     );
     const result = {};
-    const allLevels = ['TRACE', 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL', 'FATAL'];
+    const allLevels = ['TRACE', 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL', 'FATAL', 'SECURITY'];
     // Initialize all levels to 0
     allLevels.forEach(l => result[l] = 0);
     // Fill in actual counts
