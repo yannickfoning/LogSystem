@@ -51,18 +51,24 @@ services:
       - key: RETENTION_CRON_HOUR
         value: "3"
       - key: UPLOAD_MAX_SIZE
-        value: "5242880000"
+        value: "104857600"
       - key: UPLOAD_MAX_FILES
         value: "10"
+      - key: MAX_TOTAL_EXTRACTED_SIZE
+        value: "100"
+      - key: MAX_SINGLE_FILE_SIZE
+        value: "50"
       - key: DB_CONNECTION_LIMIT
         value: "5"
-      # Chemins d'upload pour Render
+      # Chemins du runtime Node natif Render (le Dockerfile utilise /app séparément).
       - key: UPLOAD_TEMP_DIR
-        value: /app/uploads/tmp
+        value: /opt/render/project/src/uploads/tmp
       - key: UPLOAD_DEPOT_DIR
-        value: /app/uploads/depot
+        value: /opt/render/project/src/uploads/depot
       - key: UPLOAD_TRAITED_DIR
-        value: /app/uploads/processed
+        value: /opt/render/project/src/uploads/processed
+      - key: IMPORT_CONCURRENCY
+        value: "1"
       # Fuseau horaire pour les tendances (aligné avec utilisateurs métier)
       - key: LOG_TIMEZONE
         value: Africa/Douala

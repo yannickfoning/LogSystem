@@ -302,7 +302,7 @@ Changez ensuite les mots de passe par défaut depuis l'interface.
 - **Disque** : 1 Go sur Aiven (configurez une rétention courte)
 - **Fichiers locaux** : Perdus à chaque redémarrage (utilisez l'upload)
 - **RAR** : `unrar` système peut ne pas être disponible (testez après déploiement)
-- **RAM** : 512 Mo (limites d'upload réduites à 200 Mo)
+- **RAM** : 512 Mo sur le plan gratuit (limite d'upload configurée à 100 Mo par fichier; extraction d'archives limitée à 50 Mo par fichier et 100 Mo au total)
 
 ### Pour éviter la mise en veille
 
