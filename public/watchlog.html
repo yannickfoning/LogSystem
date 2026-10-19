@@ -99,20 +99,6 @@
 
       <!-- Right Panel -->
       <div class="right-panel">
-        <!-- AMÉLIORATION 4: Anomalies Alert Panel -->
-        <div class="panel-card anomaly-panel" id="anomalyPanel">
-          <div class="panel-header anomaly-header panel-header-flex">
-            <span class="icon-inline" id="icon-warning" aria-hidden="true"></span> <span data-i18n="watchlog.anomalies">Anomalies Détectées</span>
-            <span class="wl-alert-badge">⚠️</span>
-          </div>
-          <div class="panel-body anomaly-body">
-            <div id="anomalyDetails">
-              <p id="anomalyText" class="anomaly-text"></p>
-              <p id="anomalyStats" class="anomaly-stats"></p>
-            </div>
-          </div>
-        </div>
-
         <div class="panel-card">
           <div class="panel-header panel-header-flex" data-i18n="watchlog.panel.heatmap">
             <span class="icon-inline" id="icon-fire" aria-hidden="true"></span> Heatmap 24h (erreurs par heure)
@@ -224,17 +210,12 @@
       ERROR: '#ef4444', CRITICAL: '#7c3aed', FATAL: '#991b1b'
     };
 
-    let pollingTimer = null;
-    let lastLogId = 0;  // Pour ne récupérer que les nouveaux logs
-    let reconnectDelay = 2000;
-    let isPaused = false;
-
     function mountIcons() {
       if (!window.icons) return;
       var map = {
         'icon-eye': 'eye', 'icon-pause': 'pause', 'icon-trash': 'trash',
         'icon-download': 'download', 'icon-times': 'times', 'icon-stream': 'stream',
-        'icon-warning': 'exclamationTriangle', 'icon-fire': 'fire',
+        'icon-fire': 'fire',
         'icon-chart-bar': 'chartBar', 'icon-cogs': 'cogs', 'icon-chart-line': 'chartLine', 'icon-bell': 'bell'
       };
       Object.keys(map).forEach(function(id) {
@@ -244,167 +225,13 @@
     }
     const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
-    // ─── Mode SSE (Server-Sent Events) pour Render (serveur persistant) ──────────────
-    let eventSource = null;
-
-    function startSSE() {
-      if (eventSource) {
-        eventSource.close();
-      }
-
-      // Récupération initiale des derniers logs
-      fetchNewLogs();
-      fetchStats();
-
-      // Connexion SSE pour le flux temps réel
-      eventSource = new EventSource('/api/alerts/stream');
-
-      eventSource.onopen = function() {
-        document.querySelector('.status-indicator').style.background = '#22c55e';
-        updateConnectionStatus('connected');
-        reconnectDelay = 2000;
-      };
-
-      eventSource.addEventListener('log', function(e) {
-        try {
-          const log = JSON.parse(e.data);
-          if (log && log.id) {
-            addLogEntry(log);
-          }
-        } catch (err) {
-          console.warn('[WatchLog] SSE log parse error:', err);
-        }
-      });
-
-      eventSource.addEventListener('alert', function(e) {
-        try {
-          const alert = JSON.parse(e.data);
-          if (alert) {
-            prependAlertItem(alert);
-          }
-        } catch (err) {
-          console.warn('[WatchLog] SSE alert parse error:', err);
-        }
-      });
-
-      eventSource.onerror = function(err) {
-        console.warn('[WatchLog] SSE error:', err);
-        document.querySelector('.status-indicator').style.background = '#f59e0b';
-        updateConnectionStatus('reconnecting');
-        
-        // Reconnexion automatique avec backoff
-        if (eventSource) {
-          eventSource.close();
-          eventSource = null;
-        }
-        
-        setTimeout(function() {
-          if (!isPaused) {
-            startSSE();
-          }
-        }, reconnectDelay);
-        
-        reconnectDelay = Math.min(reconnectDelay * 2, 30000);
-      };
-
-      // Polling des stats toutes les 15s (SSE ne fournit que les logs/alertes)
-      setInterval(fetchStats, 15000);
-    }
-
-    function fetchNewLogs() {
-      // Récupération initiale des derniers logs
-      var url = '/api/logs?limit=50&sort=id&order=desc';
-      if (lastLogId > 0) url += '&after_id=' + lastLogId;
-      
-      api.get(url).then(function(d) {
-        var logs = d && d.data ? d.data : (Array.isArray(d) ? d : []);
-        if (logs.length > 0) {
-          lastLogId = Math.max(lastLogId, ...logs.map(l => l.id || 0));
-          addLogEntries(logs.reverse());
-          scheduleLiveRefresh();
-        }
-      }).catch(function(err) {
-        console.warn('[WatchLog] Initial fetch error:', err);
-      });
-    }
-
     function fetchStats() {
       api.get('/api/logs/watch/stats').then(function(d) {
         if (d && d.stats) {
           updateMetricsFromStats(d.stats);
-          if (d.stats.level_counts) {
-            Object.keys(STATE.metrics.levelCount).forEach(function(k) { STATE.metrics.levelCount[k] = 0; });
-            Object.assign(STATE.metrics.levelCount, d.stats.level_counts);
-          }
-          if (Array.isArray(d.stats.hourly_errors)) {
-            STATE.metrics.hourlyErrors = d.stats.hourly_errors.slice();
-          }
-          if (d.stats.total_logs != null) {
-            STATE.metrics.total = Number(d.stats.total_logs);
-          }
-          if (d.stats.error_count != null) {
-            STATE.metrics.errors = Number(d.stats.error_count);
-          }
-          if (Array.isArray(d.top_services)) {
-            STATE.metrics.services = new Map(d.top_services.map(function(row) {
-              return [row.service || 'unknown', Number(row.count || 0)];
-            }));
-          }
           updateUI();
         }
       }).catch(function() {});
-      
-      // Récupérer les alertes récentes
-      api.get('/api/dashboard/alerts?limit=10&status=new').then(function(alerts) {
-        if (Array.isArray(alerts)) alerts.forEach(prependAlertItem);
-      }).catch(function() {});
-    }
-
-    function stopPolling() {
-      if (eventSource) {
-        eventSource.close();
-        eventSource = null;
-      }
-      document.querySelector('.status-indicator').style.background = '#ef4444';
-      updateConnectionStatus('disconnected');
-    }
-
-    function updateConnectionStatus(status) {
-      var label = document.getElementById('connectionStatus');
-      if (label) {
-        label.textContent = status === 'connected' ? t('watchlog.connected') : t('watchlog.disconnected');
-      }
-    }
-
-    // ─── Ajout immédiat d'une alerte dans le panneau "Alertes récentes" ────
-    function prependAlertItem(a) {
-      var list = document.getElementById('alertsList');
-      if (!list) return;
-      // Retirer le message vide s'il existe
-      var empty = list.querySelector('li[data-empty]');
-      if (empty) empty.remove();
-
-      var sevColor = { low:'#6366f1', medium:'#f59e0b', high:'#ef4444', critical:'#991b1b' }[a.severity] || '#6366f1';
-      var li = document.createElement('li');
-      li.className = 'service-item';
-      li.style.cssText = 'flex-direction:column;align-items:flex-start;gap:2px;animation:slideInLeft 0.3s ease';
-      li.innerHTML =
-        '<span style="font-size:11px;color:' + sevColor + ';font-weight:600">[' + esc((a.severity||'?').toUpperCase()) + ']</span>' +
-        '<span style="font-size:11px;color:var(--text1)">' + esc((a.message||'').slice(0,80)) + '</span>';
-
-      // Insérer au début
-      list.insertBefore(li, list.firstChild);
-
-      // Garder max 10 dans le panneau
-      while (list.children.length > 10) list.removeChild(list.lastChild);
-
-      // Mettre à jour le badge
-      var badge = document.getElementById('alert-badge');
-      if (badge) {
-        var cur = parseInt(badge.textContent) || 0;
-        badge.textContent = cur + 1;
-        badge.style.display = 'inline';
-      }
     }
 
     // AMÉLIORATION 4: Update metrics from watch stats
@@ -416,27 +243,6 @@
       STATE.metrics.errors = Number(stats.error_count) || 0;
       STATE.metrics.serviceCount = Number(stats.services) || 0;
       STATE.metrics.logsPerMin = Number(stats.logs_per_min) || 0;
-    }
-
-    // AMÉLIORATION 4: Show anomaly alert
-    function showAnomalyAlert(anomaly) {
-      const panel = document.getElementById('anomalyPanel');
-      const text = document.getElementById('anomalyText');
-      const stats = document.getElementById('anomalyStats');
-      
-      panel.classList.add('is-visible');
-      text.textContent = `⚠️ Anomalie détectée: Taux d'erreur ${anomaly.current_rate?.toFixed(2)}% (normal: ${anomaly.baseline_rate?.toFixed(2)}%)`;
-      stats.innerHTML = `
-        <strong>Augmentation:</strong> ${anomaly.rate_increase_percent}% | 
-        <strong>Erreurs actuelles:</strong> ${anomaly.current_errors} | 
-        <strong>Seuil dépassé:</strong> ${anomaly.threshold_exceeded ? 'OUI' : 'NON'}
-      `;
-    }
-
-    // AMÉLIORATION 4: Hide anomaly alert
-    function hideAnomalyAlert() {
-      const panel = document.getElementById('anomalyPanel');
-      panel.classList.remove('is-visible');
     }
 
     function resetMetrics() {
@@ -538,16 +344,6 @@
       pruneBufferTo24Hours();
       updateUI();
     }
-
-    function scheduleLiveRefresh() {
-      if (liveRefreshTimer) return;
-      liveRefreshTimer = setTimeout(function() {
-        liveRefreshTimer = null;
-        loadHourlyTrends();
-        loadRecentAlerts();
-      }, 1000);
-    }
-
 
     const SOURCE_CONFIG = {
       watch:  { color: '#10b981', label: 'WATCH' },
@@ -681,11 +477,10 @@
 
     // Event Listeners
     document.getElementById('btnPause').addEventListener('click', () => {
-      isPaused = !isPaused;
-      STATE.paused = isPaused;
-      var label = isPaused ? (window.i18n ? window.i18n.t('watchlog.resume') : 'Reprendre') : (window.i18n ? window.i18n.t('watchlog.pause') : 'Pause');
-      document.getElementById('btnPause').innerHTML = '<span class="icon-inline" aria-hidden="true">' + window.icons[isPaused ? 'play' : 'pause'] + '</span> ' + label;
-      if (!isPaused) scheduleNextPoll();
+      STATE.paused = !STATE.paused;
+      var label = STATE.paused ? (window.i18n ? window.i18n.t('watchlog.resume') : 'Reprendre') : (window.i18n ? window.i18n.t('watchlog.pause') : 'Pause');
+      document.getElementById('btnPause').innerHTML = '<span class="icon-inline" aria-hidden="true">' + window.icons[STATE.paused ? 'play' : 'pause'] + '</span> ' + label;
+      if (!STATE.paused) scheduleNextPoll();
     });
 
     document.getElementById('btnClear').addEventListener('click', () => {
@@ -733,30 +528,6 @@
       STATE.filters.service = e.target.value;
       updateLogStream();
     });
-    function simulateLogData() {
-      const services = ['api-server', 'database', 'cache', 'worker', 'scheduler'];
-      const levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'];
-      const messages = [
-        'Connection established',
-        'Database query executed',
-        'Cache miss for key',
-        'Background job started',
-        'Error processing request'
-      ];
-
-      setInterval(() => {
-        if (!STATE.paused) {
-          addLogEntry({
-            timestamp: new Date().toISOString(),
-            log_level: levels[Math.floor(Math.random() * levels.length)],
-            service: services[Math.floor(Math.random() * services.length)],
-            message: messages[Math.floor(Math.random() * messages.length)] + ' ' + Math.random().toString(36).slice(2, 7)
-          });
-        }
-      }, 500);
-    }
-
-
     // Close watchlog modal on backdrop click
     document.getElementById('wl-modal-close').addEventListener('click', function(){ document.getElementById('wl-modal-detail').classList.remove('is-open'); });
     document.getElementById('wl-modal-detail').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('is-open'); });
@@ -865,13 +636,12 @@
     // FIX BUG-TRENDS-01: Tendances horaires temps reel + alertes recentes
     // ─────────────────────────────────────────────────────────────────────────
 
-    const LEVEL_SEV = { DEBUG:'#6366f1', INFO:'#0ea5e9', WARNING:'#f59e0b', ERROR:'#ef4444', CRITICAL:'#7c3aed', FATAL:'#991b1b' };
-
-    // ─── SOLUTION VERCEL WATCHLOG: Polling Intelligent Adaptatif ───────────────
-    // Sur Vercel serverless, le file watching est impossible. Cette solution utilise:
+    // ─── Polling adaptatif du Watch Log ────────────────────────────────────────
+    // Le Watch Log interroge la base de données, ce qui fonctionne aussi sur les
+    // hébergeurs dont le système de fichiers est éphémère.
     // 1. Delta polling (après last seen ID) pour minimiser les requêtes
     // 2. Adaptation dynamique de l'intervalle selon l'activité
-    // 3. Détection automatique de l'environnement Vercel
+    // 3. Détection automatique de l'environnement cloud
     // 4. Fallback sur mode dégradé si erreurs répétées
     
     let _lastSeenLogId = 0;
@@ -879,20 +649,19 @@
     let _pollTimer = null;
     let _statsTimer = null;
     let _consecutiveErrors = 0;
-    let _isVercelEnv = false;
-    let _lastActivityTime = Date.now();
+    let _isCloudEnv = false;
 
-    // Détection environnement Vercel
+    // Détection des environnements cloud
     function detectEnvironment() {
-      _isVercelEnv = window.location.hostname.includes('.vercel.app') ||
-                     window.location.hostname.includes('.onrender.com');
-      console.info('[WatchLog] Environment detected:', _isVercelEnv ? 'Cloud polling' : 'Local/standard polling');
+      _isCloudEnv = window.location.hostname.includes('.vercel.app') ||
+                    window.location.hostname.includes('.onrender.com');
+      console.info('[WatchLog] Environment detected:', _isCloudEnv ? 'Cloud polling' : 'Local polling');
       
       // Adapter l'intervalle selon l'environnement
-      if (_isVercelEnv) {
-        _pollInterval = 10000; // 10s sur Vercel (plus réactif)
+      if (_isCloudEnv) {
+        _pollInterval = 10000; // 10s dans le cloud (plus réactif)
       } else {
-        _pollInterval = 5000; // 5s en standard (SSE disponible)
+        _pollInterval = 5000; // 5s en environnement local
       }
     }
 
@@ -937,7 +706,6 @@
           const maxId = Math.max(...rows.map(r => r.id || 0));
           if (maxId > _lastSeenLogId) {
             _lastSeenLogId = maxId;
-            _lastActivityTime = Date.now();
           }
           _pollInterval = Math.max(_pollInterval * 0.8, 5000); // Min 5s
         }
@@ -977,8 +745,8 @@
       // Afficher le statut de connexion
       var indicator = document.querySelector('.status-indicator');
       if (indicator) {
-        indicator.style.background = _isVercelEnv ? '#f59e0b' : '#10b981';
-        indicator.title = _isVercelEnv ? 'Mode polling cloud' : 'Mode polling local';
+        indicator.style.background = _isCloudEnv ? '#f59e0b' : '#10b981';
+        indicator.title = _isCloudEnv ? 'Mode polling cloud' : 'Mode polling local';
       }
     }
 
@@ -991,9 +759,13 @@
         clearInterval(_statsTimer);
         _statsTimer = null;
       }
-      if (eventSource) {
-        eventSource.close();
-        eventSource = null;
+      if (_trendsTimer) {
+        clearTimeout(_trendsTimer);
+        _trendsTimer = null;
+      }
+      if (_alertsTimer) {
+        clearTimeout(_alertsTimer);
+        _alertsTimer = null;
       }
       var indicator = document.querySelector('.status-indicator');
       if (indicator) indicator.style.background = '#ef4444';
@@ -1003,7 +775,7 @@
       api.get('/api/dashboard/hourly').then(function(rows) {
         const tbl = document.getElementById('hourly-trends-table');
         if (!tbl) return;
-        if (!rows || !rows.length) { tbl.innerHTML = '<div style="text-align:center;color:var(--text2);padding:12px">Aucune donnee</div>'; return; }
+        if (!rows || !rows.length) { tbl.innerHTML = '<div style="text-align:center;color:var(--text2);padding:12px">' + esc(window.i18n ? window.i18n.t('watchlog.no_data') : 'Aucune donnée') + '</div>'; return; }
         const max = Math.max(...rows.map(r => r.cnt), 1);
         let html = '<table style="width:100%;border-collapse:collapse">';
         html += '<tr style="color:var(--text2);font-size:10px"><th style="padding:2px 6px;text-align:left">Heure</th><th style="text-align:right;padding:2px 6px">Logs</th><th style="padding:2px 8px;text-align:left;width:60%">Volume</th></tr>';
@@ -1020,7 +792,10 @@
         html += '</table>';
         tbl.innerHTML = html;
         const upd = document.getElementById('trends-update-time');
-        if (upd) upd.textContent = 'Mis a jour ' + new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+        if (upd) {
+          const time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+          upd.textContent = window.i18n ? window.i18n.t('watchlog.updated', { time: time }) : 'Mis à jour ' + time;
+        }
       }).catch(function() {});
     }
 
@@ -1048,7 +823,7 @@
     
     function scheduleTrendsRefresh() {
       if (_trendsTimer) clearTimeout(_trendsTimer);
-      const interval = _isVercelEnv ? 30000 : 15000; // 30s Vercel, 15s standard
+      const interval = _isCloudEnv ? 30000 : 15000; // 30s cloud, 15s local
       _trendsTimer = setTimeout(function() {
         loadHourlyTrends();
         scheduleTrendsRefresh();
@@ -1057,7 +832,7 @@
     
     function scheduleAlertsRefresh() {
       if (_alertsTimer) clearTimeout(_alertsTimer);
-      const interval = _isVercelEnv ? 20000 : 10000; // 20s Vercel, 10s standard
+      const interval = _isCloudEnv ? 20000 : 10000; // 20s cloud, 10s local
       _alertsTimer = setTimeout(function() {
         loadRecentAlerts();
         scheduleAlertsRefresh();
@@ -1079,10 +854,7 @@
 
     window.addEventListener('beforeunload', () => {
       stopPolling();
-      if (_trendsTimer) clearTimeout(_trendsTimer);
-      if (_alertsTimer) clearTimeout(_alertsTimer);
     });
   </script>
-  <script src="/js/mobile-nav.js" defer></script>
 </body>
 </html>

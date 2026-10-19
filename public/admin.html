@@ -96,7 +96,7 @@
     <div class="tab-content" id="tab-recommendations">
       <div class="flex justify-between mb-16">
         <span class="text-muted" id="recommendations-count"></span>
-        <button class="btn btn-primary btn-sm" id="btn-create-recommendation">Créer une recommandation</button>
+        <button class="btn btn-primary btn-sm" id="btn-create-recommendation" data-i18n="admin.create_recommendation">Créer une recommandation</button>
       </div>
       
       <!-- Formulaire de recommandation intégré à la page (plus de fenêtre/popup) -->
@@ -386,8 +386,7 @@
           window.location.href = '/dashboard.html';
           return;
         }
-        // Démarrer SSE et charger les données
-        connectSSE();
+        // Charger les données initiales; les alertes sont suivies par polling REST.
         loadUsers();
         loadRules();
         setInterval(function() {
@@ -421,7 +420,7 @@
           if (tab === 'system') loadSystem();
           if (tab === 'recommendations') {
             loadRecommendations();
-            loadErrorTypes();
+            loadErrorTypesDropdown('');
           }
         });
       });
@@ -454,40 +453,11 @@
       
       function playAdminSound() {
         try { notificationAudio.currentTime = 0; notificationAudio.play().catch(function(){}); }
-        catch(e) { /* audio playback blocked */ }
+        catch { /* audio playback blocked */ }
       }
       
-      function showAdminNotification(title, options) {
-        if ('Notification' in window && Notification.permission === 'granted') {
-          try {
-            var n = new Notification(title, Object.assign({
-              icon: '/image/logo.png',
-              badge: '/image/logo.png',
-              tag: 'admin-alert-' + Date.now(),
-              requireInteraction: false
-            }, options || {}));
-            n.onclick = function() { window.focus(); this.close(); };
-            setTimeout(() => n.close(), 5000);
-          } catch(e) { /* Notification not available */ }
-        }
-      }
-      
-      if ('Notification' in window && Notification.permission === 'default') {
-        Notification.requestPermission();
-      }
-      
-      // SSE ALERTS
-      var es = null;
-      var sseRetryDelay = 1000;
-      var sseHeartbeat = Date.now();
-      var ssePollingMode = false;
-      var zombieCheck = null;
-      // SSE remplacé par polling pur — SSE cause des reconnexions en boucle sur Vercel
-      // (chaque connexion consomme une lambda × pool MySQL → épuisement des connexions Aiven)
+      // Alert notifications use REST polling.
       var _lastAdminAlertId = 0;
-      function connectSSE() {
-        // No-op: SSE désactivé. Le polling ci-dessous prend le relais.
-      }
       function pollAdminAlerts() {
         api.get('/api/dashboard/alerts?limit=10&status=new').then(function(d) {
           var alerts = Array.isArray(d) ? d : (d && d.alerts ? d.alerts : []);
@@ -793,7 +763,7 @@
         // Clear existing options
         valueSelect.innerHTML = '<option value="">Sélectionner une valeur...</option>';
         
-        var options = [];
+        var options;
         
         switch(conditionType) {
           case 'level':
@@ -951,7 +921,7 @@
         var btn = this;
         btn.disabled = true;
         btn.textContent = 'Rétention en cours...';
-        api.post('/api/admin/retention/run').then(function(r) {
+        api.post('/api/admin/retention/run').then(function() {
           window.toast.success('Rétention termin?e');
           loadRetention();
         }).catch(function(err) { window.toast.error(err.error || 'Erreur'); })

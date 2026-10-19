@@ -339,8 +339,8 @@
               <span class="status-val" id="status-redis">—</span>
             </div>
             <div class="status-row">
-              <span class="status-label"><span class="status-dot ok"></span><span data-i18n="dashboard.status.sse">SSE Alertes</span></span>
-              <span class="status-val" id="status-sse">Déconnecté</span>
+              <span class="status-label"><span class="status-dot ok"></span><span data-i18n="dashboard.status.live_alerts">Alertes en direct</span></span>
+              <span class="status-val" id="status-alert-polling">—</span>
             </div>
             <div class="status-row">
               <span class="status-label"><span class="status-dot ok"></span><span data-i18n="dashboard.status.watcher">Watcher</span></span>
@@ -412,7 +412,7 @@
     // ── Helpers ──
     function fmt(n){ if(n==null)return '—'; n=parseInt(n)||0; if(n>=1e6)return(n/1e6).toFixed(1)+'M'; if(n>=1e3)return(n/1e3).toFixed(1)+'K'; return n.toString(); }
     function timeAgo(s){ if(!s)return '—'; var d=new Date(s),diff=Math.floor((Date.now()-d)/1000); if(diff<60)return diff+'s'; if(diff<3600)return Math.floor(diff/60)+'min'; if(diff<86400)return Math.floor(diff/3600)+'h'; return Math.floor(diff/86400)+'j'; }
-    function fmtDateTime(s){ if(!s)return '—'; try{return new Date(s).toLocaleString('fr-FR');}catch(e){return s;} }
+    function fmtDateTime(s){ if(!s)return '—'; try{return new Date(s).toLocaleString('fr-FR');}catch{return s;} }
     function lvlBadge(l){ return '<span class="lvl '+(l||'INFO')+'">'+(l||'INFO')+'</span>'; }
     function esc(s){ return String(s==null?'':s)
       .replace(/&/g,'&amp;')
@@ -444,7 +444,7 @@
         if (role === 'admin' || role === 'administrator') return true;
         if (Array.isArray(u.roles) && u.roles.map(function(r){return String(r).toLowerCase();}).indexOf('admin') >= 0) return true;
         if (u.is_admin === true || u.isAdmin === true) return true;
-      } catch(e) {}
+      } catch {}
       return false;
     }
     if (isAdmin()) document.body.classList.add('is-admin');
@@ -458,26 +458,16 @@
     }
 
     function refreshDashboardI18n() {
-      var refreshIndicator = document.getElementById('refresh-indicator');
-      if (refreshIndicator) refreshIndicator.textContent = '⟳ ' + t('dashboard.refreshing');
-      var refreshBtn = document.getElementById('btn-refresh');
-      if (refreshBtn) refreshBtn.textContent = t('dashboard.refresh');
-      var markAll = document.getElementById('mark-all-read');
-      if (markAll) markAll.textContent = t('dashboard.mark_all_read');
-      var todayBtn = document.getElementById('trends-today');
-      if (todayBtn) todayBtn.textContent = t('dashboard.today');
-      var prevBtn = document.getElementById('trends-prev');
-      if (prevBtn) prevBtn.title = t('dashboard.prev_day');
-      var nextBtn = document.getElementById('trends-next');
-      if (nextBtn) nextBtn.title = t('dashboard.next_day');
-      var expandBtn = document.getElementById('trends-expand');
-      if (expandBtn) expandBtn.title = t('dashboard.expand_chart');
-      if (window.loadSummary) loadSummary();
-      if (window.loadRecentLogs) loadRecentLogs();
-      if (window.loadTopErrors) loadTopErrors();
-      if (window.loadAlerts) loadAlerts();
+      loadSummary();
+      loadRecentLogs();
+      loadTopErrors();
+      loadAlerts();
+      loadTrends();
+      loadLevelChart();
+      if (isAdmin()) loadWatchdogs();
       updateTrendsLabel();
     }
+    window.addEventListener('i18n:change', refreshDashboardI18n);
 
     function getTrendsRange() {
       var end = new Date();
@@ -513,8 +503,7 @@
         { label:'ERROR',    solid:'#ef4444', fill:'rgba(239,68,68,0.08)'    },
         { label:'CRITICAL', solid:'#8b5cf6', fill:'rgba(139,92,246,0.08)'   },
         { label:'FATAL',    solid:'#fc5c65', fill:'rgba(252,92,101,0.08)'   },
-        { label:'DEBUG',    solid:'#6b7280', fill:'rgba(107,114,128,0.05)'  },
-        { label:'SECURITY', solid:'#14b8a6', fill:'rgba(20,184,166,0.06)'   }
+        { label:'DEBUG',    solid:'#6b7280', fill:'rgba(107,114,128,0.05)'  }
       ];
       return SERIES.map(function(ds) {
         var data = series[ds.label] || [];
@@ -538,7 +527,7 @@
       
       // [FIX] Vérifier si on a des données
       var hasData = false;
-      var levels = ['TRACE','INFO','WARNING','ERROR','CRITICAL','FATAL','DEBUG','SECURITY'];
+      var levels = ['TRACE','INFO','WARNING','ERROR','CRITICAL','FATAL','DEBUG'];
       levels.forEach(function(l) {
         var serie = payload.series ? payload.series[l] : payload[l.toLowerCase()];
         if (serie && serie.some(function(v) { return v > 0; })) hasData = true;
@@ -615,7 +604,7 @@
         var prev = wrapper.querySelector('.trends-empty');
         if (prev) prev.remove();
 
-        var hasAny = ['TRACE','INFO','WARNING','ERROR','CRITICAL','FATAL','DEBUG','SECURITY'].some(function(k){
+        var hasAny = ['TRACE','INFO','WARNING','ERROR','CRITICAL','FATAL','DEBUG'].some(function(k){
           return ((d.series||{})[k]||[]).some(function(v){ return Number(v)>0; });
         });
 
@@ -747,7 +736,7 @@
         var dbEl = document.getElementById('status-db');
         var redisEl = document.getElementById('status-redis');
         var redisDot = document.getElementById('status-redis-dot');
-        var sseEl = document.getElementById('status-sse');
+        var alertsPollingEl = document.getElementById('status-alert-polling');
         var watcherEl = document.getElementById('status-watcher');
         
         if (dbEl) {
@@ -767,8 +756,8 @@
           }
         }
         
-        if (sseEl) {
-          sseEl.textContent = '🟢 ' + t('dashboard.status.connected');
+        if (alertsPollingEl) {
+          alertsPollingEl.textContent = '🟡 ' + t('dashboard.status.polling');
         }
         
         if (watcherEl) {
@@ -1045,8 +1034,7 @@
         tbody.innerHTML = logs.map(function(log){
           var dt = log.timestamp ? new Date(log.timestamp) : null;
           var timeStr = dt ? dt.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '—';
-          var dateStr = dt ? dt.toLocaleDateString('fr-FR') : '—';
-           var source = window.logMetadataLabel([log.source, log.source_server, log.module, log.log_source, log.source_system], log.import_filename ? 'Fichier : ' + log.import_filename : 'Non renseignée');
+          var source = window.logMetadataLabel([log.source, log.source_server, log.module, log.log_source, log.source_system], log.import_filename ? 'Fichier : ' + log.import_filename : 'Non renseignée');
           var service = window.logMetadataLabel(log.service);
           var actor = window.logMetadataLabel(log.target_user, '');
           var clientIp = log.client_ip || log.ip_address || '';
@@ -1202,7 +1190,7 @@
 function showErrorGroupDetail(fingerprint, fallbackLogId) {
   if (!fingerprint) { if (fallbackLogId) showLogDetail(fallbackLogId); return; }
   openModal('modal-detail');
-  document.getElementById('modal-detail-title').textContent = 'Groupe d\u2019erreur \u2014 Analyse';
+  document.getElementById('modal-detail-title').textContent = window.i18n ? window.i18n.t('errgroup.title') : 'Groupe d\u2019erreur \u2014 Analyse';
   document.getElementById('modal-detail-body').innerHTML = '<span style="color:var(--text2)">Chargement de l\u2019analyse\u2026</span>';
   
   // Load error group analysis first
@@ -1211,8 +1199,6 @@ function showErrorGroupDetail(fingerprint, fallbackLogId) {
     var d = data && (data.data || data);
     if (!d) { body.innerHTML = '<p style="color:var(--text2);">Groupe introuvable</p>'; return; }
     
-    var mods  = (d.affected_modules && d.affected_modules.length) ? d.affected_modules.join(', ') : 'N/A';
-    var users = (d.affected_users  && d.affected_users.length)  ? d.affected_users.slice(0,10).join(', ') : 'N/A';
     var errorType = d.error_type || null;
     
     // Load recommendation based on error type if available
@@ -1224,44 +1210,36 @@ function showErrorGroupDetail(fingerprint, fallbackLogId) {
     
     recommendationPromise.then(function(recData) {
       var recommendation = recData && recData.recommendation ? recData.recommendation : null;
-      
-      body.innerHTML =
-        '<div class="section-title" style="color:var(--accent-red);margin-bottom:8px">Groupe #' + esc(fingerprint.slice(0,8)) + '</div>' +
-        '<table style="width:100%;font-size:13px;border-collapse:collapse;margin-bottom:12px">' +
-        '<tr><td style="padding:5px 8px;color:var(--text2);white-space:nowrap">Empreinte</td>'         + '<td><code style="font-size:11px">' + esc(fingerprint) + '</code></td></tr>' +
-        '<tr style="background:rgba(255,255,255,0.03)"><td style="padding:5px 8px;color:var(--text2)">Occurrences</td>'  + '<td style="padding:5px 8px"><strong style="color:var(--accent-red)">' + (d.occurrences||0) + '</strong></td></tr>' +
-        '<tr><td style="padding:5px 8px;color:var(--text2)">Type erreur</td>'                           + '<td style="padding:5px 8px"><strong>' + esc(d.error_type||'N/A') + '</strong></td></tr>' +
-        '<tr style="background:rgba(255,255,255,0.03)"><td style="padding:5px 8px;color:var(--text2)">1re apparition</td>'+ '<td style="padding:5px 8px">' + esc(fmtDateTime(d.first_seen)||'N/A') + '</td></tr>' +
-        '<tr><td style="padding:5px 8px;color:var(--text2)">Derniere apparition</td>'                   + '<td style="padding:5px 8px">' + esc(fmtDateTime(d.last_seen)||'N/A') + '</td></tr>' +
-        '<tr style="background:rgba(255,255,255,0.03)"><td style="padding:5px 8px;color:var(--text2)">Modules touches</td>'+ '<td style="padding:5px 8px">' + esc(mods) + '</td></tr>' +
-        '<tr><td style="padding:5px 8px;color:var(--text2)">Utilisateurs touches</td>'                  + '<td style="padding:5px 8px">' + esc(users) + '</td></tr>' +
-        '</table>' +
-        (recommendation ? '<div style="background:rgba(16,185,129,0.1);border-left:4px solid #10b981;padding:12px 16px;border-radius:6px;font-size:13px;margin-bottom:12px"><strong style="color:#10b981">💡 Recommandation :</strong><br><br>' + esc(recommendation) + '</div>' : '') +
-        (d.suggestion ? '<div style="background:rgba(14,165,233,0.08);border-left:3px solid var(--accent-blue);padding:10px 14px;border-radius:6px;font-size:12px;margin-bottom:12px"><strong>Suggestion :</strong><br>' + esc(d.suggestion) + '</div>' : '') +
-        (fallbackLogId ? '<button type="button" class="btn btn-sm btn-secondary" id="btn-show-sample-log" data-log-id="'+escAttr(String(fallbackLogId))+'">Voir le log exemple</button>' : '') +
-        (fingerprint ? ' <a class="btn btn-sm btn-primary" href="/search.html?fingerprint='+encodeURIComponent(fingerprint)+'">Voir dans la recherche</a>' : '');
+      body.innerHTML = renderErrorGroupAnalysis(d, fingerprint, fallbackLogId, recommendation);
     }).catch(function() {
       // If recommendation fails, still show the analysis without recommendation
-      body.innerHTML =
-        '<div class="section-title" style="color:var(--accent-red);margin-bottom:8px">Groupe #' + esc(fingerprint.slice(0,8)) + '</div>' +
-        '<table style="width:100%;font-size:13px;border-collapse:collapse;margin-bottom:12px">' +
-        '<tr><td style="padding:5px 8px;color:var(--text2);white-space:nowrap">Empreinte</td>'         + '<td><code style="font-size:11px">' + esc(fingerprint) + '</code></td></tr>' +
-        '<tr style="background:rgba(255,255,255,0.03)"><td style="padding:5px 8px;color:var(--text2)">Occurrences</td>'  + '<td style="padding:5px 8px"><strong style="color:var(--accent-red)">' + (d.occurrences||0) + '</strong></td></tr>' +
-        '<tr><td style="padding:5px 8px;color:var(--text2)">Type erreur</td>'                           + '<td style="padding:5px 8px"><strong>' + esc(d.error_type||'N/A') + '</strong></td></tr>' +
-        '<tr style="background:rgba(255,255,255,0.03)"><td style="padding:5px 8px;color:var(--text2)">1re apparition</td>'+ '<td style="padding:5px 8px">' + esc(fmtDateTime(d.first_seen)||'N/A') + '</td></tr>' +
-        '<tr><td style="padding:5px 8px;color:var(--text2)">Derniere apparition</td>'                   + '<td style="padding:5px 8px">' + esc(fmtDateTime(d.last_seen)||'N/A') + '</td></tr>' +
-        '<tr style="background:rgba(255,255,255,0.03)"><td style="padding:5px 8px;color:var(--text2)">Modules touches</td>'+ '<td style="padding:5px 8px">' + esc(mods) + '</td></tr>' +
-        '<tr><td style="padding:5px 8px;color:var(--text2)">Utilisateurs touches</td>'                  + '<td style="padding:5px 8px">' + esc(users) + '</td></tr>' +
-        '</table>' +
-        (d.suggestion ? '<div style="background:rgba(14,165,233,0.08);border-left:3px solid var(--accent-blue);padding:10px 14px;border-radius:6px;font-size:12px;margin-bottom:12px"><strong>Suggestion :</strong><br>' + esc(d.suggestion) + '</div>' : '') +
-        (fallbackLogId ? '<button type="button" class="btn btn-sm btn-secondary" id="btn-show-sample-log" data-log-id="'+escAttr(String(fallbackLogId))+'">Voir le log exemple</button>' : '') +
-        (fingerprint ? ' <a class="btn btn-sm btn-primary" href="/search.html?fingerprint='+encodeURIComponent(fingerprint)+'">Voir dans la recherche</a>' : '');
+      body.innerHTML = renderErrorGroupAnalysis(d, fingerprint, fallbackLogId, null);
     });
   }).catch(function(e) {
     var msg = (e && (e.error || e.message)) || 'Erreur de chargement';
     if (fallbackLogId) { showLogDetail(fallbackLogId); }
     else { document.getElementById('modal-detail-body').innerHTML = '<p style="color:var(--accent-red);">Erreur: ' + esc(msg) + '</p>'; }
   });
+}
+
+function renderErrorGroupAnalysis(data, fingerprint, fallbackLogId, recommendation) {
+  var translate = function(key, fallback) { return window.i18n ? window.i18n.t(key) : fallback; };
+  var modules = data.affected_modules && data.affected_modules.length ? data.affected_modules.join(', ') : 'N/A';
+  var users = data.affected_users && data.affected_users.length ? data.affected_users.slice(0, 10).join(', ') : 'N/A';
+  return '<div class="section-title" style="color:var(--accent-red);margin-bottom:8px">Groupe #' + esc(fingerprint.slice(0, 8)) + '</div>' +
+    '<table style="width:100%;font-size:13px;border-collapse:collapse;margin-bottom:12px">' +
+    '<tr><td style="padding:5px 8px;color:var(--text2);white-space:nowrap">' + esc(translate('errgroup.fingerprint', 'Empreinte')) + '</td><td><code style="font-size:11px">' + esc(fingerprint) + '</code></td></tr>' +
+    '<tr style="background:rgba(255,255,255,0.03)"><td style="padding:5px 8px;color:var(--text2)">' + esc(translate('errgroup.occurrences', 'Occurrences')) + '</td><td style="padding:5px 8px"><strong style="color:var(--accent-red)">' + (data.occurrences || 0) + '</strong></td></tr>' +
+    '<tr><td style="padding:5px 8px;color:var(--text2)">' + esc(translate('errgroup.error_type', 'Type erreur')) + '</td><td style="padding:5px 8px"><strong>' + esc(data.error_type || 'N/A') + '</strong></td></tr>' +
+    '<tr style="background:rgba(255,255,255,0.03)"><td style="padding:5px 8px;color:var(--text2)">' + esc(translate('errgroup.first_seen', '1re apparition')) + '</td><td style="padding:5px 8px">' + esc(fmtDateTime(data.first_seen) || 'N/A') + '</td></tr>' +
+    '<tr><td style="padding:5px 8px;color:var(--text2)">' + esc(translate('errgroup.last_seen', 'Dernière apparition')) + '</td><td style="padding:5px 8px">' + esc(fmtDateTime(data.last_seen) || 'N/A') + '</td></tr>' +
+    '<tr style="background:rgba(255,255,255,0.03)"><td style="padding:5px 8px;color:var(--text2)">' + esc(translate('errgroup.modules', 'Modules touchés')) + '</td><td style="padding:5px 8px">' + esc(modules) + '</td></tr>' +
+    '<tr><td style="padding:5px 8px;color:var(--text2)">' + esc(translate('errgroup.users', 'Utilisateurs touchés')) + '</td><td style="padding:5px 8px">' + esc(users) + '</td></tr>' +
+    '</table>' +
+    (recommendation ? '<div style="background:rgba(16,185,129,0.1);border-left:4px solid #10b981;padding:12px 16px;border-radius:6px;font-size:13px;margin-bottom:12px"><strong style="color:#10b981">💡 ' + esc(translate('errgroup.recommendation', 'Recommandation')) + ' :</strong><br><br>' + esc(recommendation) + '</div>' : '') +
+    (data.suggestion ? '<div style="background:rgba(14,165,233,0.08);border-left:3px solid var(--accent-blue);padding:10px 14px;border-radius:6px;font-size:12px;margin-bottom:12px"><strong>' + esc(translate('errgroup.suggestion', 'Suggestion')) + ' :</strong><br>' + esc(data.suggestion) + '</div>' : '') +
+    (fallbackLogId ? '<button type="button" class="btn btn-sm btn-secondary" id="btn-show-sample-log" data-log-id="' + escAttr(String(fallbackLogId)) + '">' + esc(translate('errgroup.view_sample', 'Voir le log exemple')) + '</button>' : '') +
+    ' <a class="btn btn-sm btn-primary" href="/search.html?fingerprint=' + encodeURIComponent(fingerprint) + '">' + esc(translate('nav.search', 'Voir dans la recherche')) + '</a>';
 }
 
 
@@ -1278,6 +1256,7 @@ function showLogDetail(logId){
         var l = log && (log.data||log);
         if (!l) { body.innerHTML = '<p style="color:var(--text2);">Log introuvable</p>'; return; }
 
+        var baseHtml = '<div class="section-title">Log</div>' + renderKV(l);
         var errorType = l.error_type || null;
 
         // Load recommendation based on log ID to get enriched data
@@ -1292,7 +1271,7 @@ function showLogDetail(logId){
           var errorInfo = recData && recData.errorInfo ? recData.errorInfo : null;
           var fixSuggestion = recData && recData.fixSuggestion ? recData.fixSuggestion : null;
 
-          var html = '<div class="section-title">Log</div>' + renderKV(l);
+          var html = baseHtml;
 
           // Add enhanced recommendation section with solution steps
           if (recommendation || fixSuggestion) {
@@ -1326,16 +1305,19 @@ function showLogDetail(logId){
             html += '</div>';
           }
 
-          html += '<div id="related-alert"></div><div id="related-watchdogs"></div>';
-          body.innerHTML = html;
+          body.innerHTML = html + renderRelatedLogPanels();
         }).catch(function() {
           // If recommendation fails, still show the log details without recommendation
-          body.innerHTML = '<div class="section-title">Log</div>' + renderKV(l) + '<div id="related-alert"></div><div id="related-watchdogs"></div>';
+          body.innerHTML = baseHtml + renderRelatedLogPanels();
         });
       }).catch(function(e){
         var msg = (e && (e.error || e.message)) || 'Erreur de chargement';
         document.getElementById('modal-detail-body').innerHTML = '<p style="color:var(--accent-red);">Erreur: '+esc(msg)+'</p>';
       });
+    }
+
+    function renderRelatedLogPanels() {
+      return '<div id="related-alert"></div><div id="related-watchdogs"></div>';
     }
 
     function showAlertDetail(alertId){
@@ -1481,10 +1463,9 @@ function showLogDetail(logId){
         .finally(function(){ setRefreshing(false); });
     };
 
-    // ── Alertes temps réel — polling pur (SSE désactivé sur Vercel) ──
-    // SSE /api/alerts/stream garde la lambda ouverte 300s puis épuise le pool MySQL.
-    // On remplace par du polling REST toutes les 20s, bien plus fiable en serverless.
-    var sseStatusEl = document.getElementById('status-sse');
+    // ── Alertes en temps réel via polling REST ──
+    // Le polling évite les connexions longues qui peuvent saturer le pool MySQL.
+    var alertsPollingEl = document.getElementById('status-alert-polling');
     var _lastAlertId = 0;
     function pollAlerts() {
       api.get('/api/dashboard/alerts?limit=15&status=new').then(function(d) {
@@ -1504,7 +1485,7 @@ function showLogDetail(logId){
       }).catch(function(){});
     }
     setInterval(function(){ if(!document.hidden) pollAlerts(); }, 20000);
-    if (sseStatusEl) sseStatusEl.textContent = '🟡 Polling';
+    if (alertsPollingEl) alertsPollingEl.textContent = '🟡 ' + t('dashboard.status.polling');
 
     // ── Auto-refresh ──
     var autoRefreshTimer = null;
@@ -1533,7 +1514,7 @@ function showLogDetail(logId){
     setupAdvancedFilters();
     setupClickableKPIs();
     refreshAll();
-    // SSE remplacé par pollAlerts (setInterval 20s défini ci-dessus)
+    // pollAlerts vérifie les nouvelles alertes toutes les 20 secondes.
 
     startAutoRefresh();
 

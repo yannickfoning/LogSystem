@@ -184,8 +184,11 @@
     var progress = document.getElementById("import-progress");
     var success = document.getElementById("import-success");
 
-    function tr(key, fallback) {
-        return window.i18n ? window.i18n.t(key) : fallback;
+    function tr(key, fallback, vars) {
+        if (window.i18n) return window.i18n.t(key, vars);
+        return Object.keys(vars || {}).reduce(function (text, name) {
+            return text.replace("{" + name + "}", vars[name]);
+        }, fallback);
     }
 
     function escapeHtml(value) {
@@ -322,15 +325,22 @@
         var errors = Number(job.errorCount) || 0;
         var filesProcessed = Number(job.totalFiles) || 0;
         var fileWarnings = Array.isArray(job.fileWarnings) ? job.fileWarnings : [];
-        var warningText = fileWarnings.length ? " Fichiers à vérifier : " + fileWarnings.join(" ; ") : "";
-        document.getElementById("import-success-message").textContent =
-            filesProcessed + " fichier(s) traité(s), " + inserted + " ligne(s) ajoutée(s), " + skipped + " doublon(s) ignoré(s), " + errors + " erreur(s)." + warningText;
+        var warnings = fileWarnings.length
+            ? " " + tr("import.files_to_check", "Fichiers à vérifier :") + " " + fileWarnings.join(" ; ")
+            : "";
+        document.getElementById("import-success-message").textContent = tr(
+            "import.summary.message",
+            "{files} fichier(s) traité(s), {inserted} ligne(s) ajoutée(s), {skipped} doublon(s) ignoré(s), {errors} erreur(s).{warnings}",
+            { files: filesProcessed, inserted: inserted, skipped: skipped, errors: errors, warnings: warnings }
+        );
         selectedFiles = [];
         fileInput.value = "";
         renderSelectedFiles();
         restoreImportButton();
         loadJobs();
-        showToast(fileWarnings.length ? "warning" : "success", fileWarnings.length ? "Import terminé : certains fichiers sont à vérifier" : "Import terminé avec succès");
+        showToast(fileWarnings.length ? "warning" : "success", fileWarnings.length
+            ? tr("import.completed_with_warnings", "Import terminé : certains fichiers sont à vérifier")
+            : tr("import.success", "Import terminé avec succès"));
     }
 
     function failJob(message) {
@@ -340,7 +350,7 @@
         resetProgress();
         restoreImportButton();
         loadJobs();
-        showToast("error", "Import échoué : " + (message || "Erreur inconnue"));
+        showToast("error", tr("import.failed", "Import échoué") + " : " + (message || "Erreur inconnue"));
     }
 
     async function pollJobs(jobIds) {
@@ -403,19 +413,12 @@
         importBtn.disabled = true;
         success.style.display = "none";
         progress.style.display = "block";
-        document.getElementById("progress-status").textContent = "Envoi des fichiers…";
+        document.getElementById("progress-status").textContent = tr("import.uploading", "Envoi des fichiers…");
 
         var formData = new FormData();
         selectedFiles.forEach(function (file) {
             formData.append("files", file);
         });
-        var sourceInput = document.getElementById("import-source");
-        var serviceInput = document.getElementById("import-service");
-        var localeInput = document.getElementById("import-locale");
-        if (sourceInput && sourceInput.value) formData.append("source", sourceInput.value);
-        if (serviceInput && serviceInput.value) formData.append("service", serviceInput.value);
-        if (localeInput && localeInput.value) formData.append("locale", localeInput.value);
-
         try {
             var response = await api.upload("/api/import/upload", formData);
             if (!response || !response.jobId) throw new Error("L’API n’a pas renvoyé l’identifiant de l’import");
@@ -435,7 +438,7 @@
         api.get("/api/import/jobs").then(function (jobs) {
             var body = document.getElementById("jobs-body");
             if (!Array.isArray(jobs) || !jobs.length) {
-                body.innerHTML = '<tr><td colspan="5" class="no-data">Aucun import</td></tr>';
+                body.innerHTML = '<tr><td colspan="5" class="no-data">' + escapeHtml(tr("import.no_jobs", "Aucun import")) + '</td></tr>';
                 return;
             }
             body.innerHTML = jobs.map(function (job) {
@@ -460,6 +463,5 @@
     loadJobs();
 })();
         </script>
-        <script src="/js/mobile-nav.js" defer></script>
     </body>
 </html>

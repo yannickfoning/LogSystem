@@ -13,11 +13,6 @@
   var langToggleBtn = document.getElementById('lang-toggle-btn');
   var langText = document.getElementById('lang-text');
 
-  function getCsrfToken() {
-    var match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/);
-    return match ? decodeURIComponent(match[1]) : '';
-  }
-
   function openLoginOverlay() {
     loginOverlay.classList.add('is-open');
     brandTitle.style.opacity = '0.3';

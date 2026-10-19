@@ -341,12 +341,6 @@
 }
 
 /* Watchlog utilities */
-.anomaly-panel { display: none; border-color: var(--accent-red); }
-.anomaly-panel.is-visible { display: flex; }
-.anomaly-header { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); }
-.anomaly-body { font-size: 12px; line-height: 1.6; }
-.anomaly-text { color: var(--accent-red); margin: 0; }
-.anomaly-stats { color: var(--text2); margin: 8px 0 0; font-size: 11px; }
 .wl-alert-badge {
   background: var(--accent-red); color: #fff; border-radius: 10px;
   padding: 1px 7px; font-size: 10px; margin-left: 6px;
