@@ -64,7 +64,10 @@ process.on('unhandledRejection', (reason) => {
 
 // ── Express app ────────────────────────────────────────────────────────────────
 const app = express();
-// app.set('trust proxy', 1); // Désactivé pour Docker dev sans reverse proxy
+// Activer trust proxy pour Render (reverse proxy) et rate-limiting
+if (process.env.RENDER || process.env.VERCEL) {
+  app.set('trust proxy', 1);
+}
 
 // ── Database health tracking ────────────────────────────────────────────────────
 let databaseReady = false;
