@@ -56,6 +56,16 @@ services:
         value: "10"
       - key: DB_CONNECTION_LIMIT
         value: "5"
+      # Chemins d'upload pour Render
+      - key: UPLOAD_TEMP_DIR
+        value: /app/uploads/tmp
+      - key: UPLOAD_DEPOT_DIR
+        value: /app/uploads/depot
+      - key: UPLOAD_TRAITED_DIR
+        value: /app/uploads/processed
+      # Fuseau horaire pour les tendances (aligné avec utilisateurs métier)
+      - key: LOG_TIMEZONE
+        value: Africa/Douala
       # Redis désactivé pour éviter les erreurs de connexion (optionnel)
       # L'application fonctionne en mode dégradé sans cache
       # - key: REDIS_URL
