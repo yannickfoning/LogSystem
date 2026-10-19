@@ -1,12 +1,63 @@
-# Blueprint Render — déploiement Docker (MySQL externe, ex. Aiven)
-# https://render.com/docs/docker
+# Blueprint Render — déploiement Node.js (MySQL externe, ex. Aiven)
+# https://render.com/docs/node
 services:
   - type: web
     name: logsystem
-    env: docker
-    dockerfilePath: ./Dockerfile
-    dockerContext: .
+    env: node
     plan: free
+    buildCommand: npm install --legacy-peer-deps
+    startCommand: node server.js
+    healthCheckPath: /health
+    autoDeploy: false
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: RENDER
+        value: "true"
+      - key: RUN_MIGRATIONS_ON_START
+        value: "true"
+      # Base de données MySQL 8 (Aiven ou autre hébergeur)
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: DB_SSL
+        value: "true"
+      - key: DB_SSL_CA_BASE64
+        sync: false
+      - key: DB_SSL_REJECT_UNAUTHORIZED
+        value: "true"
+      - key: DB_KEEPALIVE
+        value: "true"
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: CSRF_SECRET
+        generateValue: true
+      - key: BCRYPT_ROUNDS
+        value: "10"
+      - key: PORT
+        value: "10000"
+      - key: IMPORT_BATCH_SIZE
+        value: "500"
+      - key: ALERT_EVAL_INTERVAL
+        value: "60000"
+      - key: RETENTION_CRON_HOUR
+        value: "3"
+      - key: UPLOAD_MAX_SIZE
+        value: "209715200"
+      - key: DB_CONNECTION_LIMIT
+        value: "3"
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: logsystem-cache
+          property: connectionString
     region: frankfurt
     plan: free
     healthCheckPath: /health
