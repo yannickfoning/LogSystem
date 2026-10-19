@@ -31,15 +31,17 @@
       animation-delay: 0s !important;
     }
 
-    /* Forcer tout à tenir sur une seule page sans scroll */
+    /* Laisser le tableau de bord dérouler naturellement sur les petits écrans. */
     body {
-      overflow: hidden;
-      height: 100vh;
-      width: 100vw;
+      overflow-x: hidden;
+      overflow-y: auto;
+      min-height: 100vh;
+      width: 100%;
     }
     .dash-layout {
-      height: calc(100vh - 56px);
-      overflow-y: auto;
+      height: auto;
+      min-height: calc(100vh - 56px);
+      overflow: visible;
       overflow-x: hidden;
       padding: 10px 20px 20px;
       gap: 10px;
@@ -64,9 +66,6 @@
     }
     .scroll-y {
       max-height: 200px;
-    }
-    #trends-wrapper {
-      height: 180px;
     }
     .chart-box-sm {
       height: 180px;
@@ -152,7 +151,7 @@
     </div>
 
     <!-- Trends (full width) -->
-    <div class="card-v2">
+    <div class="card-v2" id="trends-card">
       <div class="card-v2-header">
         <div class="card-v2-title">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
@@ -635,6 +634,10 @@
 
         canvas.style.display = '';
         trendsChart = renderTrendsTo(canvas, d, false);
+        // Le canvas peut être mesuré avant que le navigateur ait terminé la mise en page.
+        requestAnimationFrame(function(){
+          if (trendsChart) trendsChart.resize();
+        });
       }).catch(function(e){ 
         console.error('[ERROR] loadTrends failed:', e);
         if (window.toast) window.toast.error('Erreur de chargement des tendances'); 
