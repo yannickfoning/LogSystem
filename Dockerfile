@@ -14,6 +14,7 @@ RUN apk add --no-cache openssl curl unzip p7zip
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV PORT=10000
 
 RUN addgroup -g 1001 -S nodejs && adduser -S logsystem -u 1001
 

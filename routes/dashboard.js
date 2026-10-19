@@ -912,7 +912,7 @@ router.get('/system', requireAdmin, async (req, res) => {
     status.watcher = getWatcherStatus();
   } catch (e) { status.watcher = { running: false, error: e.message }; }
 
-  // Format attendu par le frontend Next.js: { system: {...} }
+  // Format attendu par le frontend (dashboard.html): { system: {...} }
   const [totalLogsRow] = await pool.execute('SELECT COUNT(*) as cnt FROM logs').catch(() => [[{cnt:0}]]);
   const [lastImportRow] = await pool.execute('SELECT MAX(created_at) as last FROM import_jobs').catch(() => [[{last:null}]]);
   const [activeUsersRow] = await pool.execute('SELECT COUNT(*) as cnt FROM users WHERE is_active = 1').catch(() => [[{cnt:0}]]);

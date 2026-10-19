@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "create-admin": "node scripts/create-default-users.js",
+    "create-admin": "node scripts/setup/create-default-users.js",
     "secret": "node scripts/generate-secret.js",
     "lint": "eslint .",
     "build": "node scripts/validate-build.js",

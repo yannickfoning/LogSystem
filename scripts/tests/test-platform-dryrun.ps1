@@ -158,7 +158,7 @@ Write-Host "MODULE 8: SCRIPTS DE MAINTENANCE" -ForegroundColor "Yellow"
 Write-Host "----------------------------------------" -ForegroundColor "Yellow"
 
 $requiredScripts = @(
-    "scripts/create-default-users.js",
+    "scripts/setup/create-default-users.js",
     "scripts/comprehensive-diagnostic.js",
     "scripts/cleanup-database.js",
     "scripts/check-logs-table.js"

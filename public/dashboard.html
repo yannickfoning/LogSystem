@@ -596,16 +596,13 @@
     }
 
     function loadTrends() {
-      console.log('[DEBUG] loadTrends called');
       updateTrendsLabel();
       var r = getTrendsRange();
       var interval = trendsState.windowDays === 1 ? 'hour' : 'day';
       var url = '/api/dashboard/trends?date_from='+fmtDate(r.start)+'&date_to='+fmtDate(r.end)+'&interval='+interval;
         // Also pass days parameter for server-side reference
         if (interval === 'hour') url += '&days=1';
-      console.log('[DEBUG] Trends URL:', url);
       return api.get(url).then(function(d) {
-        console.log('[DEBUG] Trends API response:', d);
         if (!d || !d.labels) {
           console.warn('[WARN] Trends API returned invalid data');
           return;
@@ -613,7 +610,6 @@
         trendsState.lastPayload = d;
         var wrapper = document.getElementById('trends-wrapper');
         var canvas  = document.getElementById('trends-chart');
-        console.log('[DEBUG] Trends canvas element:', canvas);
 
         // Remove any "no data" message without destroying the canvas
         var prev = wrapper.querySelector('.trends-empty');
@@ -637,9 +633,7 @@
         }
 
         canvas.style.display = '';
-        console.log('[DEBUG] Rendering trends chart');
         trendsChart = renderTrendsTo(canvas, d, false);
-        console.log('[DEBUG] Trends chart rendered successfully');
       }).catch(function(e){ 
         console.error('[ERROR] loadTrends failed:', e);
         if (window.toast) window.toast.error('Erreur de chargement des tendances'); 
@@ -659,9 +653,7 @@
 
     // ── Répartition par niveau ──
     function loadLevelChart() {
-      console.log('[DEBUG] loadLevelChart called');
-      api.get('/api/dashboard/per-level').then(function(d){  // [FIX] Appeler /per-level au lieu de /summary
-        console.log('[DEBUG] Per-level API response:', d);
+      api.get('/api/dashboard/per-level').then(function(d){
         if (!d) {
           console.warn('[WARN] Per-level API returned null');
           return;
@@ -669,7 +661,7 @@
         var parent = document.querySelector('.chart-box-sm');
         var ctx = document.getElementById('level-chart');
         if (!ctx && parent) {
-          parent.innerHTML = '<canvas id="level-chart" role="img" aria-label="RÃ©partition des niveaux">Aucune donnÃ©e.</canvas>';
+          parent.innerHTML = '<canvas id="level-chart" role="img" aria-label="Répartition des niveaux"></canvas>';
           ctx = document.getElementById('level-chart');
         }
         if (!ctx) {
@@ -682,9 +674,8 @@
         // [FIX] Lire depuis /per-level qui retourne { INFO: N, WARNING: N, ... }
         var data = levels.map(function(l) { return Number(d[l] || d[l.toLowerCase()] || 0); });
         var total = data.reduce(function(a, b) { return a + b; }, 0);
-        console.log('[DEBUG] Level chart data:', data, 'Total:', total);
-        
-        // [FIX] Si aucune donnée, afficher message au lieu de graphique vide
+
+        // Si aucune donnée, afficher message au lieu de graphique vide
         if (total === 0) {
           if (levelChart) { levelChart.destroy(); levelChart = null; }
           ctx.style.display = 'none';
@@ -696,7 +687,6 @@
             ctx.parentElement.appendChild(empty);
           }
           empty.textContent = t('dashboard.no_data');
-          console.log('[DEBUG] No data, showing empty message');
           return;
         }
         
@@ -705,7 +695,6 @@
         if (oldEmpty) oldEmpty.remove();
         if (levelChart) { levelChart.destroy(); levelChart = null; }
         
-        console.log('[DEBUG] Creating level chart with data:', data);
         try {
           levelChart = new Chart(ctx, {
           type: 'doughnut',
@@ -736,7 +725,6 @@
             }
           }
         });
-        console.log('[DEBUG] Level chart created successfully');
         } catch (chartError) {
           console.error('[ERROR] Chart creation failed:', chartError);
           ctx.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text2);font-size:13px;">Erreur de création du graphique</div>';
@@ -1466,7 +1454,6 @@ function showLogDetail(logId){
     function updateLastRefresh(){ if(!lastRef) return; lastRef.textContent = 'Mis à jour ' + new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
 
     window.refreshAll = function(){
-      console.log('[DEBUG] refreshAll called');
       setRefreshing(true);
       Promise.allSettled([
         loadSummary(),
@@ -1476,8 +1463,7 @@ function showLogDetail(logId){
         loadTrends(),
         loadLevelChart()
       ])
-        .then(function(){ 
-          console.log('[DEBUG] Dashboard widgets completed');
+        .then(function(){
           if (isAdmin()) { loadWatchdogs(); initSystemStatus(); } 
           updateLastRefresh(); 
         })

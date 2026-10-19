@@ -155,25 +155,22 @@ async function evalRule(rule, targetUserId = rule.created_by || null) {
     const thresholdValue = effectiveThreshold ?? 1;
     const conditionResult = countValue >= thresholdValue;
     
-    logger.info({ 
-      event: 'rule_condition_eval', 
-      ruleId: rule.id, 
+    logger.debug({
+      event: 'rule_condition_eval',
+      ruleId: rule.id,
       ruleName: rule.name,
-      conditionType, 
-      effectiveValue, 
-      countValue, 
-      thresholdValue, 
+      conditionType,
+      effectiveValue,
+      countValue,
+      thresholdValue,
       conditionResult,
       windowStart: windowStartFormatted,
       userFilter,
       scopedParams
-    }, '[ALERT] DIAGNOSTIC');
-    
+    }, '[ALERT]');
+
     if (conditionResult) {
-      logger.info({ event: 'rule_condition_true_calling_createAlert', ruleId: rule.id, countValue, thresholdValue }, '[ALERT] DIAGNOSTIC');
       return createAlert(rule, `Level ${effectiveValue} detected ${rows[0].cnt} times in last ${rule.time_window_minutes}min`, targetUserId);
-    } else {
-      logger.info({ event: 'rule_condition_false_skipping_createAlert', ruleId: rule.id, countValue, thresholdValue }, '[ALERT] DIAGNOSTIC');
     }
   } else if (conditionType === 'count') {
     const [rows] = await pool.execute(

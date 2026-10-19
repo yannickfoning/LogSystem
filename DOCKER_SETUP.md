@@ -104,7 +104,7 @@ SHOW TABLES;
 
 ## Créer l'utilisateur admin
 
-Le script `create-default-users.js` crée automatiquement un utilisateur admin au démarrage.
+Exécutez le script de création des comptes par défaut après la première migration :
 
 Par défaut :
 - Email : `admin@logsystem.local`
@@ -115,7 +115,7 @@ Par défaut :
 ### Créer un admin manuellement
 
 ```bash
-docker exec -it logsystem node scripts/create-default-users.js
+docker exec -it logsystem node scripts/setup/create-default-users.js
 ```
 
 ## Commandes Docker utiles
@@ -326,8 +326,51 @@ server {
 }
 ```
 
+## Déploiement sur Render (Docker)
+
+Render peut construire et lancer **uniquement le conteneur applicatif** défini par le `Dockerfile` (pas le `docker-compose` complet). MySQL reste **externe** (Aiven, PlanetScale, instance managée, etc.).
+
+### Prérequis Render
+
+1. Dépôt Git connecté à Render.
+2. Blueprint `render.yaml` à la racine (déjà configuré avec `runtime: docker`).
+3. Variables secrètes dans le dashboard Render :
+   - `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`
+   - `DB_SSL=true` et `DB_SSL_CA_BASE64` (certificat CA Aiven en base64, une ligne)
+   - `SESSION_SECRET` et `CSRF_SECRET` (générés par le blueprint ou définis manuellement)
+4. Service **Key Value** `logsystem-cache` pour `REDIS_URL` (optionnel mais recommandé).
+
+### Étapes
+
+1. **New → Blueprint** (ou mettre à jour le service existant) et appliquer `render.yaml`.
+2. Vérifier que le service web est en **Docker** (pas « Native Environment »).
+3. Au premier déploiement réussi, exécuter une **one-off shell** sur Render :
+   ```bash
+   node scripts/setup/create-default-users.js
+   ```
+4. Contrôler `/health` : réponse `{ "status": "ok", "database": "ok" }`.
+
+### Limites Render + Docker
+
+| Comportement | Détail |
+|--------------|--------|
+| Watcher fichiers | Désactivé (`RENDER=true`) — pas de disque persistant pour `./logs` |
+| Port | Render injecte `PORT` ; l’image expose `10000` par défaut (`render.yaml` aligné) |
+| Health check | `/health` doit répondre 200 avec MySQL joignable |
+| Uploads | Volume éphémère — les fichiers importés sont en base, pas sur disque long terme |
+
+### Build local (validation avant push)
+
+```bash
+docker build -t logsystem:local .
+docker run --rm -p 10000:10000 --env-file .env.docker.example logsystem:local
+```
+
+Adaptez `.env.docker.example` → `.env` local avec vos identifiants MySQL.
+
 ## Ressources
 
 - Documentation Docker : https://docs.docker.com/
+- Render Docker : https://render.com/docs/docker
 - Documentation Docker Compose : https://docs.docker.com/compose/
 - Documentation MySQL : https://dev.mysql.com/doc/
