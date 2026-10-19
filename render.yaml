@@ -9,6 +9,7 @@ services:
     startCommand: node server.js
     healthCheckPath: /health
     autoDeploy: false
+    region: frankfurt
     envVars:
       - key: NODE_ENV
         value: production
@@ -53,68 +54,18 @@ services:
         value: "209715200"
       - key: DB_CONNECTION_LIMIT
         value: "3"
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: logsystem-cache
-          property: connectionString
-    region: frankfurt
-    plan: free
-    healthCheckPath: /health
-    autoDeploy: false
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: RENDER
-        value: "true"
-      - key: RUN_MIGRATIONS_ON_START
-        value: "true"
-      # Base de données MySQL 8 (Aiven ou autre hébergeur — pas incluse dans l'image)
-      - key: DB_HOST
-        sync: false
-      - key: DB_PORT
-        sync: false
-      - key: DB_USER
-        sync: false
-      - key: DB_PASSWORD
-        sync: false
-      - key: DB_NAME
-        sync: false
-      - key: DB_SSL
-        value: "true"
-      - key: DB_SSL_CA_BASE64
-        sync: false
-      - key: DB_SSL_REJECT_UNAUTHORIZED
-        value: "true"
-      - key: DB_KEEPALIVE
-        value: "true"
-      - key: SESSION_SECRET
-        generateValue: true
-      - key: CSRF_SECRET
-        generateValue: true
-      - key: BCRYPT_ROUNDS
-        value: "10"
-      - key: PORT
-        value: "10000"
-      - key: IMPORT_BATCH_SIZE
-        value: "500"
-      - key: ALERT_EVAL_INTERVAL
-        value: "60000"
-      - key: RETENTION_CRON_HOUR
-        value: "3"
-      - key: UPLOAD_MAX_SIZE
-        value: "209715200"
-      - key: DB_CONNECTION_LIMIT
-        value: "3"
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: logsystem-cache
-          property: connectionString
+      # Redis désactivé pour éviter les erreurs de connexion (optionnel)
+      # L'application fonctionne en mode dégradé sans cache
+      # - key: REDIS_URL
+      #   fromService:
+      #     type: keyvalue
+      #     name: logsystem-cache
+      #     property: connectionString
 
-  - type: keyvalue
-    name: logsystem-cache
-    region: frankfurt
-    plan: free
-    maxmemoryPolicy: allkeys-lru
-    ipAllowList: []
+  # Render Key Value instance (Redis) - désactivé pour le moment
+  # - type: keyvalue
+  #   name: logsystem-cache
+  #   region: frankfurt
+  #   plan: free
+  #   maxmemoryPolicy: allkeys-lru
+  #   ipAllowList: []
