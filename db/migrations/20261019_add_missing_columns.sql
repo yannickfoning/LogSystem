@@ -42,7 +42,7 @@ SET @column_exists = (
 );
 SET @sql = IF(
   @column_exists = 0,
-  'ALTER TABLE import_jobs ADD COLUMN total_files INT DEFAULT 0 AFTER file_count',
+  'ALTER TABLE import_jobs ADD COLUMN total_files INT DEFAULT 0',
   'SELECT 1'
 );
 PREPARE stmt FROM @sql;
