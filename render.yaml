@@ -45,15 +45,17 @@ services:
       - key: PORT
         value: "10000"
       - key: IMPORT_BATCH_SIZE
-        value: "500"
+        value: "1000"
       - key: ALERT_EVAL_INTERVAL
         value: "60000"
       - key: RETENTION_CRON_HOUR
         value: "3"
       - key: UPLOAD_MAX_SIZE
-        value: "209715200"
+        value: "5242880000"
+      - key: UPLOAD_MAX_FILES
+        value: "10"
       - key: DB_CONNECTION_LIMIT
-        value: "3"
+        value: "5"
       # Redis désactivé pour éviter les erreurs de connexion (optionnel)
       # L'application fonctionne en mode dégradé sans cache
       # - key: REDIS_URL
