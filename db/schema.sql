@@ -22,7 +22,7 @@ CREATE TABLE `logs` (
   `created_time` TIME,
   `imported_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   `timezone` VARCHAR(64),
-  `log_level` ENUM('DEBUG','INFO','WARNING','ERROR','CRITICAL','FATAL') DEFAULT 'INFO',
+  `log_level` ENUM('TRACE','DEBUG','INFO','WARNING','ERROR','CRITICAL','FATAL','SECURITY') DEFAULT 'INFO',
   `source` VARCHAR(255),
   `source_server` VARCHAR(255),
   `source_system` VARCHAR(255),
