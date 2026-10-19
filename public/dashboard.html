@@ -422,10 +422,9 @@
       .replace(/"/g,'&quot;')
       .replace(/'/g,'&#39;'); }
     function fmtDate(d){
-      // UTC calendar date — aligné sur imported_at stocké en UTC côté serveur
-      var y = d.getUTCFullYear();
-      var m = String(d.getUTCMonth() + 1).padStart(2, '0');
-      var day = String(d.getUTCDate()).padStart(2, '0');
+      var y = d.getFullYear();
+      var m = String(d.getMonth() + 1).padStart(2, '0');
+      var day = String(d.getDate()).padStart(2, '0');
       return y + '-' + m + '-' + day;
     }
 
@@ -483,10 +482,10 @@
 
     function getTrendsRange() {
       var end = new Date();
-      end.setUTCHours(23, 59, 59, 999);
+      end.setHours(23, 59, 59, 999);
       end = new Date(end.getTime() - trendsState.offset * 86400000);
       var start = new Date(end.getTime() - (trendsState.windowDays - 1) * 86400000);
-      start.setUTCHours(0, 0, 0, 0);
+      start.setHours(0, 0, 0, 0);
       return { start: start, end: end };
     }
 

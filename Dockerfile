@@ -15,6 +15,10 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=10000
+ENV UPLOAD_TEMP_DIR=/app/uploads/tmp
+ENV UPLOAD_DEPOT_DIR=/app/uploads/depot
+ENV UPLOAD_TRAITED_DIR=/app/uploads/processed
+ENV LOG_TIMEZONE=Africa/Douala
 
 RUN addgroup -g 1001 -S nodejs && adduser -S logsystem -u 1001
 

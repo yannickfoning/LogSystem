@@ -18,7 +18,8 @@ const LARGE_FILE_THRESHOLD = 10 * 1024 * 1024;
 
 // Répertoires de dépôt selon le cahier des charges
 const UPLOAD_DEPOT_DIR = process.env.UPLOAD_DEPOT_DIR || './uploads/depot';
-const UPLOAD_TRAITED_DIR = process.env.UPLOAD_TRAITED_DIR || './uploads/traité';
+// Chemin ASCII uniquement (évite les échecs mkdir/rename sur Linux/Render)
+const UPLOAD_TRAITED_DIR = process.env.UPLOAD_TRAITED_DIR || './uploads/processed';
 
 // Créer les répertoires au démarrage
 [UPLOAD_DEPOT_DIR, UPLOAD_TRAITED_DIR].forEach(dir => {

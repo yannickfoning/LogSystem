@@ -32,7 +32,7 @@ const upload = multer({
   // Use disk storage for better memory management with large files
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
-      const uploadDir = process.env.UPLOAD_TEMP_DIR || './uploads/tmp';
+      const uploadDir = process.env.UPLOAD_TEMP_DIR || path.join(process.cwd(), 'uploads', 'tmp');
       // Ensure upload directory exists
       if (!fs.existsSync(uploadDir)) {
         fs.mkdirSync(uploadDir, { recursive: true });
@@ -922,7 +922,16 @@ router.get("/jobs/:id/status", async (req, res) => {
       startedAt: job.started_at,
       completedAt: job.completed_at,
       errorMessage: job.error_message,
-      importSummary: job.import_summary ? JSON.parse(job.import_summary) : null,
+      importSummary: (() => {
+        if (!job.import_summary) return null;
+        try {
+          return typeof job.import_summary === 'string'
+            ? JSON.parse(job.import_summary)
+            : job.import_summary;
+        } catch {
+          return null;
+        }
+      })(),
       workerStatus: workerStatus.status
     });
   } catch (_e) {
