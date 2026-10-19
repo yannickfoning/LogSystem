@@ -1,11 +1,13 @@
+# Blueprint Render — déploiement Docker (MySQL externe, ex. Aiven)
+# https://render.com/docs/docker
 services:
   - type: web
     name: logsystem
-    env: node
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     region: frankfurt
     plan: free
-    buildCommand: npm install --legacy-peer-deps
-    startCommand: npm start
     healthCheckPath: /health
     autoDeploy: false
     envVars:
@@ -13,7 +15,9 @@ services:
         value: production
       - key: RENDER
         value: "true"
-      # Base de données MySQL 8 (Aiven ou autre provider)
+      - key: RUN_MIGRATIONS_ON_START
+        value: "true"
+      # Base de données MySQL 8 (Aiven ou autre hébergeur — pas incluse dans l'image)
       - key: DB_HOST
         sync: false
       - key: DB_PORT
@@ -32,14 +36,12 @@ services:
         value: "true"
       - key: DB_KEEPALIVE
         value: "true"
-      # Sécurité
       - key: SESSION_SECRET
         generateValue: true
       - key: CSRF_SECRET
         generateValue: true
       - key: BCRYPT_ROUNDS
         value: "10"
-      # Application
       - key: PORT
         value: "10000"
       - key: IMPORT_BATCH_SIZE
@@ -48,23 +50,19 @@ services:
         value: "60000"
       - key: RETENTION_CRON_HOUR
         value: "3"
-      # Limites pour plan gratuit (512 Mo RAM)
       - key: UPLOAD_MAX_SIZE
         value: "209715200"
       - key: DB_CONNECTION_LIMIT
         value: "3"
-      # Redis (Render Key Value) — cache du dashboard
       - key: REDIS_URL
         fromService:
           type: keyvalue
           name: logsystem-cache
           property: connectionString
 
-  # Render Key Value instance (Redis-compatible) — cache uniquement,
-  # pas de données critiques : le plan free suffit (25 Mo, pas de persistance disque).
   - type: keyvalue
     name: logsystem-cache
     region: frankfurt
     plan: free
     maxmemoryPolicy: allkeys-lru
-    ipAllowList: []   # connexions internes uniquement, via le réseau privé Render
+    ipAllowList: []
