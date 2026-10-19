@@ -54,20 +54,20 @@
     <!-- Metrics -->
     <div class="watch-metrics">
       <div class="metric-card">
-        <div class="metric-label" data-i18n="watchlog.metric.logs_processed">Logs traités</div>
+        <div class="metric-label" data-i18n="watchlog.metric.logs_24h">Logs (24 h)</div>
         <div class="metric-value" id="metricsLogsProcessed">0</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label" data-i18n="watchlog.metric.processing_errors">Erreurs de traitement</div>
+        <div class="metric-label" data-i18n="watchlog.metric.errors_24h">Erreurs (24 h)</div>
         <div class="metric-value" id="metricsProcessingErrors">0</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label" data-i18n="watchlog.metric.files_processed">Fichiers traités</div>
-        <div class="metric-value" id="metricsFilesProcessed">0</div>
+        <div class="metric-label" data-i18n="watchlog.metric.services_24h">Services distincts (24 h)</div>
+        <div class="metric-value" id="metricsServices">0</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label" data-i18n="watchlog.metric.processing_rate">Taux de traitement</div>
-        <div class="metric-value" id="metricsProcessingRate">0/s</div>
+        <div class="metric-label" data-i18n="watchlog.metric.processing_rate">Logs/min (5 min)</div>
+        <div class="metric-value" id="metricsProcessingRate">0/min</div>
       </div>
     </div>
 
@@ -200,13 +200,14 @@
 
     const STATE = {
       paused: false,
-      sessionStartTime: Date.now(),
       buffer: [],
       seenLogIds: new Set(),
       maxBuffer: 1000,
       metrics: {
         total: 0,
         errors: 0,
+        serviceCount: 0,
+        logsPerMin: 0,
         services: new Map(),
         levelCount: { DEBUG: 0, INFO: 0, WARNING: 0, ERROR: 0, CRITICAL: 0, FATAL: 0 },
         hourlyErrors: new Array(24).fill(0)
@@ -410,23 +411,11 @@
     function updateMetricsFromStats(stats) {
       if (!stats) return;
 
-      // Backend compat : watcherService renvoie stats.total_logs / error_count / critical_count / fatal_count / services
-      const total = Number(stats.total_logs || 0);
-      const errors = Number(stats.error_count || 0);
-      const critical = Number(stats.critical_count || 0);
-      const fatal = Number(stats.fatal_count || 0);
-      const services = Number(stats.services || 0);
-
-      document.getElementById('metricsLogsProcessed').textContent = total;
-      document.getElementById('metricsProcessingErrors').textContent = errors + critical + fatal;
-      document.getElementById('metricsFilesProcessed').textContent = services;
-
-      // logs_per_min (fourni par backend) sinon calcul fallback
-      const logsPerMin = stats.logs_per_min != null
-        ? Number(stats.logs_per_min)
-        : (STATE.metrics.total / Math.max((Date.now() - STATE.sessionStartTime) / 60000, 0.0167));
-
-      document.getElementById('metricsProcessingRate').textContent = Math.round(logsPerMin) + '/min';
+      // These values come from the 24-hour and 5-minute windows in /api/logs/watch/stats.
+      STATE.metrics.total = Number(stats.total_logs) || 0;
+      STATE.metrics.errors = Number(stats.error_count) || 0;
+      STATE.metrics.serviceCount = Number(stats.services) || 0;
+      STATE.metrics.logsPerMin = Number(stats.logs_per_min) || 0;
     }
 
     // AMÉLIORATION 4: Show anomaly alert
@@ -677,13 +666,11 @@
       list.innerHTML = html;
     }
     function updateUI() {
-      // Update processing metrics
-      const elapsedMin = Math.max((Date.now() - STATE.sessionStartTime) / 60000, 0.0167); // min 1s
-      const logsPerMin = Math.round(STATE.metrics.total / elapsedMin) || 0;
+      // Display the same time windows used by the backend stats endpoint.
       document.getElementById('metricsLogsProcessed').textContent = STATE.metrics.total;
       document.getElementById('metricsProcessingErrors').textContent = STATE.metrics.errors;
-      document.getElementById('metricsFilesProcessed').textContent = STATE.metrics.services.size; // Reuse as files count
-      document.getElementById('metricsProcessingRate').textContent = logsPerMin + '/min';
+      document.getElementById('metricsServices').textContent = STATE.metrics.serviceCount;
+      document.getElementById('metricsProcessingRate').textContent = Math.round(STATE.metrics.logsPerMin) + '/min';
 
       // Update components
       updateLogStream();
