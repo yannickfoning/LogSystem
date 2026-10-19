@@ -236,7 +236,7 @@
             } else {
               userCell = '<td><span class="user-empty" title="Le log source ne contient pas d utilisateur responsable ni d adresse IP">Non renseigne</span></td>';
             }
-            return '<tr data-id="'+r.id+'"''
+            return '<tr data-id="'+r.id+'">'
               + tsCell
               + '<td>'+badge(r.log_level)+'</td>'
               + '<td>'+esc(window.logMetadataLabel([r.source, r.source_server, r.module, r.log_source, r.source_system], r.import_filename ? 'Fichier : ' + r.import_filename : 'Non renseignée'))+'</td>'

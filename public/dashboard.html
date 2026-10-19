@@ -273,7 +273,7 @@
                 <option value="high">🟠 Élevée</option>
                 <option value="medium">🟡 Moyenne</option>
               </select>
-              <input type="search" id="errorSearch" class="form-control form-control-sm" placeholder="Rechercher..." aria-label="Rechercher des erreurs">
+              <input type="search" id="errorSearch" class="form-control form-control-sm" placeholder="Rechercher..." aria-label="Rechercher des erreurs" maxlength="120">
             </div>
           </div>
           <div class="card-v2-body">
@@ -421,9 +421,9 @@
       .replace(/"/g,'&quot;')
       .replace(/'/g,'&#39;'); }
     function fmtDate(d){
-      var y = d.getFullYear();
-      var m = String(d.getMonth() + 1).padStart(2, '0');
-      var day = String(d.getDate()).padStart(2, '0');
+      var y = d.getUTCFullYear();
+      var m = String(d.getUTCMonth() + 1).padStart(2, '0');
+      var day = String(d.getUTCDate()).padStart(2, '0');
       return y + '-' + m + '-' + day;
     }
 
@@ -1071,10 +1071,12 @@
     }
 
     // ── Top erreurs ──
+    var topErrorsRequestId = 0;
     function loadTopErrors() {
       var timeRange = document.getElementById('timeRangeFilter')?.value || 'all';
       var severity = document.getElementById('severityFilter')?.value || 'all';
       var search = document.getElementById('errorSearch')?.value || '';
+      var requestId = ++topErrorsRequestId;
       
       var url = '/api/dashboard/top-errors/top-errors-grouped?limit=10';
       if (timeRange !== 'all') url += '&timeRange=' + timeRange;
@@ -1082,6 +1084,7 @@
       if (search) url += '&search=' + encodeURIComponent(search);
       
       return api.get(url).then(function(d){
+        if (requestId !== topErrorsRequestId) return;
         var list = document.getElementById('top-errors-list');
         if (!d || !d.success || !Array.isArray(d.data) || !d.data.length) { 
           list.innerHTML='<p class="cell-empty">' + t('dashboard.no_error_groups') + '</p>'; 
@@ -1118,6 +1121,7 @@
             + '</div></div>';
         }).join('');
       }).catch(function(e){
+        if (requestId !== topErrorsRequestId) return;
         var list = document.getElementById('top-errors-list');
         list.innerHTML = '<p class="cell-error">Erreur de chargement des groupes d’erreurs</p>';
         console.error('[ERROR] loadTopErrors failed:', e);
@@ -1402,10 +1406,10 @@ function showLogDetail(logId){
     document.getElementById('severityFilter')?.addEventListener('change', function() {
       loadTopErrors();
     });
-    document.getElementById('errorSearch')?.addEventListener('keyup', function(e) {
-      if (e.key === 'Enter') {
-        loadTopErrors();
-      }
+    var topErrorsSearchTimer = null;
+    document.getElementById('errorSearch')?.addEventListener('input', function() {
+      clearTimeout(topErrorsSearchTimer);
+      topErrorsSearchTimer = setTimeout(loadTopErrors, 250);
     });
 
     // ── Trends nav ──

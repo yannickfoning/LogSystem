@@ -908,6 +908,8 @@ router.get("/jobs/:id/status", async (req, res) => {
 
     res.json({
       jobId: job.id,
+      filename: job.filename,
+      totalFiles: job.total_files,
       status: job.status, // 'pending' | 'extracting' | 'parsing' | 'inserting' | 'completed' | 'failed'
       progress,
       logsProcessed: job.processed_lines,

@@ -640,6 +640,7 @@ body { font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe 
 #trends-wrapper { cursor: zoom-in; display: block; position: relative; width: 100%; height: 240px; min-height: 180px; }
 #trends-wrapper canvas { display: block !important; max-width: 100% !important; }
 #trends-wrapper:hover { opacity: .95; }
+#top-errors-list { max-height: 380px; overflow-y: auto; overscroll-behavior: contain; }
 .admin-only { display: none; }
 body.is-admin .admin-only { display: block; }
 .err-group { cursor: pointer; }

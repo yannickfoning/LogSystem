@@ -37,6 +37,7 @@ describe('Top repeated errors', () => {
     expect(route).toContain('FROM logs l');
     expect(route).toContain('COUNT(DISTINCT l.id) AS occurrence_count');
     expect(route).toContain("l.log_level IN ('ERROR', 'CRITICAL', 'FATAL')");
+    expect(route).toContain("COUNT(DISTINCT l.id) >= 1");
     expect(route).toContain('HAVING ${havingFilters.join(\' AND \')}');
     expect(route).toContain('ORDER BY occurrence_count DESC, most_recent DESC');
   });
@@ -155,6 +156,27 @@ describe('Import integration', () => {
     const src = readFileSync(path.join(root, 'routes/import.js'), 'utf8');
     expect(src).toContain('triggerPostIngestAlerts');
   });
+
+  it('tracks every uploaded job and reports the processed archive-file count', () => {
+    const html = readFileSync(path.join(root, 'public/import.html'), 'utf8');
+    const worker = readFileSync(path.join(root, 'workers/import-worker.js'), 'utf8');
+    expect(html).toContain('Promise.all(jobIds.map(function (jobId)');
+    expect(html).toContain('if (allFinished)');
+    expect(html).toContain('totalFiles: jobs.reduce');
+    expect(worker).toContain('for (const file of filesToProcess)');
+    expect(worker).toContain('fileParseErrors.push');
+  });
+
+  it('offers and extracts bzip2 and xz logs in both languages', () => {
+    const html = readFileSync(path.join(root, 'public/import.html'), 'utf8');
+    const translations = readFileSync(path.join(root, 'public/i18n.js'), 'utf8');
+    const archive = readFileSync(path.join(root, 'lib/processing/archiveHandler.js'), 'utf8');
+    expect(html).toContain('"bz2", "xz"');
+    expect(translations).toContain("'import.formats': 'Formats supportés : .log, .txt, .json, .jsonl, .csv, .xml, .zip, .gz, .bz2, .xz");
+    expect(translations).toContain("'import.formats': 'Supported formats: .log, .txt, .json, .jsonl, .csv, .xml, .zip, .gz, .bz2, .xz");
+    expect(archive).toContain("case 'bzip2':");
+    expect(archive).toContain("case 'xz':");
+  });
 });
 
 describe('Search API', () => {
@@ -162,6 +184,18 @@ describe('Search API', () => {
     const src = readFileSync(path.join(root, 'routes/api/search.js'), 'utf8');
     expect(src).toContain('async function runLogsSearch');
     expect(src).toContain('search_fallback');
+  });
+
+  it('keeps the FULLTEXT fallback parameter aligned after later filters', () => {
+    const src = readFileSync(path.join(root, 'routes/api/search.js'), 'utf8');
+    expect(src).toContain('const paramIndex = (whereClause.slice(0, matchOffset).match(/\\?/g) || []).length');
+    expect(src).toContain('fbParams.splice(paramIndex, 1, ...fallback.params)');
+    expect(src).toContain("DATE_FORMAT(timestamp, '%d/%m/%Y')");
+  });
+
+  it('renders result rows with a complete data-id attribute', () => {
+    const html = readFileSync(path.join(root, 'public/search.html'), 'utf8');
+    expect(html).toContain(`return '<tr data-id="'+r.id+'">'`);
   });
 
   it('error directory uses safe literal pagination values for MySQL', () => {
@@ -230,6 +264,25 @@ describe('Archive extraction', () => {
     expect(isArchive('logs.zip')).toBe(true);
     expect(isArchive('logs.rar')).toBe(true);
     expect(isArchive('plain.log')).toBe(false);
+  });
+
+  it('recursively expands compressed log files found inside archives', async () => {
+    const { expandArchiveEntries, detectArchiveType } = await import('../lib/processing/archiveHandler.js');
+    const zlib = await import('zlib');
+    const { promisify } = await import('util');
+    const gzip = promisify(zlib.gzip);
+    const content = Buffer.from('2026-01-01 10:00:00 ERROR nested connection failure\n');
+    const files = await expandArchiveEntries([
+      { filename: 'logs/nested.log.gz', content: await gzip(content) },
+      { filename: 'logs/plain.log', content },
+    ]);
+
+    expect(files).toHaveLength(2);
+    expect(files.map(file => file.filename)).toContain('logs/nested.log');
+    expect(files.map(file => file.filename)).toContain('logs/plain.log');
+    expect(files.every(file => file.content.toString().includes('ERROR'))).toBe(true);
+    expect(detectArchiveType('logs/nested.log.bz2')).toBe('bzip2');
+    expect(detectArchiveType('logs/nested.log.xz')).toBe('xz');
   });
 });
 

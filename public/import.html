@@ -86,7 +86,7 @@
                         Glissez un ou plusieurs fichiers ici, ou cliquez pour sélectionner
                     </p>
                     <p class="text-hint" data-i18n="import.formats">
-                        Formats supportés : .log, .txt, .json, .jsonl, .csv, .xml, .zip, .gz, .tar, .rar, <strong>.7z</strong>. Jusqu’à 10 fichiers par import ; la taille maximale dépend de la configuration du serveur. Les archives sont extraites automatiquement.
+                        Formats supportés : .log, .txt, .json, .jsonl, .csv, .xml, .zip, .gz, .bz2, .xz, .tar, .rar, <strong>.7z</strong>. Jusqu’à 10 fichiers par import ; la taille maximale dépend de la configuration du serveur. Les archives sont extraites automatiquement.
                     </p>
                     <p class="text-info" data-i18n="import.multi_files">
                         💡 Les archives (ZIP, RAR, 7z) sont extraites automatiquement
@@ -95,7 +95,7 @@
                         type="file"
                         class="file-input"
                         id="file-input"
-                        accept=".log,.txt,.json,.jsonl,.csv,.xml,.zip,.gz,.gzip,.tar,.tgz,.rar,.7z"
+                        accept=".log,.txt,.json,.jsonl,.csv,.xml,.zip,.gz,.gzip,.bz2,.xz,.tar,.tgz,.rar,.7z"
                         multiple
                     />
                 </div>
@@ -214,7 +214,7 @@
 
     function isSupported(file) {
         var extension = file.name.split(".").pop().toLowerCase();
-        var supported = ["log", "txt", "json", "jsonl", "csv", "xml", "zip", "gz", "gzip", "tar", "tgz", "rar", "7z"];
+        var supported = ["log", "txt", "json", "jsonl", "csv", "xml", "zip", "gz", "gzip", "bz2", "xz", "tar", "tgz", "rar", "7z"];
         if (supported.indexOf(extension) >= 0) return true;
         showToast("error", tr("import.unsupported", "Format non supporté : ") + file.name);
         return false;
@@ -320,14 +320,17 @@
         var inserted = Number(job.insertedLines) || 0;
         var skipped = Number(job.skippedLines) || 0;
         var errors = Number(job.errorCount) || 0;
+        var filesProcessed = Number(job.totalFiles) || 0;
+        var fileWarnings = Array.isArray(job.fileWarnings) ? job.fileWarnings : [];
+        var warningText = fileWarnings.length ? " Fichiers à vérifier : " + fileWarnings.join(" ; ") : "";
         document.getElementById("import-success-message").textContent =
-            inserted + " ligne(s) ajoutée(s), " + skipped + " doublon(s) ignoré(s), " + errors + " erreur(s).";
+            filesProcessed + " fichier(s) traité(s), " + inserted + " ligne(s) ajoutée(s), " + skipped + " doublon(s) ignoré(s), " + errors + " erreur(s)." + warningText;
         selectedFiles = [];
         fileInput.value = "";
         renderSelectedFiles();
         restoreImportButton();
         loadJobs();
-        showToast("success", "Import terminé avec succès");
+        showToast(fileWarnings.length ? "warning" : "success", fileWarnings.length ? "Import terminé : certains fichiers sont à vérifier" : "Import terminé avec succès");
     }
 
     function failJob(message) {
@@ -351,24 +354,13 @@
                 throw new Error("Réponse de suivi invalide");
             }
 
-            var failedJobs = jobs.map(function (job, index) {
-                return { job: job, index: index };
-            }).filter(function (item) { return item.job.status === "failed"; });
             var allFinished = jobs.every(function (job) {
                 return job.status === "completed" || job.status === "failed";
             });
-            if (allFinished && failedJobs.length) {
-                var failureMessage = failedJobs.map(function (item) {
-                    var prefix = jobIds.length > 1 ? "Fichier " + (item.index + 1) + " : " : "";
-                    return prefix + (item.job.errorMessage || item.job.error_message || "Erreur inconnue");
-                }).join("; ");
-                failJob(failureMessage);
-                return;
-            }
 
             var processed = jobs.reduce(function (sum, job) { return sum + (Number(job.logsProcessed) || 0); }, 0);
             var total = jobs.reduce(function (sum, job) { return sum + (Number(job.logsTotal) || 0); }, 0);
-            var allCompleted = jobs.every(function (job) { return job.status === "completed"; });
+            var allCompleted = allFinished;
             var activeJob = jobs.find(function (job) {
                 return job.status !== "completed" && job.status !== "failed";
             });
@@ -379,11 +371,17 @@
                 status: activeJob ? activeJob.status : "completed"
             });
 
-            if (allCompleted) {
+            if (allFinished) {
                 completeJob({
                     insertedLines: jobs.reduce(function (sum, job) { return sum + (Number(job.insertedLines) || 0); }, 0),
                     skippedLines: jobs.reduce(function (sum, job) { return sum + (Number(job.skippedLines) || 0); }, 0),
-                    errorCount: jobs.reduce(function (sum, job) { return sum + (Number(job.errorCount) || 0); }, 0)
+                    errorCount: jobs.reduce(function (sum, job) { return sum + (Number(job.errorCount) || 0); }, 0),
+                    totalFiles: jobs.reduce(function (sum, job) { return sum + (Number(job.totalFiles) || 0); }, 0),
+                    fileWarnings: jobs.map(function (job) {
+                        return job.errorMessage
+                            ? (job.filename || "Fichier") + ": " + job.errorMessage
+                            : (job.status === "failed" ? (job.filename || "Fichier") + ": import echoue" : null);
+                    }).filter(Boolean)
                 });
             }
         } catch (error) {

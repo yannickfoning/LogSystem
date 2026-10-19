@@ -31,7 +31,9 @@ router.get('/top-errors-grouped', requireAuth, async (req, res) => {
       ? String(req.query.severity).toLowerCase()
       : 'all';
     const search = String(req.query.search || '').trim().slice(0, 120);
-    const havingFilters = ['COUNT(DISTINCT l.id) >= 2'];
+    // Keep one-off errors visible too; imported datasets often contain many
+    // distinct fingerprints, and an empty Top errors panel hides real failures.
+    const havingFilters = ['COUNT(DISTINCT l.id) >= 1'];
     const queryParams = [userId];
 
     if (severity === 'critical') havingFilters.push('COUNT(DISTINCT l.id) > 100');

@@ -129,29 +129,65 @@ const LOG_SEARCH_SELECT_MIN = `
   (SELECT filename FROM import_jobs AS source_job WHERE source_job.id = logs.import_job_id) AS import_filename
 `.replace(/\s+/g, ' ').trim();
 
+const SEARCH_LIKE_COLUMNS = [
+  'message', 'normalized_message', 'source', 'source_server', 'source_system',
+  'log_source', 'service', 'event_type', 'error_type', 'target_user', 'log_level',
+  'CAST(timestamp AS CHAR)', 'CAST(imported_at AS CHAR)',
+  "DATE_FORMAT(timestamp, '%d/%m/%Y')", "DATE_FORMAT(imported_at, '%d/%m/%Y')",
+];
+
+function buildLiteralSearch(terms) {
+  const likeClauses = [];
+  const likeParams = [];
+  for (const term of terms) {
+    const escapedTerm = String(term).replace(/[\\%_]/g, '\\$&');
+    const pattern = `%${escapedTerm}%`;
+    likeClauses.push(`(${SEARCH_LIKE_COLUMNS.map(column => `${column} LIKE ?`).join(' OR ')})`);
+    likeParams.push(...SEARCH_LIKE_COLUMNS.map(() => pattern));
+  }
+  return {
+    sql: likeClauses.length ? `(${likeClauses.join(' AND ')})` : '(1 = 0)',
+    params: likeParams,
+  };
+}
+
 function appendTextSearch(whereConditions, params, query) {
   const trimmedQuery = query.trim();
-  if (trimmedQuery.length < 4) {
-    whereConditions.push('(message LIKE ? OR normalized_message LIKE ?)');
-    const like = '%' + trimmedQuery + '%';
-    params.push(like, like);
+  if (trimmedQuery.includes('+')) {
+    const terms = trimmedQuery.split(/\s*\+\s*/).map(term => term.trim()).filter(Boolean);
+    const literal = buildLiteralSearch(terms);
+    whereConditions.push(literal.sql);
+    params.push(...literal.params);
     return;
   }
+
+  if (trimmedQuery.length < 4) {
+    const literal = buildLiteralSearch([trimmedQuery]);
+    whereConditions.push(literal.sql);
+    params.push(...literal.params);
+    return;
+  }
+
+  const fullTextTerms = trimmedQuery.match(/[\p{L}\p{N}_]+/gu) || [];
+  const booleanQuery = fullTextTerms.map(term => `+${term}*`).join(' ');
   whereConditions.push('MATCH(message, normalized_message) AGAINST(? IN BOOLEAN MODE)');
-  params.push(trimmedQuery);
+  params.push(booleanQuery);
 }
 
 function applySearchFallback(whereClause, params) {
-  let fbWhere = whereClause;
-  let fbParams = [...params];
-  if (fbWhere.includes('MATCH(message, normalized_message)')) {
-    fbWhere = fbWhere.replace(
-      'MATCH(message, normalized_message) AGAINST(? IN BOOLEAN MODE)',
-      '(message LIKE ? OR normalized_message LIKE ?)'
-    );
-    const q = fbParams.pop();
-    fbParams.push('%' + q + '%', '%' + q + '%');
-  }
+  const matchExpression = 'MATCH(message, normalized_message) AGAINST(? IN BOOLEAN MODE)';
+  const matchOffset = whereClause.indexOf(matchExpression);
+  if (matchOffset === -1) return { fbWhere: whereClause, fbParams: [...params] };
+
+  // Text-search parameters can be followed by metadata/date filters. Replace
+  // the value at the SQL placeholder position so those filters stay aligned.
+  const paramIndex = (whereClause.slice(0, matchOffset).match(/\?/g) || []).length;
+  const query = String(params[paramIndex] ?? '');
+  const terms = query.match(/[\p{L}\p{N}_]+/gu) || [];
+  const fallback = buildLiteralSearch(terms);
+  const fbWhere = whereClause.replace(matchExpression, fallback.sql);
+  const fbParams = [...params];
+  fbParams.splice(paramIndex, 1, ...fallback.params);
   return { fbWhere, fbParams };
 }
 
@@ -165,7 +201,7 @@ async function runCountQuery(whereClause, params) {
       `SELECT COUNT(*) as total FROM logs WHERE ${whereClause}`,
       params
     );
-    return countResult[0]?.total || 0;
+    return { total: Number(countResult[0]?.total || 0), fallbackApplied: false };
   } catch (e) {
     if (!isSearchSchemaError(e)) throw e;
     const { fbWhere, fbParams } = applySearchFallback(whereClause, params);
@@ -173,7 +209,7 @@ async function runCountQuery(whereClause, params) {
       `SELECT COUNT(*) as total FROM logs WHERE ${fbWhere}`,
       fbParams
     );
-    return countResult[0]?.total || 0;
+    return { total: Number(countResult[0]?.total || 0), fallbackApplied: true };
   }
 }
 
@@ -377,9 +413,31 @@ router.get('/', async (req, res) => {
       params.push(ts);
     }
 
-    const whereClause = whereConditions.join(' AND ');
+    let whereClause = whereConditions.join(' AND ');
 
-    const totalCount = await runCountQuery(whereClause, params);
+    const countResult = await runCountQuery(whereClause, params);
+    let totalCount = countResult.total;
+    if (countResult.fallbackApplied) {
+      const fallback = applySearchFallback(whereClause, params);
+      whereClause = fallback.fbWhere;
+      params = fallback.fbParams;
+    } else if (query && query.trim() && totalCount === 0) {
+      // FULLTEXT can miss short/stop words or values stored in log metadata.
+      // Retry with a literal multi-column search only when the indexed search
+      // finds nothing, keeping the common search path index-backed.
+      const fallback = applySearchFallback(whereClause, params);
+      if (fallback.fbWhere !== whereClause) {
+        const [fallbackCount] = await pool.query(
+          `SELECT COUNT(*) as total FROM logs WHERE ${fallback.fbWhere}`,
+          fallback.fbParams
+        );
+        totalCount = Number(fallbackCount[0]?.total || 0);
+        if (totalCount > 0) {
+          whereClause = fallback.fbWhere;
+          params = fallback.fbParams;
+        }
+      }
+    }
 
     const logs = await runLogsSearch(whereClause, params, limitNum, offsetNum);
 

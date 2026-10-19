@@ -1,6 +1,6 @@
 import logger from '../config/logger.js';
 import pool from '../config/database.js';
-import { extractArchive, isArchive, mapArchiveError, filterLogFiles } from '../lib/processing/archiveHandler.js';
+import { extractLogFiles, isArchive, mapArchiveError } from '../lib/processing/archiveHandler.js';
 import { parseLogContent, detectFormat } from '../lib/processing/universalParser.js';
 import { parseJavaLog4jStream } from '../lib/processing/javaLog4jStreamParser.js';
 import { normalizeMessage } from '../lib/processing/normalize.js';
@@ -114,12 +114,11 @@ class ImportWorker {
 
       let filesToProcess;
 
-      if (isArchive(filename)) {
+      if (isArchive(filename, buffer)) {
         logger.info({ event: 'archive_extraction_start', jobId, filename, type: path.extname(filename) });
 
         try {
-          const extracted = await extractArchive(buffer, filename);
-          filesToProcess = filterLogFiles(extracted);
+          filesToProcess = await extractLogFiles(buffer, filename);
 
           if (filesToProcess.length === 0) {
             throw new Error('Aucun fichier log valide trouvé dans l\'archive');
@@ -128,9 +127,7 @@ class ImportWorker {
           logger.info({
             event: 'archive_extraction_success',
             jobId,
-            totalExtracted: extracted.length,
             validLogs: filesToProcess.length,
-            skipped: extracted.length - filesToProcess.length
           });
         } catch (error) {
           logger.error({
@@ -149,12 +146,15 @@ class ImportWorker {
         filesToProcess = [{ filename, content: buffer }];
       }
 
+      await pool.execute('UPDATE import_jobs SET total_files = ? WHERE id = ?', [filesToProcess.length, jobId]);
+
       // ÉTAPE 3: PARSING - Parser les fichiers (séparé du décompte)
       await this.updateJobStatus(jobId, 'parsing', 0, 0);
 
       let totalLines = 0;
       let streamingStats = { processedLines: 0, successfulLines: 0, skippedLines: 0, errorCount: 0 };
       let streamingStarted = false;
+      const fileParseErrors = [];
 
       for (const file of filesToProcess) {
         const detectedFormat = detectFormat(file.content);
@@ -213,6 +213,8 @@ class ImportWorker {
           } catch (parseError) {
             logger.warn({ event: 'parsing_error', jobId, file: file.filename, error: parseError.message });
             if (detectedFormat === 'java' && file.content.length > 10 * 1024 * 1024) throw parseError;
+            fileParseErrors.push({ filename: file.filename, error: parseError.message });
+            streamingStats.errorCount++;
             continue;
           }
 
@@ -234,7 +236,8 @@ class ImportWorker {
           }
         } catch (e) {
           logger.error({ event: 'file_processing_error', jobId, file: file.filename, error: e.message });
-          throw e;
+          fileParseErrors.push({ filename: file.filename, error: e.message });
+          streamingStats.errorCount++;
         }
       }
 
@@ -246,11 +249,16 @@ class ImportWorker {
 
       logger.info({ event: 'total_lines_parsed', jobId, totalLines });
 
+      const fileErrorMessage = fileParseErrors.length
+        ? fileParseErrors.map(({ filename: failedFilename, error }) => `${failedFilename}: ${error}`).join('; ').slice(0, 1000)
+        : null;
+
       if (totalLines === 0) {
-        await this.updateJobStatus(jobId, 'completed', 0, 0, 'No logs parsed');
+        const finalStatus = fileParseErrors.length ? 'failed' : 'completed';
+        await this.updateJobStatus(jobId, finalStatus, 0, fileParseErrors.length, 0, 0);
         await pool.execute(
-          'UPDATE import_jobs SET completed_at = NOW() WHERE id = ?',
-          [jobId]
+          'UPDATE import_jobs SET completed_at = NOW(), error_message = ? WHERE id = ?',
+          [fileErrorMessage || 'Aucun journal valide détecté.', jobId]
         );
         // Déplacer vers traité même si vide
         await this.moveToTreated(filePath, uniqueFilename);
@@ -272,7 +280,7 @@ class ImportWorker {
       await this.updateJobStatus(jobId, finalStatus, processedLines, errorCount, successfulLines, skippedLines);
       await pool.execute(
         `UPDATE import_jobs SET completed_at = NOW(), error_message = ? WHERE id = ?`,
-        [finalStatus === 'failed' ? 'Aucune ligne n’a pu être enregistrée.' : null, jobId]
+        [finalStatus === 'failed' ? (fileErrorMessage || 'Aucune ligne n’a pu être enregistrée.') : fileErrorMessage, jobId]
       );
 
       logger.info({
