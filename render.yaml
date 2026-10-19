@@ -8,7 +8,8 @@ services:
     buildCommand: npm install --legacy-peer-deps
     startCommand: node server.js
     healthCheckPath: /health
-    autoDeploy: false
+    # Deploy les corrections dès qu'elles sont poussées sur la branche liée.
+    autoDeployTrigger: commit
     region: frankfurt
     envVars:
       - key: NODE_ENV
