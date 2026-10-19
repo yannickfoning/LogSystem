@@ -975,17 +975,21 @@
       function loadSystem() {
         Promise.allSettled([
           api.get('/api/admin/system-stats'),
-          api.get('/api/admin/system-status')
+          api.get('/api/admin/system/status')
         ]).then(function(results) {
           var s = results[0].status === 'fulfilled' ? results[0].value : {};
           var st = results[1].status === 'fulfilled' ? results[1].value : {};
           var dbOk = st.database && st.database.connected;
           var redisOk = st.redis && st.redis.connected;
+          var uptimeSeconds = Number(st.uptime);
+          var uptimeLabel = Number.isFinite(uptimeSeconds) && uptimeSeconds >= 0
+            ? Math.floor(uptimeSeconds / 3600) + ' h ' + Math.floor((uptimeSeconds % 3600) / 60) + ' min'
+            : '—';
           document.getElementById('system-stats').innerHTML =
             '<div class="kpi-card"><span class="kpi-label">Database</span><span class="kpi-value '+(dbOk?'green':'red')+'">'+(dbOk?'✓ Connected':'✗ Disconnected')+'</span></div>' +
             '<div class="kpi-card"><span class="kpi-label">Redis Cache</span><span class="kpi-value '+(redisOk?'green':'amber')+'">'+(redisOk?'✓ Connected':'Cache disabled')+'</span></div>' +
             '<div class="kpi-card"><span class="kpi-label">Disk / Memory</span><span class="kpi-value">'+(st.disk && st.disk.usage ? st.disk.usage : 'N/A')+'</span></div>' +
-            '<div class="kpi-card"><span class="kpi-label">Uptime</span><span class="kpi-value blue">'+(st.uptime||'—')+'</span></div>' +
+            '<div class="kpi-card"><span class="kpi-label">Uptime</span><span class="kpi-value blue">'+uptimeLabel+'</span></div>' +
             '<div class="kpi-card"><span class="kpi-label">Version</span><span class="kpi-value">'+(st.version||'6.0.0')+'</span></div>' +
             '<div class="kpi-card"><span class="kpi-label">Utilisateurs</span><span class="kpi-value blue">'+s.totalUsers+'</span></div>' +
             '<div class="kpi-card"><span class="kpi-label">Taille BDD</span><span class="kpi-value green">'+s.dbSizeMb+' Mo</span></div>' +

@@ -31,7 +31,9 @@ router.get("/system/status", async (req, res) => {
       database: { connected: false, status: 'unknown' },
       redis: { connected: false, mode: 'unknown' },
       watcher: { running: false, status: 'unknown' },
-      cache: { enabled: false, status: 'unknown' }
+      cache: { enabled: false, status: 'unknown' },
+      uptime: process.uptime(),
+      version: process.env.npm_package_version || '6.0.0'
     };
 
     // Check database status

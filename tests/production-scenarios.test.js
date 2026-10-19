@@ -31,6 +31,18 @@ describe('Dashboard API trends logic', () => {
   });
 });
 
+describe('Administration system status', () => {
+  it('uses the existing authenticated status route and provides runtime uptime', () => {
+    const adminRoute = readFileSync(path.join(root, 'routes/admin.js'), 'utf8');
+    const adminPage = readFileSync(path.join(root, 'public/admin.html'), 'utf8');
+
+    expect(adminRoute).toContain('router.get("/system/status"');
+    expect(adminRoute).toContain('uptime: process.uptime()');
+    expect(adminPage).toContain("api.get('/api/admin/system/status')");
+    expect(adminPage).not.toContain("api.get('/api/admin/system-status')");
+  });
+});
+
 describe('Top repeated errors', () => {
   it('counts matching error logs and sorts the highest occurrence count first', () => {
     const route = readFileSync(path.join(root, 'routes/dashboard/top-errors-advanced.js'), 'utf8');
