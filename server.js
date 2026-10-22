@@ -20,7 +20,7 @@ import rateLimit from 'express-rate-limit';
 import compression from 'compression';
 import fs from 'fs';
 
-import { testConnection, buildSslOptions } from './config/database.js';
+import { testConnection } from './config/database.js';
 import pool from './config/database.js';
 import { runMigrations } from './lib/database/migrationRunner.js';
 import { requireAuth, requireAuthPage, requireAdminPage } from './middleware/auth.js';
@@ -151,23 +151,16 @@ const alertsStreamLimiter = rateLimit({
 
 // ── Session store (MySQL) ─────────────────────────────────────────────────────
 const MySQLSessionStore = MySQLStore(session);
-const sslOpts = buildSslOptions();
-
+// Share the application pool so session queries use the same TLS, timeout,
+// and database settings. express-mysql-session's own pool builder filters out
+// options such as `ssl`, which breaks providers that require TLS (for example
+// Aiven) even while the application's main database pool remains healthy.
 const sessionStore = new MySQLSessionStore({
-  host: process.env.DB_HOST,
-  port: parseInt(process.env.DB_PORT || '3306'),
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  waitForConnections: true,
-  connectionLimit: parseInt(process.env.DB_SESSION_CONNECTION_LIMIT || '10', 10),
-  queueLimit: parseInt(process.env.DB_SESSION_QUEUE_LIMIT || '0', 10),
-  ssl: sslOpts || undefined,
   clearExpired: true,
   checkExpirationInterval: 900000,
   expiration: 86400000,
   schema: { tableName: 'sessions' }
-});
+}, pool);
 
 app.use(session({
   secret: sessionSecret,
