@@ -393,10 +393,10 @@ router.get('/import-jobs/:jobId/live', async (req, res) => {
         id, timestamp, log_level, message, service,
         source_server
        FROM logs
-       WHERE import_job_id = ?
+       WHERE import_job_id = ? AND user_id = ?
        ORDER BY timestamp DESC
        LIMIT 100`,
-      [jobId]
+      [jobId, req.session.user.id]
     );
 
     res.json({

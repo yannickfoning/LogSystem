@@ -374,7 +374,11 @@ router.post('/:errorGroupId/mark-solved', requireAuth, async (req, res) => {
     if (isNaN(errorGroupId)) return res.status(400).json({ error: 'ID de groupe invalide' });
     if (!solution || !solution.trim()) return res.status(400).json({ error: 'La solution est requise' });
 
-    const [existing] = await pool.execute('SELECT id FROM error_groups WHERE id = ?', [errorGroupId]);
+    const scope = userScope(req);
+    const [existing] = await pool.execute(
+      `SELECT id FROM error_groups WHERE id = ?${scope.sql}`,
+      [errorGroupId, ...scope.params]
+    );
     if (!existing.length) return res.status(404).json({ error: 'Groupe d erreurs introuvable' });
 
     await pool.execute(
@@ -384,8 +388,8 @@ router.post('/:errorGroupId/mark-solved', requireAuth, async (req, res) => {
            solution_applied_at = NOW(), 
            solution_applied_by = ?,
            resolved_at = NOW()
-       WHERE id = ?`,
-      [solution.trim(), user.id, errorGroupId]
+       WHERE id = ?${scope.sql}`,
+      [solution.trim(), user.id, errorGroupId, ...scope.params]
     );
 
     logger.info({ event: 'error_group_marked_solved', errorGroupId, user_id: user.id }, '[RECOMMENDATIONS]');
