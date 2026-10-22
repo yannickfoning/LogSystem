@@ -211,6 +211,13 @@
         // Ignore older responses when searches overlap, such as the initial unfiltered load.
         var requestSequence = ++searchRequestSequence;
         var params = getSearchApiParams();
+        var tb = document.getElementById('logs-body');
+        var searchButton = document.getElementById('search-btn');
+        tb.setAttribute('aria-busy', 'true');
+        tb.innerHTML = '<tr><td colspan="6" class="no-data">Recherche en cours...</td></tr>';
+        document.getElementById('results-count').textContent = 'Recherche en cours...';
+        document.getElementById('logs-pagination').innerHTML = '';
+        if (searchButton) searchButton.disabled = true;
         api.get('/api/search?' + buildQuery(params)).then(function(resp) {
           if (requestSequence !== searchRequestSequence) return;
           var rows = resp.logs || [];
@@ -243,7 +250,7 @@
             return '<tr data-id="'+r.id+'">'
               + tsCell
               + '<td>'+badge(r.log_level)+'</td>'
-              + '<td>'+esc(window.logMetadataLabel([r.source, r.source_server, r.module, r.log_source, r.source_system], r.import_filename ? 'Fichier : ' + r.import_filename : 'Non renseignée'))+'</td>'
+              + '<td>'+esc(window.logMetadataLabel([r.source, r.source_server, r.module, r.log_source, r.source_system], r.import_filename ? 'Fichier : ' + r.import_filename : 'Non renseignÃ©e'))+'</td>'
               + '<td>'+esc(window.logMetadataLabel(r.service))+'</td>'
               + userCell
               + '<td class="text-truncate">'+esc(r.message)+'</td>'
@@ -253,7 +260,15 @@
           document.getElementById('logs-pagination').innerHTML = paginationHtml(currentPage, totalPages);
         }).catch(function(err) {
           if (requestSequence !== searchRequestSequence) return;
-          window.toast.error(err.error || 'Erreur lors de la recherche');
+          var message = (err && (err.error || err.message)) || 'Erreur lors de la recherche';
+          tb.innerHTML = '<tr><td colspan="6" class="no-data">' + esc(message) + '</td></tr>';
+          document.getElementById('results-count').textContent = 'Recherche impossible';
+          renderFacets({});
+          window.toast.error(message);
+        }).finally(function() {
+          if (requestSequence !== searchRequestSequence) return;
+          tb.removeAttribute('aria-busy');
+          if (searchButton) searchButton.disabled = false;
         });
       }
 

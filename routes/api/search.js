@@ -136,6 +136,15 @@ const SEARCH_LIKE_COLUMNS = [
   "DATE_FORMAT(timestamp, '%d/%m/%Y')", "DATE_FORMAT(imported_at, '%d/%m/%Y')",
 ];
 
+function isUsefulMetadataValue(value, kind = '') {
+  const text = String(value ?? '').trim();
+  if (!text || ['unknown', 'inconnu', 'n/a', 'na', 'null', '-'].includes(text.toLowerCase())) return false;
+  if (/^(?:\?+|:[\w-]+|\$\d+)$/.test(text)) return false;
+  if (/^(?:select|insert|update|delete|from|where|join)\b/i.test(text)) return false;
+  if (kind === 'target_user' && /^[A-Z][A-Z0-9_$]*(?:\.[A-Z][A-Z0-9_$]*)+$/.test(text)) return false;
+  return true;
+}
+
 function buildLiteralSearch(terms) {
   const likeClauses = [];
   const likeParams = [];
@@ -476,7 +485,11 @@ router.get('/', async (req, res) => {
     );
     const facetMap = {};
     for (const row of [...facetsLevel, ...facetsEType, ...facetsSvc, ...facetsMod]) {
-      if (row.facet_key) facetMap[row.facet_key] = Number(row.cnt);
+      if (!row.facet_key) continue;
+      const separator = row.facet_key.indexOf(':');
+      const kind = separator >= 0 ? row.facet_key.slice(0, separator) : '';
+      const value = separator >= 0 ? row.facet_key.slice(separator + 1) : row.facet_key;
+      if (isUsefulMetadataValue(value, kind)) facetMap[row.facet_key] = Number(row.cnt);
     }
 
     // [FIX-20] Masquer stack_trace pour les utilisateurs non-admins — peut contenir des chemins système internes
@@ -736,11 +749,11 @@ router.get('/metadata', async (req, res) => {
     );
 
     res.json({
-      services: services.map(r => r.service).filter(Boolean),
-      modules: modules.map(r => r.module).filter(Boolean),
-      sources: sources.map(r => r.source).filter(Boolean),
-      error_types: errorTypes.map(r => r.error_type).filter(Boolean),
-      target_users: users.map(r => r.target_user).filter(Boolean)
+      services: services.map(r => r.service).filter(value => isUsefulMetadataValue(value, 'service')),
+      modules: modules.map(r => r.module).filter(value => isUsefulMetadataValue(value, 'module')),
+      sources: sources.map(r => r.source).filter(value => isUsefulMetadataValue(value, 'source')),
+      error_types: errorTypes.map(r => r.error_type).filter(value => isUsefulMetadataValue(value, 'error_type')),
+      target_users: users.map(r => r.target_user).filter(value => isUsefulMetadataValue(value, 'target_user'))
     });
   } catch (e) {
     logger.error({ event: 'metadata_error', error: e.message }, '[API]');

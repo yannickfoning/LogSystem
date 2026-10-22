@@ -118,7 +118,7 @@
         <div class="kpi-value-v2" id="kpi-total">—</div>
         <div class="kpi-trend" id="kpi-total-trend" data-i18n="common.loading">Chargement…</div>
       </div>
-      <div class="kpi-card-v2 green kpi-clickable" data-filter="today" data-help="Cliquez pour voir les logs d'aujourd'hui">
+      <div class="kpi-card-v2 green kpi-clickable" data-filter="today" data-help="Cliquez pour voir les logs importés aujourd'hui">
         <div class="kpi-icon">📅</div>
         <div class="kpi-label-v2" data-i18n="kpi.today_logs">Logs aujourd'hui</div>
         <div class="kpi-value-v2" id="kpi-today">—</div>
@@ -1004,7 +1004,7 @@
               // Afficher tous les logs sans filtre
               break;
             case 'today':
-              filters.timeRange = '24h';
+              filters.timeRange = 'today';
               break;
             case 'error':
               filters.level = 'ERROR';
@@ -1146,7 +1146,8 @@
       }).catch(function(e){
         if (requestId !== topErrorsRequestId) return;
         var list = document.getElementById('top-errors-list');
-        list.innerHTML = '<p class="cell-error">Erreur de chargement des groupes d’erreurs</p>';
+        var message = (e && (e.error || e.message)) || 'Erreur de chargement des groupes d’erreurs';
+        list.innerHTML = '<p class="cell-error">'+esc(message)+'</p>';
         console.error('[ERROR] loadTopErrors failed:', e);
       });
     }

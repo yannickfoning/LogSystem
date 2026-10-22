@@ -79,9 +79,7 @@ router.get('/top-errors-grouped', requireAuth, async (req, res) => {
         END) AS recent_count,
         MAX(l.timestamp) AS most_recent,
         GROUP_CONCAT(DISTINCT NULLIF(l.module, '') ORDER BY l.module SEPARATOR ',') AS affected_modules,
-        MAX(l.id) AS sample_log_id,
-        MAX(eg.solution_applied) AS solution_applied,
-        MAX(eg.solution_applied_at) AS solution_applied_at
+        MAX(l.id) AS sample_log_id
        FROM logs l
        LEFT JOIN error_groups eg ON eg.fingerprint = l.fingerprint AND eg.user_id = l.user_id
        WHERE l.user_id = ?
@@ -97,23 +95,25 @@ router.get('/top-errors-grouped', requireAuth, async (req, res) => {
     );
 
     // Récupérer les recommandations pour chaque groupe d'erreurs
-    const fingerprints = errorGroups.map(g => g.fingerprint);
     const errorTypes = errorGroups.map(g => g.error_type).filter(Boolean);
     
     let recommendations = {};
     if (errorTypes.length > 0) {
-      const [recRows] = await pool.execute(
-        `SELECT error_type, recommendation, has_solution, solution_details
-         FROM error_recommendations
-         WHERE is_active = 1 AND error_type IN (${errorTypes.map(() => '?').join(',')})
-         ORDER BY priority DESC`,
-        errorTypes
-      );
-      
-      recommendations = recRows.reduce((acc, rec) => {
-        acc[rec.error_type] = rec;
-        return acc;
-      }, {});
+      try {
+        const [recRows] = await pool.execute(
+          `SELECT error_type, recommendation, has_solution, solution_details
+           FROM error_recommendations
+           WHERE is_active = 1 AND error_type IN (${errorTypes.map(() => '?').join(',')})
+           ORDER BY priority DESC`,
+          errorTypes
+        );
+        recommendations = recRows.reduce((acc, rec) => {
+          acc[rec.error_type] = rec;
+          return acc;
+        }, {});
+      } catch (recommendationError) {
+        logger.warn({ event: 'top_errors_recommendations_unavailable', error: recommendationError.message });
+      }
     }
 
     // Transformer pour le frontend avec indicateurs visuels et suggestions
@@ -153,8 +153,8 @@ router.get('/top-errors-grouped', requireAuth, async (req, res) => {
         // Suggestions et solutions
         suggestion: hasRecommendation ? (hasKnownSolution ? recommendation.solution_details : recommendation.recommendation) : null,
         hasKnownSolution: hasKnownSolution,
-        solutionApplied: group.solution_applied,
-        solutionAppliedAt: group.solution_applied_at
+        solutionApplied: null,
+        solutionAppliedAt: null
       };
     });
 

@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { statfs } from "node:fs/promises";
 import logger from "../config/logger.js";
 import bcrypt from "bcryptjs";
 import pool from "../config/database.js";
@@ -795,6 +796,23 @@ router.post("/purge", validateBody(purgeSchema), async (req, res) => {
 
 router.get("/system-stats", async (req, res) => {
   try {
+    const processMemory = process.memoryUsage();
+    let disk = null;
+    try {
+      const fileSystem = await statfs(process.cwd());
+      const totalBytes = Number(fileSystem.blocks) * Number(fileSystem.bsize);
+      const availableBytes = Number(fileSystem.bavail) * Number(fileSystem.bsize);
+      if (totalBytes > 0) {
+        disk = {
+          totalMb: Math.round(totalBytes / 1024 / 1024),
+          availableMb: Math.round(availableBytes / 1024 / 1024),
+          usedPercent: Math.round(((totalBytes - availableBytes) / totalBytes) * 100)
+        };
+      }
+    } catch (error) {
+      logger.warn({ event: 'disk_stats_unavailable', error: error.message }, '[ADMIN]');
+    }
+
     const [users] = await pool.execute("SELECT COUNT(*) as cnt FROM users");
     const [dbSize] = await pool.execute(
       "SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) as size_mb FROM information_schema.tables WHERE table_schema = DATABASE()",
@@ -848,6 +866,12 @@ router.get("/system-stats", async (req, res) => {
       unmappedWatchDirectories: watcherStatus.unmapped_dirs || 0,
       redisConnected: Boolean(cacheStatus.connected),
       databaseConnected: true,
+      disk,
+      processMemoryMb: {
+        rss: Math.round(processMemory.rss / 1024 / 1024),
+        heapUsed: Math.round(processMemory.heapUsed / 1024 / 1024),
+        heapTotal: Math.round(processMemory.heapTotal / 1024 / 1024)
+      },
       totalLogs: totalLogs[0].cnt,
       openErrorGroups: openErrorGroups[0].cnt,
       watchedFiles: watcherStatus.watched_files,

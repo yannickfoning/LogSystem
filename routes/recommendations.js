@@ -242,11 +242,24 @@ router.get('/', requireAuth, async (req, res) => {
       `SELECT r.*, u.display_name as created_by_username 
        FROM error_recommendations r 
        LEFT JOIN users u ON r.created_by = u.id 
-       WHERE r.is_active = 1 
        ORDER BY r.priority DESC, r.created_at DESC`
     );
-    
-    res.json({ recommendations: rows });
+
+    // Keep the latest copy of each identical rule visible without flooding
+    // the admin table with legacy duplicate rows.
+    const seen = new Set();
+    const recommendations = [];
+    for (const row of rows) {
+      const key = JSON.stringify([
+        row.error_type, row.log_format, row.event_type, row.log_level,
+        row.pattern_keywords, row.recommendation, Number(row.priority || 0),
+        Number(row.has_solution || 0), row.solution_details, Number(row.is_active || 0)
+      ]);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      recommendations.push(row);
+    }
+    res.json({ recommendations, duplicate_count: rows.length - recommendations.length });
   } catch (e) {
     logger.error({ event: 'get_recommendations_error', error: e.message }, '[RECOMMENDATIONS]');
     res.status(500).json({ error: 'Erreur serveur' });
@@ -291,10 +304,26 @@ router.post('/', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'La recommandation est requise' });
     }
 
+    const normalizedRecommendation = recommendation.trim();
+    const [duplicates] = await pool.execute(
+      `SELECT id FROM error_recommendations
+       WHERE error_type = ? AND log_format <=> ? AND event_type <=> ?
+         AND log_level <=> ? AND pattern_keywords <=> ?
+         AND recommendation = ? AND priority = ? AND has_solution = ?
+         AND solution_details <=> ? AND is_active = 1
+       LIMIT 1`,
+      [error_type || '*', log_format || null, event_type || null, log_level || null,
+        pattern_keywords || null, normalizedRecommendation, priority || 0,
+        has_solution ? 1 : 0, solution_details || null]
+    );
+    if (duplicates.length) {
+      return res.status(409).json({ error: 'Cette recommandation existe déjà.' });
+    }
+
     const [result] = await pool.execute(
       `INSERT INTO error_recommendations (error_type, log_format, event_type, log_level, pattern_keywords, recommendation, priority, created_by, has_solution, solution_details)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [error_type || '*', log_format || null, event_type || null, log_level || null, pattern_keywords || null, recommendation.trim(), priority || 0, user.id, has_solution ? 1 : 0, solution_details || null]
+      [error_type || '*', log_format || null, event_type || null, log_level || null, pattern_keywords || null, normalizedRecommendation, priority || 0, user.id, has_solution ? 1 : 0, solution_details || null]
     );
     
     logger.info({ event: 'recommendation_created', id: result.insertId, created_by: user.id }, '[RECOMMENDATIONS]');

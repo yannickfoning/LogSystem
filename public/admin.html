@@ -82,7 +82,7 @@
                 <th data-i18n="admin.condition_type">Type</th>
                 <th data-i18n="admin.condition_value">Valeur</th>
                 <th data-i18n="admin.severity">Sévérité</th>
-                <th data-i18n="admin.active">Active</th>
+                <th data-i18n="admin.active">Actif</th>
                 <th data-i18n="common.actions">Actions</th>
               </tr>
             </thead>
@@ -127,8 +127,8 @@
             <div class="form-group">
               <label data-i18n="admin.rec.active_label">Statut</label>
               <select id="rec-active">
-                <option value="1">Active</option>
-                <option value="0">Inactive</option>
+                <option value="1">Actif</option>
+                <option value="0">Inactif</option>
               </select>
             </div>
           </div>
@@ -147,7 +147,7 @@
                 <th>Type d'erreur</th>
                 <th>Recommandation</th>
                 <th>Priorité</th>
-                <th>Active</th>
+                <th>Actif</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -335,7 +335,7 @@
         </div>
         <div class="form-group">
           <label>
-            <input type="checkbox" id="rf-active" checked> <span data-i18n="admin.active">Active</span>
+            <input type="checkbox" id="rf-active" checked> <span data-i18n="admin.active">Actif</span>
           </label>
         </div>
         <div class="modal-actions">
@@ -498,8 +498,8 @@
             var statusBadge = statusIndicator(!!u.is_active);
             var actions = '';
             if (u.id !== myUserId) {
-              actions += '<button class="btn btn-xs btn-secondary act-edit-user" data-id="'+u.id+'" data-email="'+escAttr(u.email)+'" data-name="'+escAttr(u.display_name)+'" data-role="'+escAttr(u.role)+'">Edit</button> ';
-              actions += '<button class="btn btn-xs btn-secondary act-reset-pwd" data-id="'+u.id+'">Reset</button> ';
+              actions += '<button class="btn btn-xs btn-secondary act-edit-user" data-id="'+u.id+'" data-email="'+escAttr(u.email)+'" data-name="'+escAttr(u.display_name)+'" data-role="'+escAttr(u.role)+'">Modifier</button> ';
+              actions += '<button class="btn btn-xs btn-secondary act-reset-pwd" data-id="'+u.id+'">Réinitialiser</button> ';
               actions += u.is_active
                 ? '<button class="btn btn-xs btn-secondary act-toggle-user" data-id="'+u.id+'" data-active="0">Désactiver</button> '
                 : '<button class="btn btn-xs btn-success act-toggle-user" data-id="'+u.id+'" data-active="1">Activer</button> ';
@@ -509,6 +509,10 @@
             }
             return '<tr><td class="col-id">'+u.id+'</td><td>'+esc(u.email)+'</td><td>'+esc(u.display_name)+'</td><td>'+roleBadge(u.role)+'</td><td>'+statusBadge+'</td><td class="col-last-login">'+fmtDT(u.last_login)+'</td><td>'+actions+'</td></tr>';
           }).join('');
+        }).catch(function(error) {
+          document.getElementById('users-count').textContent = 'Impossible de charger les utilisateurs';
+          document.getElementById('users-body').innerHTML =
+            '<tr><td colspan="7" class="text-danger">' + esc(error && (error.error || error.message) || 'Erreur serveur') + '</td></tr>';
         });
       }
 
@@ -609,13 +613,19 @@
         api.get('/api/recommendations').then(function(payload) {
           var recs = Array.isArray(payload) ? payload : ((payload && payload.recommendations) || []);
           var tb = document.getElementById('recommendations-body');
-          document.getElementById('recommendations-count').textContent = recs.length + ' recommandation(s)';
+          var duplicateCount = Number(payload && payload.duplicate_count) || 0;
+          document.getElementById('recommendations-count').textContent = recs.length + ' recommandation(s)' +
+            (duplicateCount ? ' (' + duplicateCount + ' doublon(s) masqué(s))' : '');
           tb.innerHTML = recs.map(function(r) {
             var activeBadge = r.is_active ? '<span class="badge badge-status-resolved">Oui</span>' : '<span class="badge badge-status-open">Non</span>';
             var priorityLabels = { 1: 'Basse', 5: 'Moyenne', 10: 'Haute' };
             var text = String(r.recommendation || '');
-            return '<tr><td>'+esc(r.error_type || '')+'</td><td class="cell-ellipsis" title="'+esc(text)+'">'+esc(text.slice(0,80))+(text.length>80?'\u2026':'')+'</td><td><span class="badge badge-info">'+esc(priorityLabels[r.priority]||r.priority)+'</span></td><td>'+activeBadge+'</td><td><button class="btn btn-xs btn-secondary act-edit-rec" data-rec="'+encodeURIComponent(JSON.stringify(r))+'">Edit</button> <button class="btn btn-xs btn-danger act-delete-rec" data-id="'+r.id+'">Supprimer</button></td></tr>';
+            return '<tr><td>'+esc(r.error_type || '')+'</td><td class="cell-ellipsis" title="'+esc(text)+'">'+esc(text.slice(0,80))+(text.length>80?'\u2026':'')+'</td><td><span class="badge badge-info">'+esc(priorityLabels[r.priority]||r.priority)+'</span></td><td>'+activeBadge+'</td><td><button class="btn btn-xs btn-secondary act-edit-rec" data-rec="'+encodeURIComponent(JSON.stringify(r))+'">Modifier</button> <button class="btn btn-xs btn-danger act-delete-rec" data-id="'+r.id+'">Supprimer</button></td></tr>';
           }).join('');
+        }).catch(function(error) {
+          document.getElementById('recommendations-count').textContent = 'Impossible de charger les recommandations';
+          document.getElementById('recommendations-body').innerHTML =
+            '<tr><td colspan="5" class="text-danger">' + esc(error && (error.error || error.message) || 'Erreur serveur') + '</td></tr>';
         });
       }
 
@@ -712,7 +722,7 @@
             var cv = r.condition_value && r.condition_value.length > 30 ? r.condition_value.slice(0,30) + '\u2026' : (r.condition_value || '');
             var activeBadge = r.is_active ? '<span class="badge badge-status-resolved">Oui</span>' : '<span class="badge badge-status-open">Non</span>';
             var sevCls = { low: 'badge-info', medium: 'badge-warning', high: 'badge-error', critical: 'badge-fatal' };
-            return '<tr><td>'+esc(r.name)+'</td><td>'+esc(r.condition_type)+'</td><td title="'+esc(r.condition_value)+'" style="font-size:12px">'+esc(cv)+'</td><td><span class="badge '+(sevCls[r.severity]||'badge-info')+'">'+esc(r.severity)+'</span></td><td>'+activeBadge+'</td><td><button class="btn btn-xs btn-secondary act-edit-rule" data-rule="'+encodeURIComponent(JSON.stringify(r))+'">Edit</button> <button class="btn btn-xs btn-danger act-delete-rule" data-id="'+r.id+'">Supprimer</button></td></tr>';
+            return '<tr><td>'+esc(r.name)+'</td><td>'+esc(r.condition_type)+'</td><td title="'+esc(r.condition_value)+'" style="font-size:12px">'+esc(cv)+'</td><td><span class="badge '+(sevCls[r.severity]||'badge-info')+'">'+esc(r.severity)+'</span></td><td>'+activeBadge+'</td><td><button class="btn btn-xs btn-secondary act-edit-rule" data-rule="'+encodeURIComponent(JSON.stringify(r))+'">Modifier</button> <button class="btn btn-xs btn-danger act-delete-rule" data-id="'+r.id+'">Supprimer</button></td></tr>';
           }).join('');
         });
       }
@@ -955,15 +965,20 @@
           var uptimeLabel = Number.isFinite(uptimeSeconds) && uptimeSeconds >= 0
             ? Math.floor(uptimeSeconds / 3600) + ' h ' + Math.floor((uptimeSeconds % 3600) / 60) + ' min'
             : '—';
+          var diskLabel = s.disk
+            ? s.disk.availableMb + ' Mo libres / ' + s.disk.totalMb + ' Mo (' + s.disk.usedPercent + ' % utilisés)'
+            : 'Indisponible';
+          var processMemory = s.processMemoryMb || {};
           document.getElementById('system-stats').innerHTML =
-            '<div class="kpi-card"><span class="kpi-label">Database</span><span class="kpi-value '+(dbOk?'green':'red')+'">'+(dbOk?'✓ Connected':'✗ Disconnected')+'</span></div>' +
-            '<div class="kpi-card"><span class="kpi-label">Redis Cache</span><span class="kpi-value '+(redisOk?'green':'amber')+'">'+(redisOk?'✓ Connected':'Cache disabled')+'</span></div>' +
-            '<div class="kpi-card"><span class="kpi-label">Disk / Memory</span><span class="kpi-value">'+(st.disk && st.disk.usage ? st.disk.usage : 'N/A')+'</span></div>' +
-            '<div class="kpi-card"><span class="kpi-label">Uptime</span><span class="kpi-value blue">'+uptimeLabel+'</span></div>' +
+            '<div class="kpi-card"><span class="kpi-label">Base de données</span><span class="kpi-value '+(dbOk?'green':'red')+'">'+(dbOk?'✓ Connectée':'✗ Déconnectée')+'</span></div>' +
+            '<div class="kpi-card"><span class="kpi-label">Cache Redis</span><span class="kpi-value '+(redisOk?'green':'amber')+'">'+(redisOk?'✓ Connecté':'Désactivé')+'</span></div>' +
+            '<div class="kpi-card"><span class="kpi-label">Disque du serveur</span><span class="kpi-value">'+diskLabel+'</span></div>' +
+            '<div class="kpi-card"><span class="kpi-label">Mémoire du processus</span><span class="kpi-value">RSS '+(processMemory.rss ?? '—')+' Mo · tas '+(processMemory.heapUsed ?? '—')+' / '+(processMemory.heapTotal ?? '—')+' Mo</span></div>' +
+            '<div class="kpi-card"><span class="kpi-label">Disponibilité</span><span class="kpi-value blue">'+uptimeLabel+'</span></div>' +
             '<div class="kpi-card"><span class="kpi-label">Version</span><span class="kpi-value">'+(st.version||'6.0.0')+'</span></div>' +
             '<div class="kpi-card"><span class="kpi-label">Utilisateurs</span><span class="kpi-value blue">'+s.totalUsers+'</span></div>' +
             '<div class="kpi-card"><span class="kpi-label">Taille BDD</span><span class="kpi-value green">'+s.dbSizeMb+' Mo</span></div>' +
-            '<div class="kpi-card"><span class="kpi-label">Total logs</span><span class="kpi-value blue">'+Number(s.totalLogs).toLocaleString()+'</span></div>';
+            '<div class="kpi-card"><span class="kpi-label">Total des logs</span><span class="kpi-value blue">'+Number(s.totalLogs).toLocaleString('fr-FR')+'</span></div>';
         }).catch(function(){ if(window.toast) window.toast.error('Erreur système'); });
       }
 

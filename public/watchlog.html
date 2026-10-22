@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>LogSystem — Watch Log</title>
+  <title>LogSystem — Journaux en direct</title>
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/css/responsive.css">
   <link rel="stylesheet" href="/watchlog.css">
@@ -249,6 +249,8 @@
       STATE.metrics = {
         total: 0,
         errors: 0,
+        serviceCount: 0,
+        logsPerMin: 0,
         services: new Map(),
         levelCount: { DEBUG: 0, INFO: 0, WARNING: 0, ERROR: 0, CRITICAL: 0, FATAL: 0 },
         hourlyErrors: new Array(24).fill(0)
@@ -434,8 +436,16 @@
       var list = document.getElementById('serviceList');
       if (!list) return;
       // STATE.metrics.services is a Map<serviceName, count>
-      var entries = Array.from(STATE.metrics.services.entries || STATE.metrics.services || []);
-      if (!entries.length) { list.innerHTML = '<li style="color:var(--text2);font-size:12px">Aucun service</li>'; return; }
+      var entries = STATE.metrics.services instanceof Map
+        ? Array.from(STATE.metrics.services.entries())
+        : Array.from(STATE.metrics.services || []);
+      if (!entries.length) {
+        var fallback = STATE.metrics.serviceCount > 0
+          ? STATE.metrics.serviceCount + ' service(s) détecté(s)'
+          : 'Aucun service détecté';
+        list.innerHTML = '<li style="color:var(--text2);font-size:12px">' + esc(fallback) + '</li>';
+        return;
+      }
       // Sort by count descending
       entries.sort(function(a, b) { return (b[1] || 0) - (a[1] || 0); });
       

@@ -525,10 +525,12 @@ body { font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe 
 /* Stats grid: 5 cards in a row on desktop */
 .dash-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 20px;
 }
+.dash-kpi-grid > * { min-width: 0; }
+.dash-kpi-grid .kpi-card-v2 { min-width: 0; overflow-wrap: anywhere; }
 
 /* Alert widget enhanced (point 6) */
 .alert-widget-table {
@@ -562,19 +564,19 @@ body { font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe 
 
 /* ─── Responsive breakpoints ────────────────────────────────────────── */
 @media (max-width: 1200px) {
-  .dash-kpi-grid { grid-template-columns: repeat(3, 1fr); }
+  .dash-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media (max-width: 1024px) {
   .main-grid { grid-template-columns: 1fr !important; }
-  .dash-kpi-grid { grid-template-columns: repeat(3, 1fr); }
+  .dash-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .alert-widget-table .col-dir,
   .alert-widget-table .col-occ { display: none; }
   .filter-toolbar-v2 .form-select-sm { min-width: 110px; }
 }
 
 @media (max-width: 768px) {
-  .dash-kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .dash-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .dash-actions { flex-direction: column; gap: 6px; align-items: flex-start; }
   .alert-widget-table .col-date,
   .alert-widget-table .col-time { display: none; }
@@ -582,7 +584,7 @@ body { font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe 
 }
 
 @media (max-width: 480px) {
-  .dash-kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .dash-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .dash-header { flex-direction: column; gap: 8px; }
   .dash-title { font-size: 18px; }
   .alert-widget-table .col-type { display: none; }

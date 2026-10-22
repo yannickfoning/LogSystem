@@ -567,7 +567,7 @@ router.get('/recent-logs', async (req, res) => {
     if (req.query.timeRange) {
       const timeBounds = getTimeBounds(req.query.timeRange);
       if (timeBounds) {
-        filterSql += ' AND timestamp >= ? AND timestamp <= ?';
+        filterSql += ` AND ${OPERATIONAL_TS} >= ? AND ${OPERATIONAL_TS} <= ?`;
         filterParams.push(timeBounds.start, timeBounds.end);
       }
     }
@@ -606,6 +606,11 @@ router.get('/recent-logs', async (req, res) => {
 function getTimeBounds(range) {
   const now = new Date();
   switch (range) {
+    case 'today': {
+      const start = new Date(now);
+      start.setUTCHours(0, 0, 0, 0);
+      return { start, end: now };
+    }
     case '1h':
       return { start: new Date(now - 60 * 60 * 1000), end: now };
     case '24h':

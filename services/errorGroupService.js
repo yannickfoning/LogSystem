@@ -78,43 +78,43 @@ export async function upsertErrorGroupsFromLogs(conn, userId, records, returnGap
      ) VALUES ${valuePlaceholders}
      ON DUPLICATE KEY UPDATE
        occurrence_count = VALUES(occurrence_count),
-       previous_seen = IF(VALUES(last_seen) > last_seen, last_seen, previous_seen),
+       previous_seen = IF(VALUES(last_seen) > error_groups.last_seen, error_groups.last_seen, error_groups.previous_seen),
        return_reason = IF(
-         (status = 'resolved' OR TIMESTAMPDIFF(DAY, last_seen, VALUES(last_seen)) >= ?)
-         AND VALUES(last_seen) > last_seen,
-         CONCAT('Erreur deja observee le ', DATE_FORMAT(first_seen, '%Y-%m-%d %H:%i:%s'),
-                ', absente depuis ', TIMESTAMPDIFF(DAY, last_seen, VALUES(last_seen)),
+         (error_groups.status = 'resolved' OR TIMESTAMPDIFF(DAY, error_groups.last_seen, VALUES(last_seen)) >= ?)
+         AND VALUES(last_seen) > error_groups.last_seen,
+         CONCAT('Erreur deja observee le ', DATE_FORMAT(error_groups.first_seen, '%Y-%m-%d %H:%i:%s'),
+                ', absente depuis ', TIMESTAMPDIFF(DAY, error_groups.last_seen, VALUES(last_seen)),
                 ' jour(s), puis reapparue le ', DATE_FORMAT(VALUES(last_seen), '%Y-%m-%d %H:%i:%s')),
-         return_reason
+         error_groups.return_reason
        ),
        returned_at = IF(
-         (status = 'resolved' OR TIMESTAMPDIFF(DAY, last_seen, VALUES(last_seen)) >= ?)
-         AND VALUES(last_seen) > last_seen,
+         (error_groups.status = 'resolved' OR TIMESTAMPDIFF(DAY, error_groups.last_seen, VALUES(last_seen)) >= ?)
+         AND VALUES(last_seen) > error_groups.last_seen,
          VALUES(last_seen),
-         returned_at
+         error_groups.returned_at
        ),
        return_count = IF(
-         (status = 'resolved' OR TIMESTAMPDIFF(DAY, last_seen, VALUES(last_seen)) >= ?)
-         AND VALUES(last_seen) > last_seen,
-         return_count + 1,
-         return_count
+         (error_groups.status = 'resolved' OR TIMESTAMPDIFF(DAY, error_groups.last_seen, VALUES(last_seen)) >= ?)
+         AND VALUES(last_seen) > error_groups.last_seen,
+         error_groups.return_count + 1,
+         error_groups.return_count
        ),
        status = IF(
-         (status = 'resolved' OR TIMESTAMPDIFF(DAY, last_seen, VALUES(last_seen)) >= ?)
-         AND VALUES(last_seen) > last_seen,
+         (error_groups.status = 'resolved' OR TIMESTAMPDIFF(DAY, error_groups.last_seen, VALUES(last_seen)) >= ?)
+         AND VALUES(last_seen) > error_groups.last_seen,
          'returned',
-         IF(VALUES(last_seen) > last_seen, 'open', status)
+         IF(VALUES(last_seen) > error_groups.last_seen, 'open', error_groups.status)
        ),
        first_seen = VALUES(first_seen),
        last_seen = VALUES(last_seen),
-       source_server = COALESCE(VALUES(source_server), source_server),
-       service = COALESCE(VALUES(service), service),
-       error_type = COALESCE(VALUES(error_type), error_type),
+       source_server = COALESCE(VALUES(source_server), error_groups.source_server),
+       service = COALESCE(VALUES(service), error_groups.service),
+       error_type = COALESCE(VALUES(error_type), error_groups.error_type),
        severity_max = IF(
          FIELD(VALUES(severity_max), 'DEBUG','INFO','WARNING','ERROR','CRITICAL','FATAL') >
-         FIELD(severity_max,         'DEBUG','INFO','WARNING','ERROR','CRITICAL','FATAL'),
+         FIELD(error_groups.severity_max, 'DEBUG','INFO','WARNING','ERROR','CRITICAL','FATAL'),
          VALUES(severity_max),
-         severity_max
+         error_groups.severity_max
        )`,
     [...flatValues, returnGapDays, returnGapDays, returnGapDays, returnGapDays]
   );
@@ -168,44 +168,44 @@ export async function refreshErrorGroupsForImport(conn, userId, jobId, returnGap
        GROUP BY logs.fingerprint
      ) AS aggregate_rows
      ON DUPLICATE KEY UPDATE
-       occurrence_count = VALUES(occurrence_count),
-       previous_seen = IF(VALUES(last_seen) > last_seen, last_seen, previous_seen),
+       occurrence_count = aggregate_rows.occurrence_count,
+       previous_seen = IF(aggregate_rows.last_seen > error_groups.last_seen, error_groups.last_seen, error_groups.previous_seen),
        return_reason = IF(
-         (status = 'resolved' OR TIMESTAMPDIFF(DAY, last_seen, VALUES(last_seen)) >= ?)
-         AND VALUES(last_seen) > last_seen,
-         CONCAT('Erreur deja observee le ', DATE_FORMAT(first_seen, '%Y-%m-%d %H:%i:%s'),
-                ', absente depuis ', TIMESTAMPDIFF(DAY, last_seen, VALUES(last_seen)),
-                ' jour(s), puis reapparue le ', DATE_FORMAT(VALUES(last_seen), '%Y-%m-%d %H:%i:%s')),
-         return_reason
+         (error_groups.status = 'resolved' OR TIMESTAMPDIFF(DAY, error_groups.last_seen, aggregate_rows.last_seen) >= ?)
+         AND aggregate_rows.last_seen > error_groups.last_seen,
+         CONCAT('Erreur deja observee le ', DATE_FORMAT(error_groups.first_seen, '%Y-%m-%d %H:%i:%s'),
+                ', absente depuis ', TIMESTAMPDIFF(DAY, error_groups.last_seen, aggregate_rows.last_seen),
+                ' jour(s), puis reapparue le ', DATE_FORMAT(aggregate_rows.last_seen, '%Y-%m-%d %H:%i:%s')),
+         error_groups.return_reason
        ),
        returned_at = IF(
-         (status = 'resolved' OR TIMESTAMPDIFF(DAY, last_seen, VALUES(last_seen)) >= ?)
-         AND VALUES(last_seen) > last_seen,
-         VALUES(last_seen),
-         returned_at
+         (error_groups.status = 'resolved' OR TIMESTAMPDIFF(DAY, error_groups.last_seen, aggregate_rows.last_seen) >= ?)
+         AND aggregate_rows.last_seen > error_groups.last_seen,
+         aggregate_rows.last_seen,
+         error_groups.returned_at
        ),
        return_count = IF(
-         (status = 'resolved' OR TIMESTAMPDIFF(DAY, last_seen, VALUES(last_seen)) >= ?)
-         AND VALUES(last_seen) > last_seen,
-         return_count + 1,
-         return_count
+         (error_groups.status = 'resolved' OR TIMESTAMPDIFF(DAY, error_groups.last_seen, aggregate_rows.last_seen) >= ?)
+         AND aggregate_rows.last_seen > error_groups.last_seen,
+         error_groups.return_count + 1,
+         error_groups.return_count
        ),
        status = IF(
-         (status = 'resolved' OR TIMESTAMPDIFF(DAY, last_seen, VALUES(last_seen)) >= ?)
-         AND VALUES(last_seen) > last_seen,
+         (error_groups.status = 'resolved' OR TIMESTAMPDIFF(DAY, error_groups.last_seen, aggregate_rows.last_seen) >= ?)
+         AND aggregate_rows.last_seen > error_groups.last_seen,
          'returned',
-         IF(VALUES(last_seen) > last_seen, 'open', status)
+         IF(aggregate_rows.last_seen > error_groups.last_seen, 'open', error_groups.status)
        ),
-       first_seen = VALUES(first_seen),
-       last_seen = VALUES(last_seen),
-       source_server = COALESCE(VALUES(source_server), source_server),
-       service = COALESCE(VALUES(service), service),
-       error_type = COALESCE(VALUES(error_type), error_type),
+       first_seen = aggregate_rows.first_seen,
+       last_seen = aggregate_rows.last_seen,
+       source_server = COALESCE(aggregate_rows.source_server, error_groups.source_server),
+       service = COALESCE(aggregate_rows.service, error_groups.service),
+       error_type = COALESCE(aggregate_rows.error_type, error_groups.error_type),
        severity_max = IF(
-         FIELD(VALUES(severity_max), 'DEBUG','INFO','WARNING','ERROR','CRITICAL','FATAL') >
-         FIELD(severity_max,         'DEBUG','INFO','WARNING','ERROR','CRITICAL','FATAL'),
-         VALUES(severity_max),
-         severity_max
+         FIELD(aggregate_rows.severity_max, 'DEBUG','INFO','WARNING','ERROR','CRITICAL','FATAL') >
+         FIELD(error_groups.severity_max, 'DEBUG','INFO','WARNING','ERROR','CRITICAL','FATAL'),
+         aggregate_rows.severity_max,
+         error_groups.severity_max
        )`,
     [jobId, userId ?? null, userId ?? null, returnGapDays, returnGapDays, returnGapDays, returnGapDays]
   );
