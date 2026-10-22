@@ -329,11 +329,18 @@
         currentJobIds = [];
         progress.style.display = "none";
         success.style.display = "block";
+        var hasFailures = Boolean(job.hasFailures);
         var inserted = Number(job.insertedLines) || 0;
         var skipped = Number(job.skippedLines) || 0;
         var errors = Number(job.errorCount) || 0;
         var filesProcessed = Number(job.totalFiles) || 0;
         var fileWarnings = Array.isArray(job.fileWarnings) ? job.fileWarnings : [];
+        document.querySelector("#import-success .success-icon").textContent = hasFailures || fileWarnings.length ? "⚠️" : "✅";
+        document.querySelector("#import-success h3").textContent = hasFailures
+            ? tr("import.interrupted_title", "Import interrompu")
+            : fileWarnings.length
+                ? tr("import.completed_with_warnings_title", "Import terminé avec des avertissements")
+                : tr("import.success_title", "Import terminé !");
         var warnings = fileWarnings.length
             ? " " + tr("import.files_to_check", "Fichiers à vérifier :") + " " + fileWarnings.join(" ; ")
             : "";
@@ -347,9 +354,11 @@
         renderSelectedFiles();
         restoreImportButton();
         loadJobs();
-        showToast(fileWarnings.length ? "warning" : "success", fileWarnings.length
-            ? tr("import.completed_with_warnings", "Import terminé : certains fichiers sont à vérifier")
-            : tr("import.success", "Import terminé avec succès"));
+        showToast(hasFailures ? "error" : (fileWarnings.length ? "warning" : "success"), hasFailures
+            ? tr("import.failed", "Import échoué")
+            : fileWarnings.length
+                ? tr("import.completed_with_warnings", "Import terminé : certains fichiers sont à vérifier")
+                : tr("import.success", "Import terminé avec succès"));
     }
 
     function failJob(message) {
@@ -400,6 +409,7 @@
                     skippedLines: jobs.reduce(function (sum, job) { return sum + (Number(job.skippedLines) || 0); }, 0),
                     errorCount: jobs.reduce(function (sum, job) { return sum + (Number(job.errorCount) || 0); }, 0),
                     totalFiles: jobs.reduce(function (sum, job) { return sum + (Number(job.totalFiles) || 0); }, 0),
+                    hasFailures: jobs.some(function (job) { return job.status === "failed"; }),
                     fileWarnings: jobs.map(function (job) {
                         return job.errorMessage
                             ? (job.filename || "Fichier") + ": " + job.errorMessage
@@ -463,9 +473,9 @@
                 var isActive = ["pending", "processing", "extracting", "parsing", "inserting"].indexOf(job.status) !== -1;
                 var lineProgress = total > 0
                     ? processed.toLocaleString() + " / " + total.toLocaleString()
-                    : isActive
-                        ? (processed > 0 ? processed.toLocaleString() + " traitées…" : "En cours")
-                        : processed.toLocaleString() + " / 0";
+                    : processed > 0
+                        ? processed.toLocaleString() + (isActive ? " traitées…" : " traitées")
+                        : isActive ? "En cours" : "0 traitées";
                 return "<tr><td>" + escapeHtml(job.filename || job.originalName || "—") +
                     '</td><td><span class="badge ' + statusClass + '">' + escapeHtml(job.status || "—") +
                     "</span></td><td>" + escapeHtml(lineProgress) + "</td><td>" +
