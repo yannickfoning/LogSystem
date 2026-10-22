@@ -216,6 +216,16 @@
   width: 0%;
 }
 
+.progress-fill.progress-indeterminate {
+  animation: import-progress-indeterminate 1.4s ease-in-out infinite;
+}
+
+@keyframes import-progress-indeterminate {
+  0% { transform: translateX(-110%); }
+  50% { transform: translateX(110%); }
+  100% { transform: translateX(320%); }
+}
+
 .progress-status {
   font-size: 13px;
   color: var(--text2);

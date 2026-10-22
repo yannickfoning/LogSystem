@@ -313,6 +313,28 @@ async function start() {
     process.exit(1);
   }
 
+  // The import queue is held in memory. Jobs left in a running state by a
+  // previous process cannot resume after a restart, so expose them as failed
+  // instead of leaving the UI polling forever.
+  const staleImportMinutes = Math.max(1, Number.parseInt(process.env.IMPORT_JOB_STALE_MINUTES || '15', 10) || 15);
+  try {
+    const [recovered] = await pool.execute(
+      `UPDATE import_jobs
+       SET status = 'failed',
+           error_message = 'Import interrompu après le redémarrage du service. Relancez le fichier; les doublons seront ignorés.',
+           completed_at = NOW(),
+           updated_at = NOW()
+       WHERE status IN ('pending', 'processing', 'extracting', 'parsing', 'inserting')
+         AND COALESCE(updated_at, created_at) < DATE_SUB(NOW(), INTERVAL ${staleImportMinutes} MINUTE)`
+    );
+    if (recovered.affectedRows > 0) {
+      logger.warn({ event: 'interrupted_imports_failed', count: recovered.affectedRows,
+        staleMinutes: staleImportMinutes }, '[IMPORT-WORKER]');
+    }
+  } catch (error) {
+    logger.error({ event: 'interrupted_import_recovery_failed', error: error.message }, '[IMPORT-WORKER]');
+  }
+
   await startCacheService().catch(() => {});
   setAlertWorker(alertWorker);
 

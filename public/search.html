@@ -176,6 +176,7 @@
       if (!window.api) return;
       var currentPage = 1;
       var totalPages = 1;
+      var searchRequestSequence = 0;
       var currentLogId = null;
       var currentLogDetails = null;
       var shareDeliveryConfig = null;
@@ -207,8 +208,11 @@
       }
 
       function doSearch() {
+        // Ignore older responses when searches overlap, such as the initial unfiltered load.
+        var requestSequence = ++searchRequestSequence;
         var params = getSearchApiParams();
         api.get('/api/search?' + buildQuery(params)).then(function(resp) {
+          if (requestSequence !== searchRequestSequence) return;
           var rows = resp.logs || [];
           var total = resp.total_count != null ? resp.total_count : rows.length;
           var limit = resp.limit || 50;
@@ -248,6 +252,7 @@
           }).join('');
           document.getElementById('logs-pagination').innerHTML = paginationHtml(currentPage, totalPages);
         }).catch(function(err) {
+          if (requestSequence !== searchRequestSequence) return;
           window.toast.error(err.error || 'Erreur lors de la recherche');
         });
       }

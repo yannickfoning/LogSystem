@@ -285,6 +285,7 @@
 
     function resetProgress() {
         progress.style.display = "none";
+        document.getElementById("progress-fill").classList.remove("progress-indeterminate");
         document.getElementById("progress-fill").style.width = "0%";
         document.getElementById("progress-percentage").textContent = "0%";
     }
@@ -308,10 +309,18 @@
             parsing: "Analyse des journaux…",
             inserting: "Enregistrement des journaux…"
         };
-        fill.style.width = percent + "%";
-        percentage.textContent = percent + "%";
-        status.textContent = labels[job.status] ||
-            (processed + (total ? " / " + total : "") + " lignes traitées");
+        if (total > 0 && !job.progressIndeterminate) {
+            fill.classList.remove("progress-indeterminate");
+            fill.style.width = percent + "%";
+            percentage.textContent = percent + "%";
+            status.textContent = processed.toLocaleString() + " / " + total.toLocaleString() + " lignes traitées";
+        } else {
+            fill.classList.add("progress-indeterminate");
+            fill.style.width = "35%";
+            percentage.textContent = processed > 0 ? processed.toLocaleString() + " traitées" : "En cours";
+            status.textContent = labels[job.status] || "Traitement en cours…";
+            if (processed > 0) status.textContent += " — " + processed.toLocaleString() + " lignes traitées";
+        }
     }
 
     function completeJob(job) {
@@ -374,10 +383,14 @@
             var activeJob = jobs.find(function (job) {
                 return job.status !== "completed" && job.status !== "failed";
             });
+            var progressIndeterminate = !allFinished && jobs.some(function (job) {
+                return job.status !== "completed" && job.status !== "failed" && !(Number(job.logsTotal) > 0);
+            });
             updateProgress({
-                progress: allCompleted ? 100 : (total ? Math.round(processed / total * 100) : 0),
+                progress: allCompleted ? 100 : (!progressIndeterminate && total ? Math.round(processed / total * 100) : 0),
                 logsProcessed: processed,
                 logsTotal: total,
+                progressIndeterminate: progressIndeterminate,
                 status: activeJob ? activeJob.status : "completed"
             });
 

@@ -1,8 +1,7 @@
 import logger from '../config/logger.js';
 import pool from '../config/database.js';
-import { extractLogFiles, isArchive, mapArchiveError } from '../lib/processing/archiveHandler.js';
+import { extractLogFiles, extractRarToDirectory, isArchive, mapArchiveError } from '../lib/processing/archiveHandler.js';
 import { parseLogContent, detectFormat } from '../lib/processing/universalParser.js';
-import { parseJavaLog4jStream } from '../lib/processing/javaLog4jStreamParser.js';
 import { normalizeMessage } from '../lib/processing/normalize.js';
 import { classifyLog } from '../lib/processing/classify.js';
 import { generateFingerprint } from '../lib/processing/fingerprint.js';
@@ -11,6 +10,7 @@ import { invalidateDashboard } from '../services/cacheService.js';
 import { upsertErrorGroupsFromLogs } from '../services/errorGroupService.js';
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
 // Large file threshold for streaming (10MB)
@@ -89,6 +89,7 @@ class ImportWorker {
   // Traiter UN job complet avec dissociation import/décompte
   async handleJob({ jobId, sourcePath, filename, userId, source, service, locale }) {
     let filePath = null;
+    let extractionDirectory = null;
     try {
       this.activeJobs.set(jobId, { status: 'processing', startedAt: Date.now() });
 
@@ -106,44 +107,54 @@ class ImportWorker {
         fs.copyFileSync(sourcePath, filePath);
         fs.unlinkSync(sourcePath);
       }
-      const buffer = fs.readFileSync(filePath);
       logger.info({ event: 'file_deposited', jobId, filePath }, '[IMPORT-WORKER]');
 
       // ÉTAPE 2: EXTRACTION - Extraire l'archive si nécessaire
       await this.updateJobStatus(jobId, 'extracting', 0, 0);
 
       let filesToProcess;
-
-      if (isArchive(filename, buffer)) {
-        logger.info({ event: 'archive_extraction_start', jobId, filename, type: path.extname(filename) });
-
-        try {
-          filesToProcess = await extractLogFiles(buffer, filename);
-
-          if (filesToProcess.length === 0) {
-            throw new Error('Aucun fichier log valide trouvé dans l\'archive');
-          }
-
-          logger.info({
-            event: 'archive_extraction_success',
-            jobId,
-            validLogs: filesToProcess.length,
-          });
-        } catch (error) {
-          logger.error({
-            event: 'archive_extraction_failed',
-            jobId,
-            filename,
-            error: error.message,
-            code: error.code
-          });
-
-          const userError = mapArchiveError(error);
-
-          throw userError;
-        }
+      if (path.extname(filename).toLowerCase() === '.rar') {
+        extractionDirectory = await fs.promises.mkdtemp(path.join(os.tmpdir(), `logsystem-${jobId}-`));
+        logger.info({ event: 'archive_extraction_start', jobId, filename, type: 'rar', mode: 'disk' });
+        filesToProcess = await extractRarToDirectory(filePath, filename, extractionDirectory);
+        logger.info({
+          event: 'archive_extraction_success',
+          jobId,
+          validLogs: filesToProcess.length,
+          mode: 'disk',
+        });
       } else {
-        filesToProcess = [{ filename, content: buffer }];
+        const buffer = fs.readFileSync(filePath);
+        if (isArchive(filename, buffer)) {
+          logger.info({ event: 'archive_extraction_start', jobId, filename, type: path.extname(filename) });
+
+          try {
+            filesToProcess = await extractLogFiles(buffer, filename);
+
+            if (filesToProcess.length === 0) {
+              throw new Error('Aucun fichier log valide trouvé dans l\'archive');
+            }
+
+            logger.info({
+              event: 'archive_extraction_success',
+              jobId,
+              validLogs: filesToProcess.length,
+            });
+          } catch (error) {
+            logger.error({
+              event: 'archive_extraction_failed',
+              jobId,
+              filename,
+              error: error.message,
+              code: error.code
+            });
+
+            const userError = mapArchiveError(error);
+            throw userError;
+          }
+        } else {
+          filesToProcess = [{ filename, content: buffer }];
+        }
       }
 
       await pool.execute('UPDATE import_jobs SET total_files = ? WHERE id = ?', [filesToProcess.length, jobId]);
@@ -154,10 +165,32 @@ class ImportWorker {
       let totalLines = 0;
       let streamingStats = { processedLines: 0, successfulLines: 0, skippedLines: 0, errorCount: 0 };
       let streamingStarted = false;
+      let processedFiles = 0;
       const fileParseErrors = [];
 
-      for (const file of filesToProcess) {
-        const detectedFormat = detectFormat(file.content);
+      for (let fileIndex = 0; fileIndex < filesToProcess.length; fileIndex++) {
+        const file = filesToProcess[fileIndex];
+        if (file.path && isArchive(file.filename)) {
+          const nestedEntries = await extractLogFiles(fs.readFileSync(file.path), file.filename);
+          filesToProcess.splice(fileIndex + 1, 0, ...nestedEntries);
+          continue;
+        }
+        processedFiles++;
+
+        const contentSize = file.path ? (file.size ?? fs.statSync(file.path).size) : file.content.length;
+        let content = file.content;
+        let sample = content;
+        if (file.path) {
+          const sampleFd = fs.openSync(file.path, 'r');
+          try {
+            sample = Buffer.alloc(Math.min(contentSize, 64 * 1024));
+            fs.readSync(sampleFd, sample, 0, sample.length, 0);
+          } finally {
+            fs.closeSync(sampleFd);
+          }
+        }
+        const detectedFormat = detectFormat(sample);
+        const isLargeContent = contentSize > LARGE_FILE_THRESHOLD;
         logger.info({ event: 'format_detected', jobId, format: detectedFormat, file: file.filename });
         const fallbackSource = source || path.basename(file.filename || filename);
 
@@ -165,23 +198,16 @@ class ImportWorker {
           // Large Java Log4j files must go through the streaming parser. The batch
           // parser has a 100 MB ceiling and its text fallback splits stack traces
           // into unrelated events, which loses both structure and metadata.
-          if (detectedFormat === 'java' && file.content.length > 10 * 1024 * 1024) {
+          if (detectedFormat === 'java' && isLargeContent) {
             const parseOptions = {
               source: fallbackSource || null,
               service: service || 'java',
               locale: locale || 'fr',
               batchSize: 500,
             };
-            const { totalLogs: expectedLogs } = await parseJavaLog4jStream(file.content, parseOptions);
-            totalLines += expectedLogs;
-            await pool.execute('UPDATE import_jobs SET total_lines = ? WHERE id = ?', [totalLines, jobId]);
-
-            if (!streamingStarted) {
-              await this.updateJobStatus(jobId, 'inserting', 0, 0);
-              streamingStarted = true;
-            }
             let streamedLogs = 0;
-            await parseLogContent(file.content, detectedFormat, {
+            const parseInput = file.path ? fs.createReadStream(file.path) : file.content;
+            await parseLogContent(parseInput, detectedFormat, {
               ...parseOptions,
               onBatch: async batch => {
                 const withMetadata = batch.map(log => ({
@@ -191,28 +217,32 @@ class ImportWorker {
                   log_format: detectedFormat,
                 }));
                 streamedLogs += withMetadata.length;
+                totalLines += withMetadata.length;
+                if (!streamingStarted) {
+                  await this.updateJobStatus(jobId, 'inserting', 0, 0);
+                  streamingStarted = true;
+                }
                 streamingStats = await this.processLogsBatch(
                   withMetadata, jobId, userId, source, service, streamingStats
                 );
               },
             });
-            if (streamedLogs !== expectedLogs) {
-              throw new Error(`Java stream count mismatch: expected ${expectedLogs}, parsed ${streamedLogs}`);
-            }
             logger.info({ event: 'file_stream_parsed', jobId, file: file.filename, logs: streamedLogs });
             continue;
           }
 
+          if (file.path) content = fs.readFileSync(file.path);
+
           let parsedLogs;
           try {
-            parsedLogs = await parseLogContent(file.content, detectedFormat, {
+            parsedLogs = await parseLogContent(content, detectedFormat, {
               source: fallbackSource || null,
               service: service || null,
               locale: locale || 'fr',
             });
           } catch (parseError) {
             logger.warn({ event: 'parsing_error', jobId, file: file.filename, error: parseError.message });
-            if (detectedFormat === 'java' && file.content.length > 10 * 1024 * 1024) throw parseError;
+            if (detectedFormat === 'java' && isLargeContent) throw parseError;
             fileParseErrors.push({ filename: file.filename, error: parseError.message });
             streamingStats.errorCount++;
             continue;
@@ -243,8 +273,8 @@ class ImportWorker {
 
       // Update total lines count
       await pool.execute(
-        'UPDATE import_jobs SET total_lines = ? WHERE id = ?',
-        [totalLines, jobId]
+        'UPDATE import_jobs SET total_lines = ?, total_files = ? WHERE id = ?',
+        [totalLines, processedFiles, jobId]
       );
 
       logger.info({ event: 'total_lines_parsed', jobId, totalLines });
@@ -333,6 +363,14 @@ class ImportWorker {
       // En cas d'erreur, déplacer quand même vers traité pour nettoyer le dépôt
       if (filePath) {
         await this.moveToTreated(filePath, path.basename(filePath));
+      }
+    } finally {
+      if (extractionDirectory) {
+        try {
+          fs.rmSync(extractionDirectory, { recursive: true, force: true });
+        } catch (cleanupError) {
+          logger.warn({ event: 'rar_temp_cleanup_failed', jobId, path: extractionDirectory, error: cleanupError.message });
+        }
       }
     }
   }
