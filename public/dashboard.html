@@ -451,7 +451,13 @@
 
     // ── Charts ──
     var trendsChart = null, levelChart = null, trendsLargeChart = null;
-    var trendsState = { offset: 0, windowDays: 1, lastPayload: null };
+    var trendsState = {
+      offset: 0,
+      windowDays: 1,
+      lastPayload: null,
+      displayedRange: null,
+      requestId: 0
+    };
 
     function t(key, vars) {
       return window.i18n ? window.i18n.t(key, vars) : key;
@@ -471,16 +477,19 @@
 
     function getTrendsRange() {
       var end = new Date();
-      end.setHours(23, 59, 59, 999);
+      // The trends API accepts UTC calendar dates. Keep the selected range in
+      // UTC too, otherwise local midnight in UTC+ timezones formats as the
+      // previous date and the hourly chart combines two days of imports.
+      end.setUTCHours(23, 59, 59, 999);
       end = new Date(end.getTime() - trendsState.offset * 86400000);
       var start = new Date(end.getTime() - (trendsState.windowDays - 1) * 86400000);
-      start.setHours(0, 0, 0, 0);
+      start.setUTCHours(0, 0, 0, 0);
       return { start: start, end: end };
     }
 
     function updateTrendsLabel() {
       var r = getTrendsRange();
-      var fr = new Intl.DateTimeFormat('fr-FR', { day:'2-digit', month:'short' });
+      var fr = new Intl.DateTimeFormat('fr-FR', { day:'2-digit', month:'short', timeZone:'UTC' });
       var label = fr.format(r.start) + ' → ' + fr.format(r.end);
       document.getElementById('trends-period-display').textContent = label;
       if (trendsState.windowDays === 1 && trendsState.offset === 0) {
@@ -584,19 +593,47 @@
       });
     }
 
+    function showTrendsMessage(message) {
+      var wrapper = document.getElementById('trends-wrapper');
+      var canvas = document.getElementById('trends-chart');
+      if (trendsChart) { trendsChart.destroy(); trendsChart = null; }
+      canvas.style.display = 'none';
+
+      var msg = wrapper.querySelector('.trends-empty');
+      if (!msg) {
+        msg = document.createElement('div');
+        msg.className = 'trends-empty';
+        msg.style.cssText = 'display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted,#888);font-size:13px;';
+        wrapper.appendChild(msg);
+      }
+      msg.textContent = message;
+    }
+
     function loadTrends() {
+      var requestId = ++trendsState.requestId;
       updateTrendsLabel();
       var r = getTrendsRange();
       var interval = trendsState.windowDays === 1 ? 'hour' : 'day';
+      var rangeKey = interval + ':' + fmtDate(r.start) + ':' + fmtDate(r.end);
+      if (trendsState.displayedRange !== rangeKey) {
+        trendsState.lastPayload = null;
+        showTrendsMessage(t('dashboard.trends_loading'));
+      }
       var url = '/api/dashboard/trends?date_from='+fmtDate(r.start)+'&date_to='+fmtDate(r.end)+'&interval='+interval;
         // Also pass days parameter for server-side reference
         if (interval === 'hour') url += '&days=1';
       return api.get(url).then(function(d) {
+        // A slower request for yesterday must not replace a newer request for today.
+        if (requestId !== trendsState.requestId) return;
         if (!d || !d.labels) {
           console.warn('[WARN] Trends API returned invalid data');
+          if (trendsState.displayedRange !== rangeKey) {
+            showTrendsMessage(t('dashboard.trends_load_error'));
+          }
           return;
         }
         trendsState.lastPayload = d;
+        trendsState.displayedRange = rangeKey;
         var wrapper = document.getElementById('trends-wrapper');
         var canvas  = document.getElementById('trends-chart');
 
@@ -611,13 +648,7 @@
         if (trendsChart) { trendsChart.destroy(); trendsChart = null; }
 
         if (!hasAny) {
-          // Show message but keep canvas in DOM (hidden) so next load can reuse it
-          canvas.style.display = 'none';
-          var msg = document.createElement('div');
-          msg.className = 'trends-empty';
-          msg.style.cssText = 'display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted,#888);font-size:13px;';
-          msg.textContent = 'Aucune donnée pour cette période';
-          wrapper.appendChild(msg);
+          showTrendsMessage(t('dashboard.no_period_data'));
           return;
         }
 
@@ -627,8 +658,12 @@
         requestAnimationFrame(function(){
           if (trendsChart) trendsChart.resize();
         });
-      }).catch(function(e){ 
+      }).catch(function(e){
+        if (requestId !== trendsState.requestId) return;
         console.error('[ERROR] loadTrends failed:', e);
+        if (trendsState.displayedRange !== rangeKey) {
+          showTrendsMessage(t('dashboard.trends_load_error'));
+        }
         if (window.toast) window.toast.error('Erreur de chargement des tendances'); 
       });
     }
