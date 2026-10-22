@@ -215,11 +215,14 @@
             <div class="form-group">
               <select id="purge-level">
                 <option value="" data-i18n="admin.all_levels">Tous les niveaux</option>
+                <option value="TRACE">TRACE</option>
                 <option value="DEBUG">DEBUG</option>
                 <option value="INFO">INFO</option>
                 <option value="WARNING">WARNING</option>
                 <option value="ERROR">ERROR</option>
+                <option value="CRITICAL">CRITICAL</option>
                 <option value="FATAL">FATAL</option>
+                <option value="SECURITY">SECURITY</option>
               </select>
             </div>
             <div class="form-group">
@@ -915,7 +918,7 @@
       function loadRetention() {
         api.get('/api/admin/retention/stats').then(function(stats) {
           var html = '';
-          var levels = ['DEBUG','INFO','WARNING','ERROR','FATAL'];
+          var levels = ['TRACE','DEBUG','INFO','WARNING','ERROR','CRITICAL','FATAL','SECURITY'];
           levels.forEach(function(l) {
             var s = stats.by_level[l] || {};
             html += '<div class="retention-row">';
@@ -924,30 +927,42 @@
             html += '</div>';
           });
           document.getElementById('retention-stats').innerHTML = html;
+        }).catch(function(err) {
+          var stats = document.getElementById('retention-stats');
+          if (stats) stats.textContent = err.error || err.message || 'Erreur serveur';
+          if (window.toast) window.toast.error(err.error || 'Erreur de chargement de la rétention');
         });
       }
 
       document.getElementById('btn-run-retention').addEventListener('click', function() {
         var btn = this;
         btn.disabled = true;
-        btn.textContent = 'Rétention en cours...';
-        api.post('/api/admin/retention/run').then(function() {
-          window.toast.success('Rétention termin?e');
+        btn.textContent = window.i18n.t('admin.retention_running');
+        api.post('/api/admin/retention/run').then(function(result) {
+          var deleted = Object.keys(result || {}).reduce(function(total, key) {
+            return total + Number((result[key] && result[key].deleted) || 0);
+          }, 0);
+          window.toast.success(window.i18n.t('admin.retention_complete') + ' · ' + window.i18n.t('admin.logs_deleted', { count: deleted }));
           loadRetention();
         }).catch(function(err) { window.toast.error(err.error || 'Erreur'); })
-        .finally(function() { btn.disabled = false; btn.textContent = 'Exécuter la rétention'; });
+        .finally(function() { btn.disabled = false; btn.textContent = window.i18n.t('admin.run_retention'); });
       });
 
       document.getElementById('btn-purge').addEventListener('click', function() {
         var level = document.getElementById('purge-level').value;
         var date = document.getElementById('purge-date').value;
-        if (!level && !date) { window.toast.warning('Spécifiez un critère de purge'); return; }
-        if (!confirm('Confirmer la purge ?')) return;
+        if (!level && !date) { window.toast.warning(window.i18n.t('admin.purge_criteria')); return; }
+        if (!confirm(window.i18n.t('admin.confirm_purge'))) return;
         var data = {};
         if (level) data.log_level = level;
-        if (date) data.date_before = date + ' 23:59:59';
+        if (date) {
+          var dateLimit = new Date(date + 'T00:00:00');
+          dateLimit.setDate(dateLimit.getDate() + 1);
+          data.date_before = dateLimit.toISOString().slice(0, 19).replace('T', ' ');
+        }
         api.post('/api/admin/purge', data).then(function(r) {
-          window.toast.success(r.deleted + ' logs supprimés');
+          window.toast.success(window.i18n.t('admin.logs_deleted', { count: Number(r.deleted) || 0 }));
+          loadRetention();
         }).catch(function(err) { window.toast.error(err.error || 'Erreur'); });
       });
 

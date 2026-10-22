@@ -19,7 +19,7 @@ import {
   purgeSchema,
 } from "../middleware/validation.js";
 import { shareLogsByEmail, shareLogsByWhatsApp } from "../services/emailShareService.js";
-import { getRedisClient } from "../services/cacheService.js";
+import { getRedisClient, invalidateAllDashboards } from "../services/cacheService.js";
 
 const router = Router();
 router.use(requireAuth, requireAdmin);
@@ -628,10 +628,10 @@ router.get("/audit", async (req, res) => {
 
 router.get("/retention/stats", async (req, res) => {
   try {
-    const user = req.session.user;
-    const stats = await getRetentionStats(user.id);
+    const stats = await getRetentionStats();
     res.json(stats);
   } catch (e) {
+    logger.error({ event: 'admin_retention_stats_error', error: e.message }, '[ADMIN]');
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -741,8 +741,7 @@ router.post("/share/whatsapp", async (req, res) => {
 
 router.post("/retention/run", async (req, res) => {
   try {
-    const user = req.session.user;
-    const result = await runRetention(user.id);
+    const result = await runRetention();
     await recordAudit({
       userId: req.session.user.id,
       userEmail: req.session.user.email,
@@ -753,6 +752,7 @@ router.post("/retention/run", async (req, res) => {
     });
     res.json(result);
   } catch (e) {
+    logger.error({ event: 'admin_retention_run_error', error: e.message }, '[ADMIN]');
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
@@ -762,10 +762,8 @@ router.post("/retention/run", async (req, res) => {
 router.post("/purge", validateBody(purgeSchema), async (req, res) => {
   try {
     const { log_level, date_before } = req.body;
-    const user = req.session.user;
     let sql = "DELETE FROM logs WHERE 1=1";
-    const params = [user.id];
-    sql += " AND user_id = ?";
+    const params = [];
     if (log_level) {
       sql += " AND log_level = ?";
       params.push(log_level);
@@ -776,18 +774,24 @@ router.post("/purge", validateBody(purgeSchema), async (req, res) => {
     }
 
     const [result] = await pool.execute(sql, params);
+    await invalidateAllDashboards();
 
     await recordAudit({
       userId: req.session.user.id,
       userEmail: req.session.user.email,
       action: "purge_logs",
       resourceType: "logs",
-      details: `Purged ${result.affectedRows} logs`,
+      details: {
+        deleted: result.affectedRows,
+        logLevel: log_level || null,
+        dateBefore: date_before || null,
+      },
       ipAddress: req.ip,
     });
 
     res.json({ deleted: result.affectedRows });
   } catch (e) {
+    logger.error({ event: 'admin_log_purge_error', error: e.message }, '[ADMIN]');
     res.status(500).json({ error: "Erreur serveur" });
   }
 });

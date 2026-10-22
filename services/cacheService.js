@@ -103,6 +103,26 @@ export async function invalidateDashboard(userId) {
   return false;
 }
 
+export async function invalidateAllDashboards() {
+  if (!isReady()) return false;
+  try {
+    const batch = [];
+    let invalidated = 0;
+    for await (const key of redis.scanIterator({ MATCH: 'dashboard:*', COUNT: 100 })) {
+      batch.push(key);
+      if (batch.length === 100) {
+        invalidated += await redis.del(batch.splice(0));
+      }
+    }
+    if (batch.length) invalidated += await redis.del(batch);
+    logger.info({ event: 'dashboard_cache_invalidated_all', keysDeleted: invalidated }, '[CACHE]');
+    return true;
+  } catch (e) {
+    logger.warn({ event: 'cache_delete_all_error', error: e.message }, '[CACHE]');
+    return false;
+  }
+}
+
 export async function startCacheService() {
   redis = await initRedis();
   return redis !== null;

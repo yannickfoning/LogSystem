@@ -1,17 +1,27 @@
 import logger from '../config/logger.js';
 import pool from '../config/database.js';
+import { invalidateAllDashboards, invalidateDashboard } from './cacheService.js';
 
-// FIX RETENTION-01: Politique de retention par niveau de severite
+// Politique de rétention par niveau de journal.
 const retentionDays = {
+  TRACE: 7,
   DEBUG: 7,
   INFO: 30,
   WARNING: 60,
   ERROR: 90,
   CRITICAL: 180,
-  FATAL: 365
+  FATAL: 365,
+  SECURITY: 365
 };
 
-const CRON_HOUR = parseInt(process.env.RETENTION_CRON_HOUR || '3', 10);
+const configuredCronHour = Number.parseInt(process.env.RETENTION_CRON_HOUR || '3', 10);
+const CRON_HOUR = Number.isInteger(configuredCronHour) && configuredCronHour >= 0 && configuredCronHour <= 23
+  ? configuredCronHour
+  : 3;
+let retentionSchedulerStarted = false;
+let scheduledRetentionRunning = false;
+let lastSuccessfulScheduledRunDate = null;
+let retentionQueue = Promise.resolve();
 
 function getNextRun() {
   const now = new Date();
@@ -19,6 +29,12 @@ function getNextRun() {
   next.setHours(CRON_HOUR, 0, 0, 0);
   if (next <= now) next.setDate(next.getDate() + 1);
   return next.getTime() - now.getTime();
+}
+
+function getLocalDateKey(date = new Date()) {
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
 }
 
 function getRetentionDate(level) {
@@ -39,7 +55,7 @@ function buildUserParams(userId) {
 // ── runRetention(userId) ───────────────────────────────────────────────────────
 // userId = null  → admin global, purge tous les tenants
 // userId = N     → purge uniquement les logs de cet utilisateur
-export async function runRetention(userId = null) {
+async function runRetentionOnce(userId) {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
@@ -56,12 +72,15 @@ export async function runRetention(userId = null) {
       results[level] = { days, deleted: r.affectedRows };
     }
 
-    // Purger les groupes d'erreurs orphelins — toujours global (pas de user_id sur error_groups)
+    // Purger les groupes sans journal correspondant du même utilisateur.
     if (userId == null) {
       const [orphans] = await conn.execute(
-        `DELETE FROM error_groups WHERE fingerprint NOT IN (
-          SELECT DISTINCT fingerprint FROM logs WHERE fingerprint IS NOT NULL
-        )`
+        `DELETE eg FROM error_groups eg
+         WHERE NOT EXISTS (
+           SELECT 1 FROM logs l
+           WHERE l.fingerprint = eg.fingerprint
+             AND l.user_id <=> eg.user_id
+         )`
       );
       results.orphan_error_groups = orphans.affectedRows;
     }
@@ -85,6 +104,11 @@ export async function runRetention(userId = null) {
     results.old_alerts = oldAlerts.affectedRows;
 
     await conn.commit();
+    if (userId == null) {
+      await invalidateAllDashboards();
+    } else {
+      await invalidateDashboard(userId);
+    }
     return results;
   } catch (e) {
     await conn.rollback();
@@ -94,6 +118,14 @@ export async function runRetention(userId = null) {
   }
 }
 
+// Serialize the startup, scheduled, and manually requested passes so a large
+// purge cannot overlap another retention transaction in this process.
+export function runRetention(userId = null) {
+  const run = retentionQueue.then(() => runRetentionOnce(userId));
+  retentionQueue = run.catch(() => undefined);
+  return run;
+}
+
 // ── getRetentionStats(userId) ─────────────────────────────────────────────────
 export async function getRetentionStats(userId = null) {
   const scopeSql    = buildUserFilter(userId);
@@ -101,9 +133,10 @@ export async function getRetentionStats(userId = null) {
   const byLevel = {};
 
   for (const [level, days] of Object.entries(retentionDays)) {
+    const cutoff = getRetentionDate(level);
     const [rows] = await pool.execute(
       `SELECT COUNT(*) as cnt FROM logs WHERE log_level = ? AND timestamp >= ?${scopeSql}`,
-      [level, getRetentionDate(level), ...scopeParams]
+      [level, cutoff, ...scopeParams]
     );
     const [totalRows] = await pool.execute(
       `SELECT COUNT(*) as cnt FROM logs WHERE log_level = ?${scopeSql}`,
@@ -113,7 +146,7 @@ export async function getRetentionStats(userId = null) {
       days,
       retained: rows[0].cnt,
       total:    totalRows[0].cnt,
-      cutoff:   getRetentionDate(level)
+      cutoff
     };
   }
   return { by_level: byLevel };
@@ -121,16 +154,35 @@ export async function getRetentionStats(userId = null) {
 
 // ── Scheduler — tourne toujours en mode global (admin) ───────────────────────
 export function startRetentionScheduler() {
+  if (retentionSchedulerStarted) return;
+  retentionSchedulerStarted = true;
+
+  const executeScheduledRun = async () => {
+    const runDate = getLocalDateKey();
+    if (lastSuccessfulScheduledRunDate === runDate) return;
+    if (scheduledRetentionRunning) {
+      logger.warn({ event: 'retention_run_skipped', reason: 'previous_run_still_active' }, '[RETENTION]');
+      return;
+    }
+
+    scheduledRetentionRunning = true;
+    try {
+      const result = await runRetention();
+      lastSuccessfulScheduledRunDate = getLocalDateKey();
+      logger.info({ event: 'retention_completed', result: JSON.stringify(result) }, '[RETENTION]');
+    } catch (error) {
+      logger.error({ event: 'retention_error', error: error.message }, '[RETENTION]');
+    } finally {
+      scheduledRetentionRunning = false;
+    }
+  };
+
   const delay = getNextRun();
   logger.info({ event: 'retention_next_scheduled', minutesUntilNext: Math.round(delay / 60000) }, '[RETENTION]');
+  // Catch up after cold starts/restarts, when an in-memory timer may have been lost.
+  void executeScheduledRun();
   setTimeout(() => {
-    runRetention(null)
-      .then(r => logger.info({ event: 'retention_completed', result: JSON.stringify(r) }, '[RETENTION]'))
-      .catch(e => logger.error({ event: 'retention_error', error: e.message }, '[RETENTION]'));
-    setInterval(() => {
-      runRetention(null)
-        .then(r => logger.info({ event: 'retention_completed', result: JSON.stringify(r) }, '[RETENTION]'))
-        .catch(e => logger.error({ event: 'retention_error', error: e.message }, '[RETENTION]'));
-    }, 24 * 60 * 60 * 1000);
+    void executeScheduledRun();
+    setInterval(() => { void executeScheduledRun(); }, 24 * 60 * 60 * 1000);
   }, delay);
 }

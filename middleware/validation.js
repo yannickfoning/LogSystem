@@ -78,7 +78,7 @@ export const alertUpdateSchema = z.object({
 export const purgeSchema = z
   .object({
     log_level: z
-      .enum(["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "FATAL"])
+      .enum(["TRACE", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "FATAL", "SECURITY"])
       .optional(),
     date_before: z.string().optional(),
   })
