@@ -1,20 +1,20 @@
 import logger from '../config/logger.js';
 import pool from '../config/database.js';
-import { extractLogFiles, extractRarToDirectory, isArchive, mapArchiveError } from '../lib/processing/archiveHandler.js';
+import { extractLogFiles, extractRarToDirectory, extractZipToDirectory, isArchive, mapArchiveError } from '../lib/processing/archiveHandler.js';
 import { parseLogContent, detectFormat } from '../lib/processing/universalParser.js';
 import { normalizeMessage } from '../lib/processing/normalize.js';
 import { classifyLog } from '../lib/processing/classify.js';
 import { generateFingerprint } from '../lib/processing/fingerprint.js';
 import { normalizeLevel } from '../services/logLevelUtils.js';
 import { invalidateDashboard } from '../services/cacheService.js';
-import { upsertErrorGroupsFromLogs } from '../services/errorGroupService.js';
-import { v4 as uuidv4 } from 'uuid';
+import { refreshErrorGroupsForImport } from '../services/errorGroupService.js';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
 // Large file threshold for streaming (10MB)
 const LARGE_FILE_THRESHOLD = 10 * 1024 * 1024;
+const MAX_NESTED_ARCHIVE_DEPTH = Math.max(0, Number.parseInt(process.env.MAX_ARCHIVE_DEPTH || '3', 10) || 3);
 
 // Répertoires de dépôt selon le cahier des charges
 const UPLOAD_DEPOT_DIR = path.resolve(process.cwd(), process.env.UPLOAD_DEPOT_DIR || path.join('uploads', 'depot'));
@@ -113,10 +113,14 @@ class ImportWorker {
       await this.updateJobStatus(jobId, 'extracting', 0, 0);
 
       let filesToProcess;
-      if (path.extname(filename).toLowerCase() === '.rar') {
+      const archiveExtension = path.extname(filename).toLowerCase();
+      if (archiveExtension === '.rar' || archiveExtension === '.zip') {
         extractionDirectory = await fs.promises.mkdtemp(path.join(os.tmpdir(), `logsystem-${jobId}-`));
-        logger.info({ event: 'archive_extraction_start', jobId, filename, type: 'rar', mode: 'disk' });
-        filesToProcess = await extractRarToDirectory(filePath, filename, extractionDirectory);
+        logger.info({ event: 'archive_extraction_start', jobId, filename, type: archiveExtension.slice(1), mode: 'disk' });
+        const extractedFiles = archiveExtension === '.rar'
+          ? await extractRarToDirectory(filePath, filename, extractionDirectory)
+          : await extractZipToDirectory(filePath, filename, extractionDirectory);
+        filesToProcess = extractedFiles.map(file => ({ ...file, archiveDepth: 0 }));
         logger.info({
           event: 'archive_extraction_success',
           jobId,
@@ -171,8 +175,24 @@ class ImportWorker {
       for (let fileIndex = 0; fileIndex < filesToProcess.length; fileIndex++) {
         const file = filesToProcess[fileIndex];
         if (file.path && isArchive(file.filename)) {
-          const nestedEntries = await extractLogFiles(fs.readFileSync(file.path), file.filename);
-          filesToProcess.splice(fileIndex + 1, 0, ...nestedEntries);
+          const currentDepth = Number(file.archiveDepth) || 0;
+          if (currentDepth >= MAX_NESTED_ARCHIVE_DEPTH) {
+            throw new Error(`Imbrication d'archives trop profonde (max ${MAX_NESTED_ARCHIVE_DEPTH}).`);
+          }
+          const nestedExtension = path.extname(file.filename).toLowerCase();
+          let nestedEntries;
+          if (nestedExtension === '.rar' || nestedExtension === '.zip') {
+            const nestedDirectory = await fs.promises.mkdtemp(path.join(extractionDirectory, `nested-${fileIndex}-`));
+            nestedEntries = nestedExtension === '.rar'
+              ? await extractRarToDirectory(file.path, file.filename, nestedDirectory)
+              : await extractZipToDirectory(file.path, file.filename, nestedDirectory);
+          } else {
+            nestedEntries = await extractLogFiles(fs.readFileSync(file.path), file.filename);
+          }
+          filesToProcess.splice(fileIndex + 1, 0, ...nestedEntries.map(entry => ({
+            ...entry,
+            archiveDepth: currentDepth + 1,
+          })));
           continue;
         }
         processedFiles++;
@@ -195,13 +215,12 @@ class ImportWorker {
         const fallbackSource = source || path.basename(file.filename || filename);
 
         try {
-          // Large Java Log4j files must go through the streaming parser. The batch
-          // parser has a 100 MB ceiling and its text fallback splits stack traces
-          // into unrelated events, which loses both structure and metadata.
-          if (detectedFormat === 'java' && isLargeContent) {
+          // Keep large line-oriented logs on disk and stream them in bounded
+          // batches. Java uses its dedicated parser to preserve stack traces.
+          if (isLargeContent && (detectedFormat === 'java' || !['json', 'xml'].includes(detectedFormat))) {
             const parseOptions = {
               source: fallbackSource || null,
-              service: service || 'java',
+              service: service || (detectedFormat === 'java' ? 'java' : null),
               locale: locale || 'fr',
               batchSize: 500,
             };
@@ -295,6 +314,10 @@ class ImportWorker {
         return;
       }
 
+      const returnGapDays = Number.parseInt(process.env.ERROR_RETURN_GAP_DAYS || '7', 10);
+      const refreshedGroups = await refreshErrorGroupsForImport(pool, userId, jobId, returnGapDays);
+      logger.info({ event: 'import_error_groups_refreshed', jobId, refreshedGroups }, '[IMPORT-WORKER]');
+
       // ÉTAPE 4: DÉCOMPTE ET INDEXATION - Insérer en BD par BATCH
       if (!streamingStarted) await this.updateJobStatus(jobId, 'inserting', 0, 0);
       const finalStats = streamingStats;
@@ -343,13 +366,13 @@ class ImportWorker {
         try {
           const mappedError = mapArchiveError(error);
           errorMessage = mappedError.message;
-        } catch (e) {
+        } catch {
           // Si le mapping échoue, utiliser le message original
         }
       }
 
       await pool.execute(
-        `UPDATE import_jobs SET status = 'failed', error_message = ?, completed_at = NOW()
+        `UPDATE import_jobs SET status = 'failed', error_message = ?, completed_at = NOW(), updated_at = NOW()
          WHERE id = ?`,
         [errorMessage.substring(0, 1000), jobId]
       );
@@ -453,13 +476,11 @@ class ImportWorker {
             const bTimestamp = String(b[1] || '');
             return aTimestamp === bTimestamp ? 0 : (aTimestamp < bTimestamp ? -1 : 1);
           });
-          let insertedRows = [];
           try {
             const [insertResult] = await conn.query(`INSERT IGNORE INTO logs (${columns}) VALUES ?`, [batchRows]);
             processedLines += batchRows.length;
             successfulLines += Number(insertResult.affectedRows) || 0;
             skippedLines += batchRows.length - (Number(insertResult.affectedRows) || 0);
-            insertedRows = batchRows;
           } catch (batchError) {
             logger.warn({
               event: 'log_batch_insertion_error',
@@ -477,7 +498,6 @@ class ImportWorker {
                 processedLines++;
                 if (Number(insertResult.affectedRows) > 0) successfulLines++;
                 else skippedLines++;
-                insertedRows.push(batchRows[offset]);
               } catch (e) {
                 processedLines++;
                 errorCount++;
@@ -491,10 +511,11 @@ class ImportWorker {
             }
           }
 
-          await this.upsertErrorGroups(conn, insertedRows);
         }
 
-        await this.updateJobStatus(jobId, 'inserting', processedLines, errorCount, successfulLines, skippedLines);
+        // Keep the batch's rows and visible progress in the same transaction.
+        // A second pool connection here can stall when the database pool is busy.
+        await this.updateJobStatus(jobId, 'inserting', processedLines, errorCount, successfulLines, skippedLines, conn);
         await conn.commit();
         if (end < logs.length) await conn.beginTransaction();
       }
@@ -515,22 +536,6 @@ class ImportWorker {
     } finally {
       conn.release();
     }
-  }
-
-  async upsertErrorGroups(conn, logRows) {
-    const records = logRows.map(row => ({
-      fingerprint: row[12],
-      log_level: row[4],
-      timestamp: row[1],
-      message: row[9],
-      event_type: row[11],
-      source_server: row[6],
-      service: row[8],
-      error_type: row[18],
-    }));
-    const userId = logRows[0]?.[13] ?? null;
-    const returnGapDays = Number.parseInt(process.env.ERROR_RETURN_GAP_DAYS || '7', 10);
-    await upsertErrorGroupsFromLogs(conn, userId, records, returnGapDays);
   }
 
   // Déplacer un fichier traité vers le répertoire traité
@@ -556,15 +561,16 @@ class ImportWorker {
   }
 
   // Mettre à jour le status du job
-  async updateJobStatus(jobId, status, processedLines, errorCount, successfulLines = null, skippedLines = null) {
+  async updateJobStatus(jobId, status, processedLines, errorCount, successfulLines = null, skippedLines = null, connection = null) {
+    const execute = connection ? connection.execute.bind(connection) : pool.execute.bind(pool);
     if (successfulLines == null || skippedLines == null) {
-      await pool.execute(
+      await execute(
         `UPDATE import_jobs SET status = ?, processed_lines = ?, error_count = ?, updated_at = NOW()
          WHERE id = ?`,
         [status, processedLines, errorCount, jobId]
       );
     } else {
-      await pool.execute(
+      await execute(
         `UPDATE import_jobs SET status = ?, processed_lines = ?, successful_lines = ?, skipped_lines = ?,
          error_count = ?, updated_at = NOW() WHERE id = ?`,
         [status, processedLines, successfulLines, skippedLines, errorCount, jobId]

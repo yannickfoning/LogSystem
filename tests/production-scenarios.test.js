@@ -91,7 +91,9 @@ describe('Error group count consistency', () => {
     expect(service).toContain('COUNT(*) AS occurrence_count');
     expect(service).toContain('occurrence_count = VALUES(occurrence_count)');
     expect(service).toContain("IF(VALUES(last_seen) > last_seen, 'open', status)");
-    expect(worker).toContain('upsertErrorGroupsFromLogs(conn, userId, records, returnGapDays)');
+    expect(worker).toContain('refreshErrorGroupsForImport(pool, userId, jobId, returnGapDays)');
+    expect(service).toContain('import_job_id = ?');
+    expect(service).toContain('INNER JOIN');
     expect(importer).toContain('upsertErrorGroupsFromLogs(conn, userId, orderedBatch, RETURN_GAP_DAYS)');
   });
 
@@ -175,7 +177,7 @@ describe('Import integration', () => {
     expect(html).toContain('Promise.all(jobIds.map(function (jobId)');
     expect(html).toContain('if (allFinished)');
     expect(html).toContain('totalFiles: jobs.reduce');
-    expect(worker).toContain('for (const file of filesToProcess)');
+    expect(worker).toContain('for (let fileIndex = 0; fileIndex < filesToProcess.length; fileIndex++)');
     expect(worker).toContain('fileParseErrors.push');
   });
 
