@@ -51,14 +51,8 @@ services:
         value: "60000"
       - key: RETENTION_CRON_HOUR
         value: "3"
-      - key: UPLOAD_MAX_SIZE
-        value: "104857600"
       - key: UPLOAD_MAX_FILES
         value: "10"
-      - key: MAX_TOTAL_EXTRACTED_SIZE
-        value: "100"
-      - key: MAX_SINGLE_FILE_SIZE
-        value: "50"
       - key: DB_CONNECTION_LIMIT
         value: "5"
       # Chemins du runtime Node natif Render (le Dockerfile utilise /app séparément).

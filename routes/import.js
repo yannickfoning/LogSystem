@@ -28,9 +28,6 @@ const router = Router();
 router.use(requireAuth);
 const RETURN_GAP_DAYS = parseInt(process.env.ERROR_RETURN_GAP_DAYS || "7", 10);
 const UPLOAD_MAX_FILES = Math.max(1, Number.parseInt(process.env.UPLOAD_MAX_FILES || "10", 10) || 10);
-const IS_RENDER = !!(process.env.RENDER || process.env.RENDER_SERVICE_NAME);
-const DEFAULT_UPLOAD_MAX_SIZE = IS_RENDER ? 104857600 : 5242880000;
-const UPLOAD_MAX_SIZE = Math.max(1, Number.parseInt(process.env.UPLOAD_MAX_SIZE || `${DEFAULT_UPLOAD_MAX_SIZE}`, 10) || DEFAULT_UPLOAD_MAX_SIZE);
 
 function uploadValidationError(message) {
   const error = new Error(message);
@@ -58,7 +55,6 @@ const upload = multer({
   }),
   limits: {
     files: UPLOAD_MAX_FILES,
-    fileSize: UPLOAD_MAX_SIZE,
   },
   fileFilter: (req, file, cb) => {
     const filename = file.originalname;
@@ -1036,7 +1032,7 @@ export function multerErrorHandler(err, req, res, next) {
     const messages = {
       LIMIT_FILE_COUNT: 'Trop de fichiers',
       LIMIT_UNEXPECTED_FILE: 'Champ de fichier inattendu',
-      LIMIT_FILE_SIZE: `Fichier trop volumineux (maximum ${Math.round(UPLOAD_MAX_SIZE / 1024 / 1024)} Mo par fichier)`,
+      LIMIT_FILE_SIZE: "Le serveur d'hébergement a refusé le téléversement en raison de ses limites de ressources.",
     };
     const message = messages[err.code] || 'Erreur de téléversement';
     logger.warn({ event: 'multer_error', code: err.code, field: err.field }, `[IMPORT] ${message}`);
