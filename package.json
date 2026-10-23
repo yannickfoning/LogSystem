@@ -15,6 +15,7 @@
     "lint": "eslint .",
     "build": "node scripts/validate-build.js",
     "test": "vitest run",
+    "test:platform": "bash scripts/test-platform-complete.sh",
     "diagnose:alerts": "node scripts/diagnostics/check-alert-rules.js",
     "diagnose:admin": "node scripts/diagnostics/check-admin-user.js",
     "diagnose:counts": "node scripts/diagnostics/check-counts.js",
