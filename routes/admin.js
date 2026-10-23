@@ -785,15 +785,30 @@ router.post("/purge", validateBody(purgeSchema), async (req, res) => {
     await conn.beginTransaction();
     transactionStarted = true;
 
+    // Vérifier si la colonne sample_log_id existe dans error_groups
+    const [colCheck] = await conn.execute(
+      `SELECT COUNT(*) as cnt FROM information_schema.columns
+       WHERE table_schema = DATABASE() AND table_name = 'error_groups' AND column_name = 'sample_log_id'`
+    );
+    const hasSampleLogId = colCheck[0].cnt > 0;
+
     // error_groups keeps a sample_log_id pointing into logs. Detach references
     // before deleting rows so production schemas with a restrictive FK can purge.
-    await conn.execute(
-      `UPDATE error_groups eg
-       JOIN logs l ON l.id = eg.sample_log_id
-       SET eg.sample_log_id = NULL
-       WHERE ${referenceConditions.length ? referenceConditions.join(" AND ") : "1=1"}`,
-      referenceParams
-    );
+    // Ignorer si la colonne n'existe pas (idempotent)
+    if (hasSampleLogId) {
+      try {
+        await conn.execute(
+          `UPDATE error_groups eg
+           JOIN logs l ON l.id = eg.sample_log_id
+           SET eg.sample_log_id = NULL
+           WHERE ${referenceConditions.length ? referenceConditions.join(" AND ") : "1=1"}`,
+          referenceParams
+        );
+      } catch (detachError) {
+        // Ignorer l'erreur de détachement (la purge des logs peut quand même réussir)
+        logger.warn({ event: 'purge_detach_skipped', error: detachError.message }, '[ADMIN]');
+      }
+    }
 
     const [result] = await conn.execute(
       `DELETE FROM logs WHERE ${conditions.length ? conditions.join(" AND ") : "1=1"}`,
@@ -801,14 +816,20 @@ router.post("/purge", validateBody(purgeSchema), async (req, res) => {
     );
 
     // Remove derived groups with no remaining source log for the same tenant.
-    const [groupResult] = await conn.execute(
-      `DELETE eg FROM error_groups eg
-       WHERE NOT EXISTS (
-         SELECT 1 FROM logs l
-         WHERE l.fingerprint = eg.fingerprint
-           AND l.user_id <=> eg.user_id
-       )`
-    );
+    // Ignorer si la table error_groups n'existe pas ou a une structure différente
+    try {
+      const [groupResult] = await conn.execute(
+        `DELETE eg FROM error_groups eg
+         WHERE NOT EXISTS (
+           SELECT 1 FROM logs l
+           WHERE l.fingerprint = eg.fingerprint
+             AND l.user_id <=> eg.user_id
+         )`
+      );
+    } catch (groupError) {
+      // Ignorer l'erreur de nettoyage des groupes (la purge des logs a réussi)
+      logger.warn({ event: 'purge_groups_skipped', error: groupError.message }, '[ADMIN]');
+    }
 
     await conn.commit();
     transactionStarted = false;

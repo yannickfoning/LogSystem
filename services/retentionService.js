@@ -73,35 +73,56 @@ async function runRetentionOnce(userId) {
     }
 
     // Purger les groupes sans journal correspondant du même utilisateur.
+    // Ignorer si la table error_groups n'existe pas ou a une structure différente
     if (userId == null) {
-      const [orphans] = await conn.execute(
-        `DELETE eg FROM error_groups eg
-         WHERE NOT EXISTS (
-           SELECT 1 FROM logs l
-           WHERE l.fingerprint = eg.fingerprint
-             AND l.user_id <=> eg.user_id
-         )`
-      );
-      results.orphan_error_groups = orphans.affectedRows;
+      try {
+        const [orphans] = await conn.execute(
+          `DELETE eg FROM error_groups eg
+           WHERE NOT EXISTS (
+             SELECT 1 FROM logs l
+             WHERE l.fingerprint = eg.fingerprint
+               AND l.user_id <=> eg.user_id
+           )`
+        );
+        results.orphan_error_groups = orphans.affectedRows;
+      } catch (groupError) {
+        // Ignorer l'erreur de nettoyage des groupes (la rétention des logs a réussi)
+        logger.warn({ event: 'retention_groups_skipped', error: groupError.message }, '[RETENTION]');
+        results.orphan_error_groups = 0;
+      }
     }
 
     // Purger les alertes lues anciennes avec scope
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - 30);
-    const [alerts] = await conn.execute(
-      `DELETE FROM alerts WHERE status = ? AND read_at < ?${scopeSql}`,
-      ['read', cutoff.toISOString().slice(0, 19).replace('T', ' '), ...scopeParams]
-    );
-    results.read_alerts = alerts.affectedRows;
+    // Ignorer si la table alerts n'existe pas ou a une structure différente
+    try {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 30);
+      const [alerts] = await conn.execute(
+        `DELETE FROM alerts WHERE status = ? AND read_at < ?${scopeSql}`,
+        ['read', cutoff.toISOString().slice(0, 19).replace('T', ' '), ...scopeParams]
+      );
+      results.read_alerts = alerts.affectedRows;
+    } catch (alertError) {
+      // Ignorer l'erreur de suppression des alertes (la rétention des logs a réussi)
+      logger.warn({ event: 'retention_alerts_skipped', error: alertError.message }, '[RETENTION]');
+      results.read_alerts = 0;
+    }
 
     // FIX #15: Purger les alertes non lues anciennes (90 jours max)
-    const oldCutoff = new Date();
-    oldCutoff.setDate(oldCutoff.getDate() - 90);
-    const [oldAlerts] = await conn.execute(
-      `DELETE FROM alerts WHERE created_at < ?${scopeSql}`,
-      [oldCutoff.toISOString().slice(0, 19).replace('T', ' '), ...scopeParams]
-    );
-    results.old_alerts = oldAlerts.affectedRows;
+    // Ignorer si la table alerts n'existe pas ou a une structure différente
+    try {
+      const oldCutoff = new Date();
+      oldCutoff.setDate(oldCutoff.getDate() - 90);
+      const [oldAlerts] = await conn.execute(
+        `DELETE FROM alerts WHERE created_at < ?${scopeSql}`,
+        [oldCutoff.toISOString().slice(0, 19).replace('T', ' '), ...scopeParams]
+      );
+      results.old_alerts = oldAlerts.affectedRows;
+    } catch (oldAlertError) {
+      // Ignorer l'erreur de suppression des alertes (la rétention des logs a réussi)
+      logger.warn({ event: 'retention_old_alerts_skipped', error: oldAlertError.message }, '[RETENTION]');
+      results.old_alerts = 0;
+    }
 
     await conn.commit();
     if (userId == null) {
