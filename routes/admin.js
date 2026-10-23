@@ -760,20 +760,58 @@ router.post("/retention/run", async (req, res) => {
 // ─── PURGE ─────────────────────────────────────────────
 
 router.post("/purge", validateBody(purgeSchema), async (req, res) => {
+  let conn;
+  let transactionStarted = false;
   try {
     const { log_level, date_before } = req.body;
-    let sql = "DELETE FROM logs WHERE 1=1";
+    const conditions = [];
     const params = [];
+    const referenceConditions = [];
+    const referenceParams = [];
     if (log_level) {
-      sql += " AND log_level = ?";
+      conditions.push("log_level = ?");
       params.push(log_level);
+      referenceConditions.push("l.log_level = ?");
+      referenceParams.push(log_level);
     }
     if (date_before) {
-      sql += " AND timestamp < ?";
+      conditions.push("timestamp < ?");
       params.push(date_before);
+      referenceConditions.push("l.timestamp < ?");
+      referenceParams.push(date_before);
     }
 
-    const [result] = await pool.execute(sql, params);
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    transactionStarted = true;
+
+    // error_groups keeps a sample_log_id pointing into logs. Detach references
+    // before deleting rows so production schemas with a restrictive FK can purge.
+    await conn.execute(
+      `UPDATE error_groups eg
+       JOIN logs l ON l.id = eg.sample_log_id
+       SET eg.sample_log_id = NULL
+       WHERE ${referenceConditions.length ? referenceConditions.join(" AND ") : "1=1"}`,
+      referenceParams
+    );
+
+    const [result] = await conn.execute(
+      `DELETE FROM logs WHERE ${conditions.length ? conditions.join(" AND ") : "1=1"}`,
+      params
+    );
+
+    // Remove derived groups with no remaining source log for the same tenant.
+    const [groupResult] = await conn.execute(
+      `DELETE eg FROM error_groups eg
+       WHERE NOT EXISTS (
+         SELECT 1 FROM logs l
+         WHERE l.fingerprint = eg.fingerprint
+           AND l.user_id <=> eg.user_id
+       )`
+    );
+
+    await conn.commit();
+    transactionStarted = false;
     await invalidateAllDashboards();
 
     await recordAudit({
@@ -783,6 +821,7 @@ router.post("/purge", validateBody(purgeSchema), async (req, res) => {
       resourceType: "logs",
       details: {
         deleted: result.affectedRows,
+        deletedErrorGroups: groupResult.affectedRows,
         logLevel: log_level || null,
         dateBefore: date_before || null,
       },
@@ -791,8 +830,13 @@ router.post("/purge", validateBody(purgeSchema), async (req, res) => {
 
     res.json({ deleted: result.affectedRows });
   } catch (e) {
-    logger.error({ event: 'admin_log_purge_error', error: e.message }, '[ADMIN]');
+    if (transactionStarted && conn) {
+      try { await conn.rollback(); } catch (_) { /* preserve the original purge error */ }
+    }
+    logger.error({ event: 'admin_log_purge_error', error: e.message, code: e.code }, '[ADMIN]');
     res.status(500).json({ error: "Erreur serveur" });
+  } finally {
+    if (conn) conn.release();
   }
 });
 
