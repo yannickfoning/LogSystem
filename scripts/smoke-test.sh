@@ -1,103 +1,110 @@
-#!/bin/bash
-# Smoke test minimal pour la plateforme LogSystem
-# Tests non-destructifs basiques
+#!/usr/bin/env bash
+set -u
 
-set -e
+# Detect OS and set temp directory
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
+  TEMP_DIR="${TEMP:-/tmp}"
+else
+  TEMP_DIR="/tmp"
+fi
 
 BASE_URL="${BASE_URL:-http://localhost:10000}"
 ADMIN_EMAIL="${ADMIN_EMAIL:-admin@logsystem.local}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-Admin@1234}"
-COOKIE_FILE="cookies.txt"
 
 echo "=== SMOKE TEST LOGSYSTEM ==="
-echo "URL: $BASE_URL"
-echo ""
+echo "URL: ${BASE_URL}"
+echo
 
-# Test 1: Health
+curl -fsS "${BASE_URL}/health" > "${TEMP_DIR}/logsystem_health.json" || {
+  echo "❌ Health endpoint failed"
+  exit 1
+}
+
 echo "1. Test /health endpoint..."
-response=$(curl -s -w '\n%{http_code}' "$BASE_URL/health")
-http_code=$(echo "$response" | tail -n1)
-body=$(echo "$response" | sed '$d')
+curl -sS -o "${TEMP_DIR}/logsystem_health.json" -w "%{http_code}" "${BASE_URL}/health" | grep -q "200" || {
+  echo "❌ Health endpoint not returning 200"
+  exit 1
+}
+echo "✅ Health endpoint OK"
 
-if [ "$http_code" = "200" ]; then
-    echo "✅ Health endpoint OK (HTTP 200)"
-    echo "   Réponse: $(echo "$body" | head -c 100)..."
-else
-    echo "❌ Health endpoint FAILED (HTTP $http_code)"
-    exit 1
-fi
-
-# Test 2: Login
-echo ""
+echo
 echo "2. Test login admin..."
-login_body="{\"email\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}"
-response=$(curl -s -w '\n%{http_code}' -c "$COOKIE_FILE" -X POST \
-    -H "Content-Type: application/json" \
-    -d "$login_body" \
-    "$BASE_URL/api/auth/login")
+COOKIE_JAR=$(mktemp)
+LOGIN_CODE=$(curl -sS -o "${TEMP_DIR}/logsystem_login.json" -w "%{http_code}" \
+  -c "$COOKIE_JAR" \
+  -H "Content-Type: application/json" \
+  -X POST "${BASE_URL}/api/auth/login" \
+  -d "{\"email\":\"${ADMIN_EMAIL}\",\"password\":\"${ADMIN_PASSWORD}\"}")
 
-http_code=$(echo "$response" | tail -n1)
-
-if [ "$http_code" = "200" ]; then
-    echo "✅ Login admin OK (HTTP 200)"
-else
-    echo "❌ Login admin FAILED (HTTP $http_code)"
-    echo "   Vérifiez: npm run create-admin"
-    rm -f "$COOKIE_FILE"
-    exit 1
+if [ "$LOGIN_CODE" != "200" ] && [ "$LOGIN_CODE" != "204" ]; then
+  echo "❌ Login failed (HTTP ${LOGIN_CODE})"
+  cat "${TEMP_DIR}/logsystem_login.json"
+  rm -f "$COOKIE_JAR"
+  exit 1
 fi
+echo "✅ Login admin OK"
 
-# Test 3: Admin status
-echo ""
+echo
 echo "3. Test /api/admin/system/status..."
-response=$(curl -s -w '\n%{http_code}' -b "$COOKIE_FILE" "$BASE_URL/api/admin/system/status")
-http_code=$(echo "$response" | tail -n1)
+STATUS_CODE=$(curl -sS -o "${TEMP_DIR}/logsystem_status.json" -w "%{http_code}" \
+  -b "$COOKIE_JAR" \
+  "${BASE_URL}/api/admin/system/status")
 
-if [ "$http_code" = "200" ]; then
-    echo "✅ Admin status OK (HTTP 200)"
-else
-    echo "⚠️  Admin status returned HTTP $http_code"
+if [ "$STATUS_CODE" != "200" ]; then
+  echo "❌ Admin status failed (HTTP ${STATUS_CODE})"
+  cat "${TEMP_DIR}/logsystem_status.json"
+  rm -f "$COOKIE_JAR"
+  exit 1
 fi
+echo "✅ Admin status OK"
 
-# Test 4: Users list
-echo ""
+echo
 echo "4. Test /api/admin/users..."
-response=$(curl -s -w '\n%{http_code}' -b "$COOKIE_FILE" "$BASE_URL/api/admin/users")
-http_code=$(echo "$response" | tail -n1)
+USERS_CODE=$(curl -sS -o "${TEMP_DIR}/logsystem_users.json" -w "%{http_code}" \
+  -b "$COOKIE_JAR" \
+  "${BASE_URL}/api/admin/users")
 
-if [ "$http_code" = "200" ]; then
-    echo "✅ Users list OK (HTTP 200)"
-else
-    echo "⚠️  Users list returned HTTP $http_code"
+if [ "$USERS_CODE" != "200" ]; then
+  echo "❌ Users list failed (HTTP ${USERS_CODE})"
+  cat "${TEMP_DIR}/logsystem_users.json"
+  rm -f "$COOKIE_JAR"
+  exit 1
 fi
+echo "✅ Users list OK"
 
-# Test 5: Retention stats
-echo ""
+echo
 echo "5. Test /api/admin/retention/stats..."
-response=$(curl -s -w '\n%{http_code}' -b "$COOKIE_FILE" "$BASE_URL/api/admin/retention/stats")
-http_code=$(echo "$response" | tail -n1)
+RETENTION_CODE=$(curl -sS -o "${TEMP_DIR}/logsystem_retention.json" -w "%{http_code}" \
+  -b "$COOKIE_JAR" \
+  "${BASE_URL}/api/admin/retention/stats")
 
-if [ "$http_code" = "200" ]; then
-    echo "✅ Retention stats OK (HTTP 200)"
-else
-    echo "⚠️  Retention stats returned HTTP $http_code"
+if [ "$RETENTION_CODE" != "200" ]; then
+  echo "❌ Retention stats failed (HTTP ${RETENTION_CODE})"
+  cat "${TEMP_DIR}/logsystem_retention.json"
+  rm -f "$COOKIE_JAR"
+  exit 1
 fi
+echo "✅ Retention stats OK"
 
-# Test 6: Search
-echo ""
+echo
 echo "6. Test /api/search..."
-response=$(curl -s -w '\n%{http_code}' -b "$COOKIE_FILE" "$BASE_URL/api/search?q=ERROR&limit=10")
-http_code=$(echo "$response" | tail -n1)
+SEARCH_CODE=$(curl -sS -o "${TEMP_DIR}/logsystem_search.json" -w "%{http_code}" \
+  -b "$COOKIE_JAR" \
+  "${BASE_URL}/api/search?q=ERROR")
 
-if [ "$http_code" = "200" ]; then
-    echo "✅ Search OK (HTTP 200)"
-else
-    echo "⚠️  Search returned HTTP $http_code"
+if [ "$SEARCH_CODE" != "200" ]; then
+  echo "❌ Search failed (HTTP ${SEARCH_CODE})"
+  cat "${TEMP_DIR}/logsystem_search.json"
+  rm -f "$COOKIE_JAR"
+  exit 1
 fi
+echo "✅ Search OK"
 
 # Cleanup
-rm -f "$COOKIE_FILE"
+rm -f "$COOKIE_JAR"
+rm -f "${TEMP_DIR}/logsystem_"*.json
 
-echo ""
+echo
 echo "=== SMOKE TEST TERMINÉ ==="
 echo "✅ Tests critiques passés"
