@@ -639,8 +639,8 @@ body { font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe 
   background: var(--surface2); border-radius: 6px; min-width: 200px; text-align: center;
 }
 #trends-card { display: block; min-width: 0; }
-#trends-wrapper { cursor: zoom-in; display: block; position: relative; width: 100%; height: 240px; min-height: 180px; }
-#trends-wrapper canvas { display: block !important; max-width: 100% !important; }
+#trends-wrapper { cursor: zoom-in; display: block; position: relative; width: 100%; height: 240px; min-height: 240px; max-height: 240px; overflow: hidden; }
+#trends-wrapper canvas { display: block !important; width: 100% !important; height: 100% !important; max-width: 100% !important; }
 #trends-wrapper:hover { opacity: .95; }
 #top-errors-list { max-height: 380px; overflow-y: auto; overscroll-behavior: contain; }
 .admin-only { display: none; }
@@ -660,12 +660,14 @@ body.is-admin .admin-only { display: block; }
 .card-v2-body-tight { padding-bottom: 8px; }
 .chart-legend { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; font-size: 11px; }
 .legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; }
+.legend-trace { background: #9ca3af; }
 .legend-info { background: var(--accent-blue); }
 .legend-warning { background: var(--accent-amber); }
 .legend-error { background: var(--accent-red); }
 .legend-critical { background: var(--accent-purple); }
 .legend-fatal { background: #fc5c65; }
 .legend-debug { background: #6b7280; }
+.legend-security { background: #14b8a6; }
 .col-stack { display: flex; flex-direction: column; gap: 16px; }
 /* Panneau "Alertes en temps réel" agrandi pour afficher plus d'alertes sans avoir
    à scroller sans arrêt (demande : rallonger la taille des alertes en temps réel). */
