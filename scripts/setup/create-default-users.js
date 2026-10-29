@@ -18,6 +18,18 @@ const USERS = [
     display_name: process.env.DEFAULT_USER_NAME     || 'Utilisateur Standard',
     role:         'user',
   },
+  {
+    email:        process.env.TEST_USER1_EMAIL    || 'test1@logsystem.local',
+    password:     process.env.TEST_USER1_PASSWORD || 'Test1@1234',
+    display_name: process.env.TEST_USER1_NAME     || 'Test User 1',
+    role:         'user',
+  },
+  {
+    email:        process.env.TEST_USER2_EMAIL    || 'test2@logsystem.local',
+    password:     process.env.TEST_USER2_PASSWORD || 'Test2@1234',
+    display_name: process.env.TEST_USER2_NAME     || 'Test User 2',
+    role:         'user',
+  },
 ];
 
 async function ensureUsers() {
