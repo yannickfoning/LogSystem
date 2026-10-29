@@ -679,17 +679,15 @@ router.get("/watchlog/active-sources", async (req, res) => {
     
     // Récupérer les sources ayant importé des logs dans les 24 dernières heures
     const [sources] = await pool.execute(
-      `SELECT DISTINCT
-        ij.user_id,
-        ij.import_source,
-        COUNT(l.id) as log_count,
-        MAX(l.timestamp) as last_import,
-        COUNT(DISTINCT l.log_level) as level_diversity
+      `SELECT ij.import_source,
+        COUNT(l.id) AS log_count,
+        MAX(ij.completed_at) AS last_import,
+        COUNT(DISTINCT l.log_level) AS level_diversity
        FROM import_jobs ij
-       LEFT JOIN logs l ON l.import_job_id = ij.id
+       LEFT JOIN logs l ON l.import_job_id = ij.id AND l.user_id = ij.user_id
        WHERE ij.user_id = ?
-       AND ij.created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
-       AND ij.status = 'completed'
+         AND ij.completed_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+         AND ij.status = 'completed'
        GROUP BY ij.import_source
        ORDER BY last_import DESC`,
       [userId]
@@ -762,6 +760,7 @@ router.post("/retention/run", async (req, res) => {
 router.post("/purge", validateBody(purgeSchema), async (req, res) => {
   let conn;
   let transactionStarted = false;
+  let deletedErrorGroups = 0;
   try {
     const { log_level, date_before } = req.body;
     const conditions = [];
@@ -826,6 +825,7 @@ router.post("/purge", validateBody(purgeSchema), async (req, res) => {
              AND l.user_id <=> eg.user_id
          )`
       );
+      deletedErrorGroups = Number(groupResult.affectedRows) || 0;
     } catch (groupError) {
       // Ignorer l'erreur de nettoyage des groupes (la purge des logs a réussi)
       logger.warn({ event: 'purge_groups_skipped', error: groupError.message }, '[ADMIN]');
@@ -842,7 +842,7 @@ router.post("/purge", validateBody(purgeSchema), async (req, res) => {
       resourceType: "logs",
       details: {
         deleted: result.affectedRows,
-        deletedErrorGroups: groupResult.affectedRows,
+        deletedErrorGroups,
         logLevel: log_level || null,
         dateBefore: date_before || null,
       },

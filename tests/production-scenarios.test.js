@@ -40,6 +40,13 @@ describe('Dashboard API trends logic', () => {
     expect(html).toContain("api.get('/api/dashboard/active-sources')");
     expect(html).not.toContain("api.get('/api/admin/watchlog/active-sources')");
   });
+
+  it('keeps the admin WatchLog query scoped and based on completed imports', () => {
+    const route = readFileSync(path.join(root, 'routes/admin.js'), 'utf8');
+    expect(route).toContain('LEFT JOIN logs l ON l.import_job_id = ij.id AND l.user_id = ij.user_id');
+    expect(route).toContain('MAX(ij.completed_at) AS last_import');
+    expect(route).not.toContain('MAX(l.timestamp) as last_import');
+  });
 });
 
 describe('Administration system status', () => {
@@ -51,6 +58,30 @@ describe('Administration system status', () => {
     expect(adminRoute).toContain('uptime: process.uptime()');
     expect(adminPage).toContain("api.get('/api/admin/system/status')");
     expect(adminPage).not.toContain("api.get('/api/admin/system-status')");
+  });
+
+  it('recovers health after a transient database outage and retries startup connection', () => {
+    const server = readFileSync(path.join(root, 'server.js'), 'utf8');
+    const healthRoute = server.match(/app\.get\('\/health',[\s\S]*?\n\}\);/)?.[0] || '';
+    const startupStart = server.indexOf('async function start() {');
+    const migrationStart = server.indexOf('if (process.env.RUN_MIGRATIONS_ON_START', startupStart);
+    const startup = server.slice(startupStart, migrationStart);
+
+    expect(healthRoute).toContain("await pool.execute('SELECT 1')");
+    expect(healthRoute).toContain('databaseReady = true;');
+    expect(healthRoute).not.toContain('if (!databaseReady)');
+    expect(startup).toContain('startupConnectionAttempt += 1;');
+    expect(startup).toContain('retryDelayMs');
+    expect(startup).toContain('retryTimer.unref();');
+  });
+
+  it('keeps purge audit counts available after cleaning derived groups', () => {
+    const adminRoute = readFileSync(path.join(root, 'routes/admin.js'), 'utf8');
+    const purgeRoute = adminRoute.match(/router\.post\("\/purge"[\s\S]*?\n\}\);/)?.[0] || '';
+
+    expect(purgeRoute).toContain('let deletedErrorGroups = 0;');
+    expect(purgeRoute).toContain('deletedErrorGroups = Number(groupResult.affectedRows) || 0;');
+    expect(purgeRoute).toContain('deletedErrorGroups,');
   });
 });
 

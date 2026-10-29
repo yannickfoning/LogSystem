@@ -71,6 +71,7 @@ if (process.env.RENDER || process.env.VERCEL) {
 
 // ── Database health tracking ────────────────────────────────────────────────────
 let databaseReady = false;
+let startupConnectionAttempt = 0;
 
 
 // ── HTTPS redirect ────────────────────────────────────────────────────────────
@@ -224,18 +225,9 @@ app.get('/api/alerts/stream', alertsStreamLimiter, requireAuth, (req, res) => {
 });
 
 app.get('/health', async (req, res) => {
-  if (!databaseReady) {
-    return res.status(503).json({
-      status: 'degraded',
-      database: 'unavailable',
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime()
-    });
-  }
-
-  // Optional: Execute a simple database query to verify connectivity
   try {
     await pool.execute('SELECT 1');
+    databaseReady = true;
   } catch (error) {
     databaseReady = false;
     return res.status(503).json({
@@ -286,10 +278,18 @@ async function start() {
   try {
     await testConnection();
     databaseReady = true;
+    startupConnectionAttempt = 0;
     logger.info({ event: 'db_connected' }, '[DB] Connected');
   } catch (e) {
-    logger.error({ event: 'db_connection_failed', error: e.message }, '[DB] Connection failed — check env vars');
-    return; // Don't run migrations if DB unreachable
+    databaseReady = false;
+    startupConnectionAttempt += 1;
+    const retryDelayMs = Math.min(startupConnectionAttempt * 5000, 60000);
+    logger.error({ event: 'db_connection_failed', error: e.message, retryDelayMs }, '[DB] Connection failed — retrying');
+    const retryTimer = setTimeout(() => {
+      start().catch(error => logger.error({ event: 'startup_retry_failed', error: error.message }, '[DB]'));
+    }, retryDelayMs);
+    retryTimer.unref();
+    return;
   }
 
   try {
