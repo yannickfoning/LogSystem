@@ -1030,12 +1030,14 @@
     }
     
     function loadActiveSources() {
-      api.get('/api/admin/watchlog/active-sources').then(function(d) {
+      api.get('/api/dashboard/active-sources').then(function(d) {
         if (d.success && d.activeSources) {
-          var message = d.activeSources.map(function(s) {
-            return s.name + ': ' + s.logsCount + ' logs (' + s.status + ')';
-          }).join('\n');
-          alert('Sources actives:\n\n' + message);
+          var message = d.activeSources.length
+            ? d.activeSources.map(function(s) {
+                return (s.name || 'Source non précisée') + ' : ' + s.logsCount + ' journaux (' + s.status + ')';
+              }).join('\n')
+            : 'Aucune source n’a importé de journaux au cours des dernières 24 heures.';
+          alert('Sources d’import récentes :\n\n' + message);
         }
       }).catch(function() {
         toast.error('Erreur lors du chargement des sources actives');

@@ -29,6 +29,17 @@ describe('Dashboard API trends logic', () => {
     expect(src).toContain("'application','app','java','java application'");
     expect(usages).toHaveLength(2);
   });
+
+  it('exposes recent import sources to regular users through a user-scoped dashboard route', () => {
+    const route = readFileSync(path.join(root, 'routes/dashboard.js'), 'utf8');
+    const html = readFileSync(path.join(root, 'public/dashboard.html'), 'utf8');
+
+    expect(route).toContain("router.get('/active-sources'");
+    expect(route).toContain('WHERE ij.user_id = ?');
+    expect(route).toContain('l.user_id = ij.user_id');
+    expect(html).toContain("api.get('/api/dashboard/active-sources')");
+    expect(html).not.toContain("api.get('/api/admin/watchlog/active-sources')");
+  });
 });
 
 describe('Administration system status', () => {

@@ -41,6 +41,43 @@ function alertScope(req) {
   return { sql: ' AND user_id = ?', params: [parseInt(user.id, 10)] };
 }
 
+router.get('/active-sources', async (req, res) => {
+  try {
+    const userId = Number.parseInt(req.session?.user?.id, 10);
+    if (!Number.isInteger(userId)) {
+      return res.status(401).json({ error: 'Authentification requise' });
+    }
+
+    const [sources] = await pool.execute(
+      `SELECT ij.import_source, COUNT(l.id) AS log_count,
+              MAX(ij.completed_at) AS last_import,
+              COUNT(DISTINCT l.log_level) AS level_diversity
+       FROM import_jobs ij
+       LEFT JOIN logs l ON l.import_job_id = ij.id AND l.user_id = ij.user_id
+       WHERE ij.user_id = ?
+         AND ij.completed_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+         AND ij.status = 'completed'
+       GROUP BY ij.import_source
+       ORDER BY last_import DESC`,
+      [userId]
+    );
+
+    res.json({
+      success: true,
+      activeSources: sources.map(source => ({
+        name: source.import_source,
+        logsCount: Number(source.log_count || 0),
+        lastImport: source.last_import,
+        status: new Date() - new Date(source.last_import) < 3600000 ? 'active' : 'inactive',
+        diversity: Number(source.level_diversity || 0)
+      }))
+    });
+  } catch (e) {
+    logger.error({ event: 'dashboard_active_sources_error', error: e.message }, '[DASHBOARD]');
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 
 // PUT /alerts/read-all — MUST be first (static route)
 router.put('/alerts/read-all', async (req, res) => {

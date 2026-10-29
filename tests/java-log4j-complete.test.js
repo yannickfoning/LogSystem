@@ -4,6 +4,16 @@ import { parseJavaLog4jStream } from '../lib/processing/javaLog4jStreamParser.js
 import { enrichLogMetadata } from '../lib/processing/logMetadata.js';
 
 describe('Java Log4j complete parsing', () => {
+  it('keeps a generic timestamped text log out of the Java parser', async () => {
+    const buffer = Buffer.from('2026-10-05 08:00:00 INFO Service started\n');
+
+    expect(detectFormat(buffer)).toBe('text');
+    const parsed = await parseLogContent(buffer);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].parser_format).toBe('text');
+    expect(parsed[0].log_level).toBe('INFO');
+  });
+
   it.each([
     ['dot milliseconds', '2026-10-05 08:00:00.123 ERROR [com.example.Service] failed'],
     ['comma milliseconds', '2026-10-05 08:00:00,123 ERROR [com.example.Service] failed'],
