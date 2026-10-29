@@ -22,6 +22,32 @@ let retentionSchedulerStarted = false;
 let scheduledRetentionRunning = false;
 let lastSuccessfulScheduledRunDate = null;
 let retentionQueue = Promise.resolve();
+let retentionRetryTimer = null;
+
+const RETENTION_MAX_ATTEMPTS = 3;
+const RETENTION_RETRY_BASE_MS = 1000;
+const RETENTION_SCHEDULE_RETRY_MS = 5 * 60 * 1000;
+const transientDatabaseErrorCodes = new Set([
+  'ECONNABORTED',
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'EHOSTUNREACH',
+  'EPIPE',
+  'ETIMEDOUT',
+  'PROTOCOL_CONNECTION_LOST',
+  'PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR',
+  'PROTOCOL_ENQUEUE_AFTER_QUIT'
+]);
+
+function isTransientDatabaseError(error) {
+  if (transientDatabaseErrorCodes.has(error?.code)) return true;
+  return /connection (?:is )?(?:in )?closed|connection lost|server closed the connection|socket hang up|ECONN(?:ABORTED|REFUSED|RESET)|EHOSTUNREACH|EPIPE|ETIMEDOUT/i
+    .test(error?.message || '');
+}
+
+function wait(milliseconds) {
+  return new Promise(resolve => setTimeout(resolve, milliseconds));
+}
 
 function getNextRun() {
   const now = new Date();
@@ -56,9 +82,13 @@ function buildUserParams(userId) {
 // userId = null  → admin global, purge tous les tenants
 // userId = N     → purge uniquement les logs de cet utilisateur
 async function runRetentionOnce(userId) {
-  const conn = await pool.getConnection();
+  let conn;
+  let transactionStarted = false;
+  let destroyConnection = false;
   try {
+    conn = await pool.getConnection();
     await conn.beginTransaction();
+    transactionStarted = true;
     const results = {};
     const scopeSql    = buildUserFilter(userId);
     const scopeParams = buildUserParams(userId);
@@ -125,24 +155,63 @@ async function runRetentionOnce(userId) {
     }
 
     await conn.commit();
+    transactionStarted = false;
     if (userId == null) {
-      await invalidateAllDashboards();
+      try {
+        await invalidateAllDashboards();
+      } catch (cacheError) {
+        logger.warn({ event: 'retention_cache_invalidation_failed', error: cacheError.message }, '[RETENTION]');
+      }
     } else {
-      await invalidateDashboard(userId);
+      try {
+        await invalidateDashboard(userId);
+      } catch (cacheError) {
+        logger.warn({ event: 'retention_cache_invalidation_failed', error: cacheError.message }, '[RETENTION]');
+      }
     }
     return results;
   } catch (e) {
-    await conn.rollback();
+    if (isTransientDatabaseError(e)) destroyConnection = true;
+    if (transactionStarted) {
+      try {
+        await conn.rollback();
+      } catch (rollbackError) {
+        destroyConnection = true;
+        logger.warn({ event: 'retention_rollback_failed', error: rollbackError.message }, '[RETENTION]');
+      }
+    }
     throw e;
   } finally {
-    conn.release();
+    if (conn) {
+      if (destroyConnection && typeof conn.destroy === 'function') conn.destroy();
+      else conn.release();
+    }
+  }
+}
+
+async function runRetentionWithRetry(userId) {
+  for (let attempt = 1; attempt <= RETENTION_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      return await runRetentionOnce(userId);
+    } catch (error) {
+      if (!isTransientDatabaseError(error) || attempt === RETENTION_MAX_ATTEMPTS) throw error;
+      const delayMs = RETENTION_RETRY_BASE_MS * (2 ** (attempt - 1));
+      logger.warn({
+        event: 'retention_retry',
+        attempt,
+        maxAttempts: RETENTION_MAX_ATTEMPTS,
+        delayMs,
+        error: error.message
+      }, '[RETENTION]');
+      await wait(delayMs);
+    }
   }
 }
 
 // Serialize the startup, scheduled, and manually requested passes so a large
 // purge cannot overlap another retention transaction in this process.
 export function runRetention(userId = null) {
-  const run = retentionQueue.then(() => runRetentionOnce(userId));
+  const run = retentionQueue.then(() => runRetentionWithRetry(userId));
   retentionQueue = run.catch(() => undefined);
   return run;
 }
@@ -178,7 +247,22 @@ export function startRetentionScheduler() {
   if (retentionSchedulerStarted) return;
   retentionSchedulerStarted = true;
 
-  const executeScheduledRun = async () => {
+  const clearRetentionRetry = () => {
+    if (retentionRetryTimer) {
+      clearTimeout(retentionRetryTimer);
+      retentionRetryTimer = null;
+    }
+  };
+
+  const scheduleRetentionRetry = () => {
+    if (retentionRetryTimer) return;
+    retentionRetryTimer = setTimeout(() => {
+      retentionRetryTimer = null;
+      void executeScheduledRun();
+    }, RETENTION_SCHEDULE_RETRY_MS);
+  };
+
+  async function executeScheduledRun() {
     const runDate = getLocalDateKey();
     if (lastSuccessfulScheduledRunDate === runDate) return;
     if (scheduledRetentionRunning) {
@@ -186,6 +270,7 @@ export function startRetentionScheduler() {
       return;
     }
 
+    clearRetentionRetry();
     scheduledRetentionRunning = true;
     try {
       const result = await runRetention();
@@ -193,10 +278,11 @@ export function startRetentionScheduler() {
       logger.info({ event: 'retention_completed', result: JSON.stringify(result) }, '[RETENTION]');
     } catch (error) {
       logger.error({ event: 'retention_error', error: error.message }, '[RETENTION]');
+      scheduleRetentionRetry();
     } finally {
       scheduledRetentionRunning = false;
     }
-  };
+  }
 
   const delay = getNextRun();
   logger.info({ event: 'retention_next_scheduled', minutesUntilNext: Math.round(delay / 60000) }, '[RETENTION]');
