@@ -428,7 +428,7 @@ describe('Retention and Cache Services', () => {
       const req = createMockRequest(session, { log_level: 'DEBUG' });
       const res = createMockResponse();
 
-      const purgeHandler = adminRouter.stack.find(layer => layer.route?.path === '/purge' && layer.route?.methods?.post)?.route?.stack[0]?.handle;
+      const purgeHandler = adminRouter.stack.find(layer => layer.route?.path === '/purge' && layer.route?.methods?.post)?.route?.stack[1]?.handle;
       
       if (purgeHandler) {
         await purgeHandler(req, res);
@@ -449,7 +449,7 @@ describe('Retention and Cache Services', () => {
       const req = createMockRequest(session, { date_before: cutoffDate });
       const res = createMockResponse();
 
-      const purgeHandler = adminRouter.stack.find(layer => layer.route?.path === '/purge' && layer.route?.methods?.post)?.route?.stack[0]?.handle;
+      const purgeHandler = adminRouter.stack.find(layer => layer.route?.path === '/purge' && layer.route?.methods?.post)?.route?.stack[1]?.handle;
       
       if (purgeHandler) {
         await purgeHandler(req, res);
@@ -477,6 +477,66 @@ describe('Retention and Cache Services', () => {
       expect(invalidResult.success).toBe(false);
     });
 
+    it('should validate an inclusive date range and reject reversed dates', async () => {
+      const { purgeSchema } = await import('../../middleware/validation.js');
+
+      const validRange = purgeSchema.safeParse({
+        date_from: '2026-10-15 00:00:00',
+        date_before: '2026-10-16 00:00:00',
+      });
+      const reversedRange = purgeSchema.safeParse({
+        date_from: '2026-10-16 00:00:00',
+        date_before: '2026-10-15 00:00:00',
+      });
+
+      expect(validRange.success).toBe(true);
+      expect(reversedRange.success).toBe(false);
+    });
+
+    it('should preview and purge only logs inside the selected date range', async () => {
+      const rows = [
+        ['2026-10-14 23:59:59', 'ERROR', 'Before range'],
+        ['2026-10-15 00:00:00', 'INFO', 'Range start'],
+        ['2026-10-15 23:59:59', 'CRITICAL', 'Range end'],
+        ['2026-10-16 00:00:00', 'WARNING', 'After range'],
+      ];
+
+      for (const [timestamp, level, message] of rows) {
+        await dbPool.execute(
+          `INSERT INTO logs (timestamp, log_level, service, message, user_id, imported_at)
+           VALUES (?, ?, 'purge-range-test', ?, ?, NOW())`,
+          [timestamp, level, message, testUsers.user.id]
+        );
+      }
+
+      const { default: adminRouter } = await import('../../routes/admin.js');
+      const session = createMockSession(testUsers.admin);
+      const req = createMockRequest(session, {
+        date_from: '2026-10-15 00:00:00',
+        date_before: '2026-10-16 00:00:00',
+      });
+      const previewRes = createMockResponse();
+      const previewHandler = adminRouter.stack.find(layer => layer.route?.path === '/purge/preview' && layer.route?.methods?.post)?.route?.stack[1]?.handle;
+      const purgeHandler = adminRouter.stack.find(layer => layer.route?.path === '/purge' && layer.route?.methods?.post)?.route?.stack[1]?.handle;
+
+      await previewHandler(req, previewRes);
+      expect(previewRes.statusCode).toBe(200);
+      expect(previewRes.jsonData).toMatchObject({ matching: 2, scope: 'all_users' });
+
+      const purgeRes = createMockResponse();
+      await purgeHandler(req, purgeRes);
+      expect(purgeRes.statusCode).toBe(200);
+      expect(purgeRes.jsonData.deleted).toBe(2);
+
+      const [remainingRows] = await dbPool.execute(
+        `SELECT message FROM logs
+         WHERE user_id = ? AND service = 'purge-range-test'
+         ORDER BY timestamp`,
+        [testUsers.user.id]
+      );
+      expect(remainingRows.map(row => row.message)).toEqual(['Before range', 'After range']);
+    });
+
     it('should create audit log for purge operations', async () => {
       await createTestLogs(testUsers.user.id, 10);
       
@@ -486,7 +546,7 @@ describe('Retention and Cache Services', () => {
       const req = createMockRequest(session, { log_level: 'DEBUG' });
       const res = createMockResponse();
 
-      const purgeHandler = adminRouter.stack.find(layer => layer.route?.path === '/purge' && layer.route?.methods?.post)?.route?.stack[0]?.handle;
+      const purgeHandler = adminRouter.stack.find(layer => layer.route?.path === '/purge' && layer.route?.methods?.post)?.route?.stack[1]?.handle;
       
       if (purgeHandler) {
         await purgeHandler(req, res);

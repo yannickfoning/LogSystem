@@ -411,21 +411,6 @@ router.get('/watch/stream', async (req, res) => {
   }
 });
 
-/* AMÉLIORATION 4: Get current watch statistics */
-router.get('/watch/stats', async (req, res) => {
-  try {
-    const user = req.session?.user;
-    if (!user) {
-      return res.status(401).json({ error: 'Authentification requise' });
-    }
-    const stats = await getWatchStats(user.id);
-    res.json(stats);
-  } catch (error) {
-    logger.error({ event: 'watch_stats_failed', error: error.message }, '[WATCH STATS]');
-    res.status(500).json({ error: error.message });
-  }
-});
-
 /* AMÉLIORATION 4: Check for anomalies */
 router.get('/watch/anomalies', async (req, res) => {
   try {

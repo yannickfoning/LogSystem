@@ -107,6 +107,20 @@ describe('Top repeated errors', () => {
 });
 
 describe('Watcher ingestion reliability', () => {
+  it('routes WatchLog stats through the user-scoped handler without a shadowing route', () => {
+    const logsRoute = readFileSync(path.join(root, 'routes/logs.js'), 'utf8');
+    const ingestionRoute = readFileSync(path.join(root, 'routes/logs-ingestion.js'), 'utf8');
+    const server = readFileSync(path.join(root, 'server.js'), 'utf8');
+
+    expect(logsRoute).not.toContain("router.get('/watch/stats'");
+    expect(ingestionRoute).toContain("router.get('/watch/stats'");
+    expect(ingestionRoute).toContain('const scope = userScope(req);');
+    const logsMountIndex = server.indexOf("app.use('/api/logs', requireAuth, scopeGuard, logsRoutes)");
+    const ingestionMountIndex = server.indexOf("app.use('/api/logs', requireAuth, scopeGuard, logsIngestionRoutes)");
+    expect(logsMountIndex).toBeGreaterThanOrEqual(0);
+    expect(ingestionMountIndex).toBeGreaterThan(logsMountIndex);
+  });
+
   it('retries lock conflicts and only advances offsets after committed inserts', () => {
     const watcher = readFileSync(path.join(root, 'services/watcherService.js'), 'utf8');
     const commitIndex = watcher.indexOf('await conn.commit();');

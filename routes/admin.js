@@ -757,28 +757,60 @@ router.post("/retention/run", async (req, res) => {
 
 // ─── PURGE ─────────────────────────────────────────────
 
+function buildPurgeFilters({ log_level, date_from, date_before }) {
+  const conditions = [];
+  const params = [];
+  const referenceConditions = [];
+  const referenceParams = [];
+
+  if (log_level) {
+    conditions.push("log_level = ?");
+    params.push(log_level);
+    referenceConditions.push("l.log_level = ?");
+    referenceParams.push(log_level);
+  }
+  if (date_from) {
+    conditions.push("timestamp >= ?");
+    params.push(date_from);
+    referenceConditions.push("l.timestamp >= ?");
+    referenceParams.push(date_from);
+  }
+  if (date_before) {
+    conditions.push("timestamp < ?");
+    params.push(date_before);
+    referenceConditions.push("l.timestamp < ?");
+    referenceParams.push(date_before);
+  }
+
+  return {
+    where: conditions.length ? conditions.join(" AND ") : "1=1",
+    params,
+    referenceWhere: referenceConditions.length ? referenceConditions.join(" AND ") : "1=1",
+    referenceParams,
+  };
+}
+
+router.post("/purge/preview", validateBody(purgeSchema), async (req, res) => {
+  try {
+    const filters = buildPurgeFilters(req.body);
+    const [rows] = await pool.execute(
+      `SELECT COUNT(*) AS matching FROM logs WHERE ${filters.where}`,
+      filters.params
+    );
+    res.json({ matching: Number(rows[0]?.matching) || 0, scope: "all_users" });
+  } catch (e) {
+    logger.error({ event: 'admin_log_purge_preview_error', error: e.message }, '[ADMIN]');
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
 router.post("/purge", validateBody(purgeSchema), async (req, res) => {
   let conn;
   let transactionStarted = false;
   let deletedErrorGroups = 0;
   try {
-    const { log_level, date_before } = req.body;
-    const conditions = [];
-    const params = [];
-    const referenceConditions = [];
-    const referenceParams = [];
-    if (log_level) {
-      conditions.push("log_level = ?");
-      params.push(log_level);
-      referenceConditions.push("l.log_level = ?");
-      referenceParams.push(log_level);
-    }
-    if (date_before) {
-      conditions.push("timestamp < ?");
-      params.push(date_before);
-      referenceConditions.push("l.timestamp < ?");
-      referenceParams.push(date_before);
-    }
+    const { log_level, date_from, date_before } = req.body;
+    const filters = buildPurgeFilters(req.body);
 
     conn = await pool.getConnection();
     await conn.beginTransaction();
@@ -800,8 +832,8 @@ router.post("/purge", validateBody(purgeSchema), async (req, res) => {
           `UPDATE error_groups eg
            JOIN logs l ON l.id = eg.sample_log_id
            SET eg.sample_log_id = NULL
-           WHERE ${referenceConditions.length ? referenceConditions.join(" AND ") : "1=1"}`,
-          referenceParams
+          WHERE ${filters.referenceWhere}`,
+          filters.referenceParams
         );
       } catch (detachError) {
         // Ignorer l'erreur de détachement (la purge des logs peut quand même réussir)
@@ -810,8 +842,8 @@ router.post("/purge", validateBody(purgeSchema), async (req, res) => {
     }
 
     const [result] = await conn.execute(
-      `DELETE FROM logs WHERE ${conditions.length ? conditions.join(" AND ") : "1=1"}`,
-      params
+      `DELETE FROM logs WHERE ${filters.where}`,
+      filters.params
     );
 
     // Remove derived groups with no remaining source log for the same tenant.
@@ -844,6 +876,7 @@ router.post("/purge", validateBody(purgeSchema), async (req, res) => {
         deleted: result.affectedRows,
         deletedErrorGroups,
         logLevel: log_level || null,
+        dateFrom: date_from || null,
         dateBefore: date_before || null,
       },
       ipAddress: req.ip,

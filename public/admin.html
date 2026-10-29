@@ -226,7 +226,11 @@
               </select>
             </div>
             <div class="form-group">
-              <label data-i18n="admin.purge.date">Date antérieure</label>
+              <label for="purge-date-from" data-i18n="admin.purge.date_from">À partir du (inclus)</label>
+              <input type="date" id="purge-date-from">
+            </div>
+            <div class="form-group">
+              <label for="purge-date" data-i18n="admin.purge.date">Jusqu'au (inclus)</label>
               <input type="date" id="purge-date">
             </div>
             <button class="btn btn-danger btn-sm" id="btn-purge" data-i18n="admin.purge">Purger</button>
@@ -935,6 +939,7 @@
       }
 
       document.getElementById('btn-run-retention').addEventListener('click', function() {
+        if (!confirm(window.i18n.t('admin.confirm_retention'))) return;
         var btn = this;
         btn.disabled = true;
         btn.textContent = window.i18n.t('admin.retention_running');
@@ -949,21 +954,37 @@
       });
 
       document.getElementById('btn-purge').addEventListener('click', function() {
+        var btn = this;
         var level = document.getElementById('purge-level').value;
-        var date = document.getElementById('purge-date').value;
-        if (!level && !date) { window.toast.warning(window.i18n.t('admin.purge_criteria')); return; }
-        if (!confirm(window.i18n.t('admin.confirm_purge'))) return;
+        var dateFrom = document.getElementById('purge-date-from').value;
+        var dateThrough = document.getElementById('purge-date').value;
+        if (!level && !dateFrom && !dateThrough) { window.toast.warning(window.i18n.t('admin.purge_criteria')); return; }
+        if (dateFrom && dateThrough && dateFrom > dateThrough) { window.toast.warning(window.i18n.t('admin.purge.invalid_range')); return; }
         var data = {};
         if (level) data.log_level = level;
-        if (date) {
-          var dateLimit = new Date(date + 'T00:00:00');
-          dateLimit.setDate(dateLimit.getDate() + 1);
-          data.date_before = dateLimit.toISOString().slice(0, 19).replace('T', ' ');
+        function toSqlBoundary(dateValue, daysToAdd) {
+          var boundary = new Date(dateValue + 'T00:00:00');
+          boundary.setDate(boundary.getDate() + daysToAdd);
+          return boundary.toISOString().slice(0, 19).replace('T', ' ');
         }
-        api.post('/api/admin/purge', data).then(function(r) {
-          window.toast.success(window.i18n.t('admin.logs_deleted', { count: Number(r.deleted) || 0 }));
-          loadRetention();
-        }).catch(function(err) { window.toast.error(err.error || 'Erreur'); });
+        if (dateFrom) data.date_from = toSqlBoundary(dateFrom, 0);
+        if (dateThrough) data.date_before = toSqlBoundary(dateThrough, 1);
+
+        btn.disabled = true;
+        api.post('/api/admin/purge/preview', data).then(function(preview) {
+          var matching = Number(preview.matching) || 0;
+          if (!matching) {
+            window.toast.warning(window.i18n.t('admin.purge.none'));
+            return;
+          }
+          var message = window.i18n.t('admin.confirm_purge_count', { count: matching.toLocaleString() });
+          if (!confirm(message)) return;
+          return api.post('/api/admin/purge', data).then(function(result) {
+            window.toast.success(window.i18n.t('admin.logs_deleted', { count: Number(result.deleted) || 0 }));
+            loadRetention();
+          });
+        }).catch(function(err) { window.toast.error(err.error || 'Erreur'); })
+        .finally(function() { btn.disabled = false; });
       });
 
       // SYSTEM

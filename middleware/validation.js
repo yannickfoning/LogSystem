@@ -75,16 +75,33 @@ export const alertUpdateSchema = z.object({
   is_read: z.boolean().optional(),
 });
 
-export const purgeSchema = z
-  .object({
-    log_level: z
-      .enum(["TRACE", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "FATAL", "SECURITY"])
-      .optional(),
-    date_before: z.string().optional(),
-  })
-  .refine((data) => data.log_level || data.date_before, {
-    message: "Spécifiez au moins un critère de purge",
-  });
+const purgeBoundarySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}(?: \d{2}:\d{2}:\d{2})?$/).refine((value) => {
+  const [datePart, timePart = "00:00:00"] = value.split(" ");
+  const [year, month, day] = datePart.split("-").map(Number);
+  const [hour, minute, second] = timePart.split(":").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day &&
+    date.getUTCHours() === hour && date.getUTCMinutes() === minute && date.getUTCSeconds() === second;
+}, "Date invalide");
+
+export const purgeSchema = z.object({
+  log_level: z
+    .enum(["TRACE", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "FATAL", "SECURITY"])
+    .optional(),
+  date_from: purgeBoundarySchema.optional(),
+  date_before: purgeBoundarySchema.optional(),
+}).superRefine((data, context) => {
+  if (!data.log_level && !data.date_from && !data.date_before) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "Spécifiez au moins un critère de purge" });
+  }
+
+  if (data.date_from && data.date_before) {
+    const toUtcTimestamp = (value) => `${value.replace(" ", "T")}${value.length === 10 ? "T00:00:00" : ""}Z`;
+    if (Date.parse(toUtcTimestamp(data.date_from)) >= Date.parse(toUtcTimestamp(data.date_before))) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["date_before"], message: "La date de fin doit être postérieure à la date de début" });
+    }
+  }
+});
 
 export const externalSourceSchema = z.object({
   name: z.string().min(1).max(128),
