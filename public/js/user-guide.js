@@ -123,16 +123,15 @@ function showBeginnerGuide() {
   guide.className = 'beginner-guide';
   guide.innerHTML = `
     <div class="guide-content">
-      <h3>👋 Bienvenue sur LogSystem !</h3>
-      <p>Voici comment utiliser la plateforme simplement :</p>
+      <h3 id="beginner-guide-title">👋 Bienvenue sur LogSystem !</h3>
+      <p>Cette page résume l’activité et les erreurs signalées par vos applications.</p>
       <ul>
-        <li><strong>📊 Tableau de bord</strong> : Vue d'ensemble de vos enregistrements</li>
-        <li><strong>🔴 Erreurs</strong> : Problèmes qui nécessitent votre attention</li>
-        <li><strong>🚨 Alertes</strong> : Notifications importantes en temps réel</li>
-        <li><strong>📥 Import</strong> : Ajoutez vos fichiers d'enregistrements ici</li>
-        <li><strong>🔍 Recherche</strong> : Trouvez facilement ce que vous cherchez</li>
+        <li><strong>📥 Importer des fichiers</strong> : choisissez un ou plusieurs fichiers contenant vos journaux d’activité.</li>
+        <li><strong>📊 Vue d’ensemble</strong> : consultez les événements enregistrés et leur évolution.</li>
+        <li><strong>🔴 Erreurs et alertes</strong> : repérez les problèmes à vérifier.</li>
+        <li><strong>🔍 Rechercher</strong> : retrouvez un événement par date ou par mot-clé.</li>
       </ul>
-      <button id="close-guide">Compris !</button>
+      <button id="close-guide" type="button">Commencer</button>
     </div>
   `;
   
@@ -147,17 +146,22 @@ function showBeginnerGuide() {
     align-items: center;
     justify-content: center;
     z-index: 100000;
-    pointer-events: none;
+    pointer-events: auto;
   `;
+  guide.setAttribute('role', 'dialog');
+  guide.setAttribute('aria-modal', 'true');
+  guide.setAttribute('aria-labelledby', 'beginner-guide-title');
   
   const content = guide.querySelector('.guide-content');
   content.style.cssText = `
     background: var(--surface);
     padding: 30px;
     border-radius: 12px;
-    max-width: 500px;
+    width: min(500px, calc(100vw - 32px));
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
     color: var(--text);
-    pointer-events: none;
+    pointer-events: auto;
   `;
 
   const closeGuideButton = guide.querySelector('#close-guide');
@@ -167,22 +171,21 @@ function showBeginnerGuide() {
     guide.remove();
     localStorage.setItem('beginnerGuideSeen', 'true');
     document.removeEventListener('keydown', onGuideKeydown);
-    document.removeEventListener('click', onGuideOutsideClick, true);
   }
 
   function onGuideKeydown(event) {
     if (event.key === 'Escape') dismissGuide();
-  }
-
-  function onGuideOutsideClick(event) {
-    if (!guide.contains(event.target)) dismissGuide();
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      closeGuideButton.focus();
+    }
   }
 
   closeGuideButton.addEventListener('click', dismissGuide);
   document.addEventListener('keydown', onGuideKeydown);
-  document.addEventListener('click', onGuideOutsideClick, true);
   
   document.body.appendChild(guide);
+  closeGuideButton.focus();
 }
 
 // Initialiser quand le DOM est prêt

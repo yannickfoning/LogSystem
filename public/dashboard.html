@@ -83,8 +83,8 @@
     <ul class="nav-links" id="nav-links">
       <li><a href="/dashboard.html" aria-current="page" data-i18n="nav.dashboard">📊 Vue d'ensemble</a></li>
       <li><a href="/search.html" data-i18n="nav.search">🔍 Rechercher</a></li>
-      <li><a href="/import.html" data-i18n="nav.import">📥 Importer</a></li>
-      <li><a href="/watchlog.html" data-i18n="nav.watchlog">👁️ Monitoring</a></li>
+      <li><a href="/import.html" data-i18n="nav.import">📥 Importer des fichiers</a></li>
+      <li><a href="/watchlog.html" data-i18n="nav.watchlog">👁️ Activité en direct</a></li>
       <li><a href="/admin.html" id="admin-link" data-i18n="nav.admin">⚙️ Administration</a></li>
     </ul>
     <div class="nav-right">
@@ -112,15 +112,15 @@
     <!-- KPI -->
 
     <div class="kpi-row">
-      <div class="kpi-card-v2 blue kpi-clickable" data-filter="all" data-help="Cliquez pour voir tous les logs">
+      <div class="kpi-card-v2 blue kpi-clickable" data-filter="all" data-help="Cliquez pour consulter tous les événements">
         <div class="kpi-icon">📊</div>
-        <div class="kpi-label-v2" data-i18n="kpi.total_logs">Total logs</div>
+        <div class="kpi-label-v2" data-i18n="kpi.total_logs">Événements enregistrés</div>
         <div class="kpi-value-v2" id="kpi-total">—</div>
         <div class="kpi-trend" id="kpi-total-trend" data-i18n="common.loading">Chargement…</div>
       </div>
-      <div class="kpi-card-v2 green kpi-clickable" data-filter="today" data-help="Cliquez pour voir les logs importés aujourd'hui">
+      <div class="kpi-card-v2 green kpi-clickable" data-filter="today" data-help="Cliquez pour consulter les événements ajoutés aujourd’hui">
         <div class="kpi-icon">📅</div>
-        <div class="kpi-label-v2" data-i18n="kpi.today_logs">Logs aujourd'hui</div>
+        <div class="kpi-label-v2" data-i18n="kpi.today_logs">Ajoutés aujourd’hui</div>
         <div class="kpi-value-v2" id="kpi-today">—</div>
         <div class="kpi-trend" id="kpi-today-trend" data-i18n="common.loading">Chargement…</div>
       </div>
@@ -142,7 +142,7 @@
         <div class="kpi-value-v2" id="kpi-fatal">—</div>
         <div class="kpi-trend" id="kpi-fatal-trend" data-i18n="common.loading">Chargement…</div>
       </div>
-      <div class="kpi-card-v2 cyan kpi-clickable" data-filter="sources" data-help="Cliquez pour voir les sources actives">
+      <div class="kpi-card-v2 cyan kpi-clickable" data-filter="sources" data-help="Cliquez pour consulter les origines surveillées">
         <div class="kpi-icon">📁</div>
         <div class="kpi-label-v2" data-i18n="dashboard.active_sources">Sources actives</div>
         <div class="kpi-value-v2" id="kpi-sources">—</div>
@@ -155,7 +155,7 @@
       <div class="card-v2-header">
         <div class="card-v2-title">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-          <span data-i18n="dashboard.trends">Activité des logs</span> — <span id="trends-window-label" data-i18n="dashboard.today">Aujourd'hui</span>
+          <span data-i18n="dashboard.trends">Évolution de l’activité</span> — <span id="trends-window-label" data-i18n="dashboard.today">Aujourd'hui</span>
         </div>
         <div class="trends-nav">
           <button class="btn btn-xs btn-secondary" id="trends-prev" data-i18n-title="dashboard.prev_day" title="Jour précédent">←</button>
@@ -187,7 +187,7 @@
           <div class="card-v2-header">
             <div class="card-v2-title">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-              <span data-i18n="dashboard.recent_logs">Logs récents</span>
+              <span data-i18n="dashboard.recent_logs">Événements récents</span>
             </div>
             <a href="/search.html" class="btn btn-xs btn-secondary" data-i18n="dashboard.view_all">Voir tout →</a>
           </div>

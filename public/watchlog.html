@@ -18,8 +18,8 @@
     <ul class="nav-links" id="nav-links">
       <li><a href="/dashboard.html" data-i18n="nav.dashboard">📊 Vue d'ensemble</a></li>
       <li><a href="/search.html" data-i18n="nav.search">🔍 Rechercher</a></li>
-      <li><a href="/import.html" data-i18n="nav.import">📥 Importer</a></li>
-      <li><a href="/watchlog.html" aria-current="page" data-i18n="nav.watchlog">👁️ Monitoring</a></li>
+      <li><a href="/import.html" data-i18n="nav.import">📥 Importer des fichiers</a></li>
+      <li><a href="/watchlog.html" aria-current="page" data-i18n="nav.watchlog">👁️ Activité en direct</a></li>
       <li><a href="/admin.html" id="admin-link" data-i18n="nav.admin">⚙️ Administration</a></li>
     </ul>
     <div class="nav-right">
@@ -32,20 +32,20 @@
     <div class="watch-header">
       <div class="header-title">
         <span class="icon-inline" id="icon-eye" aria-hidden="true"></span>
-        <span data-i18n="watchlog.title">Watch Log — Monitoring Temps Réel</span>
+        <span data-i18n="watchlog.title">Suivi de l’activité en direct</span>
         <div class="status-indicator" aria-label="Statut connexion live"></div>
       </div>
       <div class="controls">
-        <button class="btn-small btn-primary" id="btnPause" data-i18n="watchlog.pause" aria-label="Pause ou reprendre le flux">
+        <button class="btn-small btn-primary" id="btnPause" data-i18n="watchlog.pause" aria-label="Mettre en pause ou reprendre le suivi">
           <span class="icon-inline" id="icon-pause" aria-hidden="true"></span> Pause
         </button>
-        <button class="btn-small btn-secondary" id="btnClear" data-i18n="watchlog.clear" aria-label="Effacer le flux">
+        <button class="btn-small btn-secondary" id="btnClear" data-i18n="watchlog.clear" aria-label="Vider l’affichage">
           <span class="icon-inline" id="icon-trash" aria-hidden="true"></span> Effacer
         </button>
-        <button class="btn-small btn-secondary" id="btnExport" data-i18n="watchlog.export" aria-label="Exporter les logs">
+        <button class="btn-small btn-secondary" id="btnExport" data-i18n="watchlog.export" aria-label="Télécharger les événements affichés">
           <span class="icon-inline" id="icon-download" aria-hidden="true"></span> Exporter
         </button>
-        <button class="btn-small btn-danger" id="btnDisconnect" data-i18n="watchlog.disconnect" aria-label="Déconnecter le flux">
+        <button class="btn-small btn-danger" id="btnDisconnect" data-i18n="watchlog.disconnect" aria-label="Arrêter le suivi en direct">
           <span class="icon-inline" id="icon-times" aria-hidden="true"></span> Déconnecter
         </button>
       </div>

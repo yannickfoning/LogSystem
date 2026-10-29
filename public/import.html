@@ -37,11 +37,11 @@
                 </li>
                 <li>
                     <a href="/import.html" aria-current="page" data-i18n="nav.import"
-                        >📥 Importer</a
+                        >📥 Importer des fichiers</a
                     >
                 </li>
                 <li>
-                    <a href="/watchlog.html" data-i18n="nav.watchlog">👁️ Monitoring</a>
+                    <a href="/watchlog.html" data-i18n="nav.watchlog">👁️ Activité en direct</a>
                 </li>
                 <li>
                     <a href="/admin.html" id="admin-link" data-i18n="nav.admin"
@@ -63,7 +63,7 @@
         </nav>
 
         <main class="page-container import-page" role="main">
-            <h1 class="page-title" data-i18n="import.title">Import de logs</h1>
+            <h1 class="page-title" data-i18n="import.title">Importer vos fichiers</h1>
 
             <div class="card mb-24">
                 <div class="drop-zone-simple" id="drop-zone">
@@ -86,10 +86,10 @@
                         Glissez un ou plusieurs fichiers ici, ou cliquez pour sélectionner
                     </p>
                     <p class="text-hint" data-i18n="import.formats">
-                        Formats de journaux supportés : .log, .txt, .json, .jsonl, .csv, .xml et archives .zip, .gz, .bz2, .xz, .tar, .rar, <strong>.7z</strong>. Jusqu’à 10 fichiers par import ; aucune limite fixe de taille n’est définie par l’application. La capacité reste celle de l’hébergement. Les archives sont extraites automatiquement.
+                        Fichiers acceptés : .log, .txt, .json, .jsonl, .csv, .xml, .zip, .gz, .gzip, .bz2, .xz, .tar, .tgz, .rar et .7z. Jusqu’à 10 fichiers à la fois. Les fichiers compressés et les archives sont ouverts automatiquement.
                     </p>
                     <p class="text-info" data-i18n="import.multi_files">
-                        💡 Les archives (ZIP, RAR, 7z) sont extraites automatiquement
+                        💡 Les fichiers compressés et les archives sont ouverts automatiquement.
                     </p>
                     <input
                         type="file"
