@@ -176,11 +176,9 @@ async function runRetentionOnce(userId) {
       try {
         await conn.rollback();
       } catch (rollbackError) {
-        // Si le rollback échoue à cause d'une connexion perdue, détruire la connexion
-        // pour éviter de la remettre dans le pool dans un état invalide
-        if (isTransientDatabaseError(rollbackError)) {
-          destroyConnection = true;
-        }
+        // TOUJOURS détruire la connexion si le rollback échoue
+        // La connexion peut être dans un état invalide avec une transaction ouverte
+        destroyConnection = true;
         logger.warn({ event: 'retention_rollback_failed', error: rollbackError.message }, '[RETENTION]');
       }
     }
