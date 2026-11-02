@@ -51,7 +51,6 @@ async function changeAdminPassword(newPassword) {
 
     if (result.affectedRows > 0) {
       console.log(`✅ Mot de passe admin changé pour : ${email}`);
-      console.log(`⚠️  Le nouveau mot de passe est : ${newPassword}`);
       console.log('⚠️  Changez-le à nouveau après la première connexion');
     } else {
       console.log(`❌ Admin non trouvé : ${email}`);
@@ -73,8 +72,20 @@ if (command === 'delete-test') {
     console.error('[ERREUR]', err.message);
     process.exit(1);
   });
-} else if (command === 'change-admin-password' && args[1]) {
-  changeAdminPassword(args[1]).catch(err => {
+} else if (command === 'change-admin-password') {
+  // Priorité : variable d'environnement, puis argument de ligne de commande
+  const newPassword = process.env.ADMIN_NEW_PASSWORD || args[1];
+  if (!newPassword) {
+    console.error('[ERREUR] Mot de passe non fourni');
+    console.log();
+    console.log('Usage:');
+    console.log('  node scripts/secure-production-users.js change-admin-password <NOUVEAU_MOT_DE_PASSE>');
+    console.log('  ADMIN_NEW_PASSWORD="secret" node scripts/secure-production-users.js change-admin-password');
+    console.log();
+    console.log('Le mot de passe ne sera PAS affiché dans les logs.');
+    process.exit(1);
+  }
+  changeAdminPassword(newPassword).catch(err => {
     console.error('[ERREUR]', err.message);
     process.exit(1);
   });
@@ -82,9 +93,8 @@ if (command === 'delete-test') {
   console.log('Usage:');
   console.log('  node scripts/secure-production-users.js delete-test');
   console.log('  node scripts/secure-production-users.js change-admin-password <NOUVEAU_MOT_DE_PASSE>');
+  console.log('  ADMIN_NEW_PASSWORD="secret" node scripts/secure-production-users.js change-admin-password');
   console.log();
-  console.log('Exemple:');
-  console.log('  node scripts/secure-production-users.js delete-test');
-  console.log('  node scripts/secure-production-users.js change-admin-password "MonMotDePasseTrèsSécurisé123!"');
+  console.log('Recommandé : utiliser la variable d\'environnement pour éviter d\'exposer le mot de passe dans l\'historique du terminal.');
   process.exit(1);
 }

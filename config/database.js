@@ -99,12 +99,21 @@ pool.on('error', (err) => {
 
 // Keepalive toutes les 5 minutes pour maintenir la connexion Aiven
 // Nécessaire sur Render aussi car le timeout de 8h vient d'Aiven, pas de Render
+let keepaliveTimer = null;
 if (!isVercelEnv && process.env.DB_KEEPALIVE !== 'false') {
-  setInterval(() => {
+  keepaliveTimer = setInterval(() => {
     pool.execute('SELECT 1').catch(err => {
       logger.warn({ event: 'db_keepalive_failed', error: err.message }, '[DB]');
     });
   }, 5 * 60 * 1000);
+
+  // Arrêter le timer quand le pool se ferme pour éviter les erreurs
+  pool.on('close', () => {
+    if (keepaliveTimer) {
+      clearInterval(keepaliveTimer);
+      keepaliveTimer = null;
+    }
+  });
 }
 
 // Test connexion au démarrage — sans process.exit (incompatible Vercel serverless)
@@ -115,7 +124,7 @@ pool.getConnection()
     logger.info({
       event: 'db_connected',
       env: process.env.NODE_ENV,
-      database: `${userMasked}@***${dbConfig.database}`,
+      database: `${userMasked}@***/${dbConfig.database}`,
       ssl: sslConfig ? `enabled (rejectUnauthorized=${sslConfig.rejectUnauthorized}, ca=${!!sslConfig.ca})` : 'disabled'
     }, '[DB] MySQL connection pool initialized successfully.');
     connection.release();
