@@ -111,12 +111,11 @@ if (!isVercelEnv && process.env.DB_KEEPALIVE !== 'false') {
 pool.getConnection()
   .then(connection => {
     // Masquer les infos sensibles dans les logs (hôte, utilisateur)
-    const hostMasked = dbConfig.host ? dbConfig.host.replace(/\d+\.\d+\.\d+\.\d+/, '***.***.***.***') : 'unknown';
     const userMasked = dbConfig.user ? dbConfig.user.substring(0, 3) + '***' : 'unknown';
     logger.info({
       event: 'db_connected',
       env: process.env.NODE_ENV,
-      database: `${userMasked}@${hostMasked}/${dbConfig.database}`,
+      database: `${userMasked}@***${dbConfig.database}`,
       ssl: sslConfig ? `enabled (rejectUnauthorized=${sslConfig.rejectUnauthorized}, ca=${!!sslConfig.ca})` : 'disabled'
     }, '[DB] MySQL connection pool initialized successfully.');
     connection.release();
