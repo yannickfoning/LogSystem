@@ -90,6 +90,13 @@ const dbConfig = {
 
 const pool = mysql.createPool(dbConfig);
 
+// Pool error handler - gère les erreurs de connexion inattendues
+pool.on('error', (err) => {
+  logger.error({ event: 'db_pool_error', error: err.message, code: err.code }, '[DB] Pool error occurred');
+  // Les erreurs PROTOCOL_CONNECTION_LOST sont gérées automatiquement par mysql2
+  // Le pool recréera les connexions nécessaires
+});
+
 // Keepalive toutes les 5 minutes pour maintenir la connexion Aiven
 // Nécessaire sur Render aussi car le timeout de 8h vient d'Aiven, pas de Render
 if (!isVercelEnv && process.env.DB_KEEPALIVE !== 'false') {
@@ -103,10 +110,13 @@ if (!isVercelEnv && process.env.DB_KEEPALIVE !== 'false') {
 // Test connexion au démarrage — sans process.exit (incompatible Vercel serverless)
 pool.getConnection()
   .then(connection => {
+    // Masquer les infos sensibles dans les logs (hôte, utilisateur)
+    const hostMasked = dbConfig.host ? dbConfig.host.replace(/\d+\.\d+\.\d+\.\d+/, '***.***.***.***') : 'unknown';
+    const userMasked = dbConfig.user ? dbConfig.user.substring(0, 3) + '***' : 'unknown';
     logger.info({
       event: 'db_connected',
       env: process.env.NODE_ENV,
-      database: `${dbConfig.user}@${dbConfig.host}/${dbConfig.database}`,
+      database: `${userMasked}@${hostMasked}/${dbConfig.database}`,
       ssl: sslConfig ? `enabled (rejectUnauthorized=${sslConfig.rejectUnauthorized}, ca=${!!sslConfig.ca})` : 'disabled'
     }, '[DB] MySQL connection pool initialized successfully.');
     connection.release();
