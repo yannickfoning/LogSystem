@@ -8,6 +8,7 @@ uploads/
 .env.local
 .env.docker
 .env.aiven
+PRODUCTION_SECURITY_NOTES.md
 !.env.example
 !.env.docker.example
 ca.pem
