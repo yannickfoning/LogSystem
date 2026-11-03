@@ -85,6 +85,10 @@ if (command === 'delete-test') {
     console.log('Le mot de passe ne sera PAS affiché dans les logs.');
     process.exit(1);
   }
+  if (newPassword.length < 12) {
+    console.error('[ERREUR] Le mot de passe doit contenir au moins 12 caractères');
+    process.exit(1);
+  }
   changeAdminPassword(newPassword).catch(err => {
     console.error('[ERREUR]', err.message);
     process.exit(1);
