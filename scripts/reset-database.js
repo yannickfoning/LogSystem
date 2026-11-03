@@ -9,11 +9,10 @@ import { seedDefaultAlerts, seedDefaultRecommendations } from './setup/seed-defa
 const rounds = parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
 
 async function dropAllTables() {
-  const dbConfig = pool.pool.connectionConfig;
   logger.info({
     event: 'reset_start',
-    host: dbConfig.host,
-    database: dbConfig.database
+    host: process.env.DB_HOST,
+    database: process.env.DB_NAME
   }, '[RESET] Database reset for');
 
   // Désactiver les vérifications de clés étrangères pour permettre DROP TABLE
