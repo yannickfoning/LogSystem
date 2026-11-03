@@ -7,7 +7,7 @@ SET @column_exists = (SELECT COUNT(*) FROM information_schema.columns
                      WHERE table_schema = DATABASE() AND table_name = 'error_recommendations' AND column_name = 'frequency_threshold');
 
 SET @sql = IF(@column_exists = 0,
-  'ALTER TABLE error_recommendations ADD COLUMN `frequency_threshold` INT DEFAULT 5 COMMENT ''Nombre minimum d''occurrences pour déclencher la recommandation''',
+  'ALTER TABLE error_recommendations ADD COLUMN `frequency_threshold` INT DEFAULT 5 COMMENT ''Nombre minimum d''occurrences pour declencher la recommandation''',
   'SELECT "Column frequency_threshold already exists" AS message');
 
 PREPARE stmt FROM @sql;

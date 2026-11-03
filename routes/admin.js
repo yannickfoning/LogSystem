@@ -1067,4 +1067,51 @@ router.get('/db-stats', async (req, res) => {
   }
 });
 
+// ─── FIX MISSING COLUMN (TEMPORARY) ────────────────────────────────
+
+router.post('/fix-missing-column', async (req, res) => {
+  try {
+    logger.info({ event: 'fix_missing_column_start' }, '[ADMIN] Starting fix for missing has_solution column');
+
+    // Vérifier si la colonne existe
+    const [columns] = await pool.execute(
+      "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'error_recommendations' AND COLUMN_NAME = 'has_solution'"
+    );
+
+    if (columns.length > 0) {
+      logger.info({ event: 'fix_missing_column_already_exists' }, '[ADMIN] Column has_solution already exists');
+      return res.json({ success: true, message: 'Column has_solution already exists' });
+    }
+
+    // Ajouter la colonne has_solution
+    await pool.execute(
+      "ALTER TABLE error_recommendations ADD COLUMN `has_solution` TINYINT(1) DEFAULT 0 COMMENT 'Whether a known solution exists for this recommendation'"
+    );
+    logger.info({ event: 'fix_missing_column_has_solution_added' }, '[ADMIN] Column has_solution added');
+
+    // Ajouter la colonne solution_details
+    await pool.execute(
+      "ALTER TABLE error_recommendations ADD COLUMN `solution_details` TEXT COMMENT 'Detailed solution steps if has_solution = 1'"
+    );
+    logger.info({ event: 'fix_missing_column_solution_details_added' }, '[ADMIN] Column solution_details added');
+
+    // Ajouter l'index
+    await pool.execute(
+      "ALTER TABLE error_recommendations ADD INDEX `idx_has_solution` (`has_solution`)"
+    );
+    logger.info({ event: 'fix_missing_column_index_added' }, '[ADMIN] Index idx_has_solution added');
+
+    logger.info({ event: 'fix_missing_column_success' }, '[ADMIN] Fix completed successfully');
+
+    res.json({
+      success: true,
+      message: 'Missing columns and index added successfully',
+      changes: ['has_solution', 'solution_details', 'idx_has_solution']
+    });
+  } catch (error) {
+    logger.error({ event: 'fix_missing_column_error', error: error.message }, '[ADMIN] Error fixing missing column');
+    res.status(500).json({ error: 'Erreur serveur', details: error.message });
+  }
+});
+
 export default router;
