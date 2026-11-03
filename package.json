@@ -17,6 +17,7 @@
     "test": "vitest run",
     "test:platform": "bash scripts/test-platform-complete.sh",
     "smoke-test": "bash scripts/smoke-test.sh",
+    "db:reset": "node scripts/reset-database.js",
     "diagnose:alerts": "node scripts/diagnostics/check-alert-rules.js",
     "diagnose:admin": "node scripts/diagnostics/check-admin-user.js",
     "diagnose:counts": "node scripts/diagnostics/check-counts.js",
