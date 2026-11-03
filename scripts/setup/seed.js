@@ -6,20 +6,30 @@ import pool from '../../config/database.js';
 async function main() {
   const rounds = parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
 
-  const adminHash = await bcrypt.hash('Admin@1234', rounds);
+  // Vérifier que les variables d'environnement sont définies
+  if (!process.env.DEFAULT_ADMIN_EMAIL || !process.env.DEFAULT_ADMIN_PASSWORD) {
+    console.error('[ERREUR] DEFAULT_ADMIN_EMAIL et DEFAULT_ADMIN_PASSWORD doivent être définis');
+    process.exit(1);
+  }
+  if (!process.env.DEFAULT_USER_EMAIL || !process.env.DEFAULT_USER_PASSWORD) {
+    console.error('[ERREUR] DEFAULT_USER_EMAIL et DEFAULT_USER_PASSWORD doivent être définis');
+    process.exit(1);
+  }
+
+  const adminHash = await bcrypt.hash(process.env.DEFAULT_ADMIN_PASSWORD, rounds);
   await pool.execute(
     `INSERT INTO users (email, password_hash, display_name, role, is_active)
      VALUES (?, ?, ?, 'admin', 1)
      ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash)`,
-    ['admin@logsystem.local', adminHash, 'Administrateur']
+    [process.env.DEFAULT_ADMIN_EMAIL, adminHash, process.env.DEFAULT_ADMIN_NAME || 'Administrateur']
   );
 
-  const userHash = await bcrypt.hash('User@1234', rounds);
+  const userHash = await bcrypt.hash(process.env.DEFAULT_USER_PASSWORD, rounds);
   await pool.execute(
     `INSERT INTO users (email, password_hash, display_name, role, is_active)
      VALUES (?, ?, ?, 'user', 1)
      ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash)`,
-    ['user@logsystem.local', userHash, 'Utilisateur']
+    [process.env.DEFAULT_USER_EMAIL, userHash, process.env.DEFAULT_USER_NAME || 'Utilisateur']
   );
 
   // Seed alert rules
@@ -89,8 +99,8 @@ async function main() {
   }
 
   console.log('[SEED] Seed data inserted successfully');
-  console.log('[SEED] Admin: admin@logsystem.local / Admin@1234');
-  console.log('[SEED] User:  user@logsystem.local / User@1234');
+  console.log('[SEED] Admin:', process.env.DEFAULT_ADMIN_EMAIL);
+  console.log('[SEED] User:', process.env.DEFAULT_USER_EMAIL);
   await pool.end();
 }
 

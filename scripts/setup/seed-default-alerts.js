@@ -213,4 +213,8 @@ async function main() {
   }
 }
 
-main();
+export { seedDefaultAlerts, seedDefaultRecommendations };
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main();
+}

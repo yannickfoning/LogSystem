@@ -7,34 +7,47 @@ const rounds = parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
 
 const USERS = [
   {
-    email:        process.env.DEFAULT_ADMIN_EMAIL    || 'admin@logsystem.local',
-    password:     process.env.DEFAULT_ADMIN_PASSWORD || 'Admin@1234',
+    email:        process.env.DEFAULT_ADMIN_EMAIL,
+    password:     process.env.DEFAULT_ADMIN_PASSWORD,
     display_name: process.env.DEFAULT_ADMIN_NAME     || 'Administrateur',
     role:         'admin',
   },
   {
-    email:        process.env.DEFAULT_USER_EMAIL    || 'user@logsystem.local',
-    password:     process.env.DEFAULT_USER_PASSWORD || 'User@1234',
+    email:        process.env.DEFAULT_USER_EMAIL,
+    password:     process.env.DEFAULT_USER_PASSWORD,
     display_name: process.env.DEFAULT_USER_NAME     || 'Utilisateur Standard',
-    role:         'user',
-  },
-  {
-    email:        process.env.TEST_USER1_EMAIL    || 'test1@logsystem.local',
-    password:     process.env.TEST_USER1_PASSWORD || 'Test1@1234',
-    display_name: process.env.TEST_USER1_NAME     || 'Test User 1',
-    role:         'user',
-  },
-  {
-    email:        process.env.TEST_USER2_EMAIL    || 'test2@logsystem.local',
-    password:     process.env.TEST_USER2_PASSWORD || 'Test2@1234',
-    display_name: process.env.TEST_USER2_NAME     || 'Test User 2',
     role:         'user',
   },
 ];
 
 async function ensureUsers() {
+  // Vérifier que les variables d'environnement sont définies
+  if (!process.env.DEFAULT_ADMIN_EMAIL || !process.env.DEFAULT_ADMIN_PASSWORD) {
+    console.error('[ERREUR] DEFAULT_ADMIN_EMAIL et DEFAULT_ADMIN_PASSWORD doivent être définis');
+    process.exit(1);
+  }
+  if (!process.env.DEFAULT_USER_EMAIL || !process.env.DEFAULT_USER_PASSWORD) {
+    console.error('[ERREUR] DEFAULT_USER_EMAIL et DEFAULT_USER_PASSWORD doivent être définis');
+    process.exit(1);
+  }
+
+  const users = [
+    {
+      email: process.env.DEFAULT_ADMIN_EMAIL,
+      password: process.env.DEFAULT_ADMIN_PASSWORD,
+      display_name: process.env.DEFAULT_ADMIN_NAME || 'Administrateur',
+      role: 'admin',
+    },
+    {
+      email: process.env.DEFAULT_USER_EMAIL,
+      password: process.env.DEFAULT_USER_PASSWORD,
+      display_name: process.env.DEFAULT_USER_NAME || 'Utilisateur Standard',
+      role: 'user',
+    },
+  ];
+
   try {
-    for (const u of USERS) {
+    for (const u of users) {
       const passwordHash = await bcrypt.hash(u.password, rounds);
 
       const [existing] = await pool.execute(
@@ -54,14 +67,14 @@ async function ensureUsers() {
            WHERE id = ?`,
           [passwordHash, u.display_name, u.role, id]
         );
-        console.log(`[${u.role.toUpperCase()}] Mis à jour  — ID: ${id} | Email: ${u.email} | Mot de passe: ${u.password}`);
+        console.log(`[${u.role.toUpperCase()}] Mis à jour  — ID: ${id} | Email: ${u.email}`);
       } else {
         const [result] = await pool.execute(
           `INSERT INTO users (email, password_hash, display_name, role, is_active, created_at)
            VALUES (?, ?, ?, ?, 1, NOW())`,
           [u.email, passwordHash, u.display_name, u.role]
         );
-        console.log(`[${u.role.toUpperCase()}] Créé       — ID: ${result.insertId} | Email: ${u.email} | Mot de passe: ${u.password}`);
+        console.log(`[${u.role.toUpperCase()}] Créé       — ID: ${result.insertId} | Email: ${u.email}`);
       }
     }
 
