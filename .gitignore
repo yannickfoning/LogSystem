@@ -8,9 +8,11 @@ uploads/
 .env.local
 .env.docker
 .env.aiven
+.env.compose
 PRODUCTION_SECURITY_NOTES.md
 !.env.example
 !.env.docker.example
+!.env.production.example
 ca.pem
 cookies.txt
 tsconfig.tsbuildinfo
@@ -21,3 +23,4 @@ qa-results*.json
 *.log
 test-report-*.json
 server-runtime.log
+DEPLOYMENT_PURGE.md
