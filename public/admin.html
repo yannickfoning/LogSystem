@@ -963,9 +963,9 @@
         var data = {};
         if (level) data.log_level = level;
         function toSqlBoundary(dateValue, daysToAdd) {
-          var boundary = new Date(dateValue + 'T00:00:00');
-          boundary.setDate(boundary.getDate() + daysToAdd);
-          return boundary.toISOString().slice(0, 19).replace('T', ' ');
+          var p = dateValue.split('-').map(Number);
+          var d = new Date(Date.UTC(p[0], p[1] - 1, p[2] + daysToAdd));
+          return d.toISOString().slice(0, 10) + ' 00:00:00';
         }
         if (dateFrom) data.date_from = toSqlBoundary(dateFrom, 0);
         if (dateThrough) data.date_before = toSqlBoundary(dateThrough, 1);
