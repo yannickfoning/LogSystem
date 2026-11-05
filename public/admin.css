@@ -38,28 +38,35 @@
 
 @media (max-width: 768px) {
   .tabs {
-    flex-direction: column;
-    border-bottom: none;
-    gap: 4px;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
+  .tabs::-webkit-scrollbar { display: none; }
   .tab-btn {
-    width: 100%;
-    text-align: left;
-    border-bottom: none;
-    border-left: 3px solid transparent;
-    border-radius: 8px;
-    padding: 12px 16px;
+    flex: 0 0 auto;
+    width: auto;
+    white-space: nowrap;
+    text-align: center;
+    border-left: none;
+    border-bottom: 3px solid transparent;
+    border-radius: 8px 8px 0 0;
+    padding: 10px 14px;
   }
   .tab-btn.active {
-    border-left-color: var(--primary);
+    border-bottom-color: var(--primary);
     background: rgba(79, 142, 247, 0.08);
-    border-bottom-color: transparent;
   }
   .admin-table-users .col-id,
   .admin-table-audit .col-ip { display: none; }
 }
 
 @media (max-width: 480px) {
+  .admin-table-users { min-width: 480px; }
   .admin-table-users .col-last-login,
   .admin-table-audit .col-resource { display: none; }
 }

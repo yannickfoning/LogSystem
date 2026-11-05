@@ -326,8 +326,8 @@
 
 @media (max-width: 480px) {
   .stream-filter { width: 100%; }
-  .stream-controls { width: 100%; }
-  .stream-controls .stream-filter { flex: 1; }
+  .stream-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+  .stream-controls .stream-filter { flex: 1 1 100%; min-width: 0; text-overflow: ellipsis; }
   .log-entries { max-height: 45vh; }
 }
 

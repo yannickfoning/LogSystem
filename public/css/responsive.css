@@ -13,7 +13,7 @@ img, video, canvas, svg {
 }
 
 body.has-bottom-nav {
-  padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
 }
 
 /* ─── Grid: 6 → 3 → 1 columns ─────────────────────────────────────────── */
@@ -90,12 +90,15 @@ body.has-bottom-nav {
   align-items: center;
   justify-content: center;
   gap: 2px;
-  padding: 8px 4px;
+  padding: 8px 2px 6px;
   min-height: 44px;
   color: var(--text2);
   text-decoration: none;
   font-size: 10px;
   transition: color 0.2s;
+  line-height: 1.15;
+  text-align: center;
+  min-width: 0;
 }
 
 .bottom-nav a.active,
@@ -266,8 +269,8 @@ body.has-bottom-nav {
 /* ─── Safe areas (iPhone notch) ──────────────────────────────────────────── */
 .navbar {
   padding-top: env(safe-area-inset-top, 0px);
-  padding-left: env(safe-area-inset-left, 0px);
-  padding-right: env(safe-area-inset-right, 0px);
+  padding-left: max(12px, env(safe-area-inset-left, 0px));
+  padding-right: max(12px, env(safe-area-inset-right, 0px));
 }
 
 .page-container,
