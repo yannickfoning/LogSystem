@@ -913,3 +913,4 @@ body.is-admin .admin-only { display: block; }
   .trends-nav { gap: 4px; }
   .trends-nav .btn-xs { padding: 4px 8px; font-size: 11px; }
 }
+.kpi-card-v2 { min-width: 0; }
