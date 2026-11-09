@@ -910,3 +910,7 @@ body.is-admin .admin-only { display: block; }
 }
 
 .kpi-card-v2 { min-width: 0; }
+
+/* ── Fix dash-header layout ───────────────────────────────────────────── */
+.dash-header { width: 100%; justify-content: space-between; }
+.dash-actions { margin-left: auto; }
